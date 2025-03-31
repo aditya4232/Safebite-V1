@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,12 @@ import ProgressChart from '@/components/ProgressChart';
 import FoodSearchBar from '@/components/FoodSearchBar';
 import FoodItemCard from '@/components/FoodItemCard';
 import HealthBox from '@/components/HealthBox';
+import { useGuestMode } from '@/hooks/useGuestMode';
+import GuestBanner from '@/components/GuestBanner';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { isGuest } = useGuestMode();
   const [showWeeklyPrompt, setShowWeeklyPrompt] = useState(false);
   const [recentFoods, setRecentFoods] = useState([
     { id: 1, name: 'Greek Yogurt', calories: 120, nutritionScore: 'green' as const },
@@ -26,12 +28,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Show weekly prompt after 3 seconds (for demo purposes)
-    const timer = setTimeout(() => {
-      setShowWeeklyPrompt(true);
-    }, 3000);
+    // Only show for logged-in users, not guests
+    if (!isGuest) {
+      const timer = setTimeout(() => {
+        setShowWeeklyPrompt(true);
+      }, 3000);
 
-    return () => clearTimeout(timer);
-  }, []);
+      return () => clearTimeout(timer);
+    }
+  }, [isGuest]);
 
   const handleSearch = (query: string) => {
     console.log('Searching for:', query);
@@ -83,11 +88,20 @@ const Dashboard = () => {
       
       <main className="md:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 md:p-8">
+          {/* Guest Banner */}
+          {isGuest && <GuestBanner />}
+          
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-safebite-text mb-2">Welcome back, Alex</h1>
-              <p className="text-safebite-text-secondary">Here's your health overview for today</p>
+              <h1 className="text-3xl font-bold text-safebite-text mb-2">
+                {isGuest ? 'Welcome, Guest' : 'Welcome back, Alex'}
+              </h1>
+              <p className="text-safebite-text-secondary">
+                {isGuest 
+                  ? "Explore SafeBite's features (limited in guest mode)" 
+                  : "Here's your health overview for today"}
+              </p>
             </div>
             <div className="mt-4 sm:mt-0">
               <Button variant="outline" className="mr-2 border-safebite-card-bg-alt hover:border-safebite-teal">
@@ -97,8 +111,8 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Weekly prompt modal */}
-          {showWeeklyPrompt && (
+          {/* Weekly prompt modal - only show for logged-in users */}
+          {showWeeklyPrompt && !isGuest && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <Card className="sci-fi-card max-w-md w-full">
                 <h3 className="text-xl font-bold text-safebite-text mb-4">Weekly Health Check</h3>
@@ -128,6 +142,7 @@ const Dashboard = () => {
             </div>
           )}
 
+          {/* Rest of dashboard */}
           {/* Stats Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard 
