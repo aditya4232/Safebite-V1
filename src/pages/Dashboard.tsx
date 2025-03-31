@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import FoodSearchBar from '@/components/FoodSearchBar';
 import FoodItemCard from '@/components/FoodItemCard';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [showWeeklyPrompt, setShowWeeklyPrompt] = useState(false);
   const [recentFoods, setRecentFoods] = useState([
     { id: 1, name: 'Greek Yogurt', calories: 120, nutritionScore: 'green' as const },

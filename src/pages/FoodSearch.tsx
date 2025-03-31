@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +22,7 @@ interface FoodItem {
     fat: number;
     sodium: number;
     sugar: number;
+    calories?: number;
     ingredients: string[];
     allergens: string[];
     additives: string[];
@@ -48,6 +48,7 @@ const FoodSearch = () => {
         fat: 4,
         sodium: 50,
         sugar: 5,
+        calories: 120,
         ingredients: ['Milk', 'Live active cultures'],
         allergens: ['Milk'],
         additives: []
@@ -64,6 +65,7 @@ const FoodSearch = () => {
         fat: 1,
         sodium: 150,
         sugar: 2,
+        calories: 80,
         ingredients: ['Whole wheat flour', 'Water', 'Yeast', 'Salt'],
         allergens: ['Wheat', 'Gluten'],
         additives: []
@@ -80,6 +82,7 @@ const FoodSearch = () => {
         fat: 9,
         sodium: 100,
         sugar: 15,
+        calories: 180,
         ingredients: ['Wheat flour', 'Sugar', 'Butter', 'Chocolate chips'],
         allergens: ['Wheat', 'Milk', 'Soy'],
         additives: ['Artificial flavors', 'Preservatives']
@@ -96,6 +99,7 @@ const FoodSearch = () => {
         fat: 8,
         sodium: 350,
         sugar: 3,
+        calories: 250,
         ingredients: ['Black beans', 'Brown rice', 'Onions', 'Spices'],
         allergens: ['Soy'],
         additives: ['Natural flavors']
