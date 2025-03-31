@@ -1,6 +1,7 @@
 # SafeBite-V1
 
 SafeBite is a **one-stop health and food safety platform** designed to provide nutritional insights, food safety metrics, and personalized recommendations. It integrates **multiple APIs, AI-driven suggestions, and real-time data tracking** to help users make healthier food choices.
+Try now - https://aditya4232.github.io/SafeBite-V1/
 
 ## 🚀 Features
 
