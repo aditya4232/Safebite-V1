@@ -36,7 +36,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/SafeBite-V1/">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
