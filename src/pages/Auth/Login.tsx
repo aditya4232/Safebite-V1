@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import Loader from '@/components/Loader';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { app } from "../../main"; // Assuming you have initialized Firebase in main.tsx
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -16,51 +18,52 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const auth = getAuth(app); // Get the auth instance
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Login successful",
         description: "Welcome back to SafeBite!",
       });
       navigate('/dashboard');
-    }, 1500);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
-    
-    // Simulate Google API call
-    setTimeout(() => {
-      setIsLoading(false);
+    const provider = new GoogleAuthProvider();
+
+    try {
+      await signInWithPopup(auth, provider);
       toast({
         title: "Google login successful",
         description: "Welcome to SafeBite!",
       });
       navigate('/dashboard');
-    }, 1500);
-  };
-
-  const handleGuestLogin = () => {
-    setIsLoading(true);
-    
-    // Simulate guest login process
-    setTimeout(() => {
-      setIsLoading(false);
+    } catch (error: any) {
+      console.error("Google login error:", error);
       toast({
-        title: "Guest access granted",
-        description: "Welcome to SafeBite! Some features may be limited in guest mode.",
+        title: "Google login failed",
+        description: error.message,
+        variant: "destructive",
       });
-      
-      // Set a guest user flag in localStorage
-      localStorage.setItem('userType', 'guest');
-      navigate('/dashboard');
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -70,7 +73,7 @@ const Login = () => {
           <h1 className="text-3xl font-bold gradient-text mb-2">SafeBite</h1>
           <p className="text-safebite-text-secondary">Sign in to access your health dashboard</p>
         </div>
-        
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -87,7 +90,7 @@ const Login = () => {
               />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label htmlFor="password">Password</Label>
@@ -119,9 +122,9 @@ const Login = () => {
               </button>
             </div>
           </div>
-          
-          <Button 
-            type="submit" 
+
+          <Button
+            type="submit"
             className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
             disabled={isLoading}
           >
@@ -129,7 +132,7 @@ const Login = () => {
             Sign In
           </Button>
         </form>
-        
+
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-safebite-card-bg-alt"></div>
@@ -138,10 +141,10 @@ const Login = () => {
             <span className="bg-safebite-card-bg px-2 text-safebite-text-secondary">Or continue with</span>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="sci-fi-button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
@@ -154,18 +157,8 @@ const Login = () => {
             </svg>
             Google
           </Button>
-          
-          <Button 
-            variant="outline" 
-            className="sci-fi-button-purple"
-            onClick={handleGuestLogin}
-            disabled={isLoading}
-          >
-            <User className="mr-2 h-4 w-4" />
-            Guest
-          </Button>
         </div>
-        
+
         <div className="mt-6 text-center text-sm">
           <span className="text-safebite-text-secondary">Don't have an account? </span>
           <Link to="/auth/signup" className="text-safebite-teal hover:text-safebite-teal/80">

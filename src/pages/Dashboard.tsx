@@ -13,6 +13,8 @@ import FoodItemCard from '@/components/FoodItemCard';
 import HealthBox from '@/components/HealthBox';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import GuestBanner from '@/components/GuestBanner';
+import { getAuth } from "firebase/auth";
+import { app } from "../main";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +27,9 @@ const Dashboard = () => {
     { id: 4, name: 'Chocolate Cookies', calories: 420, nutritionScore: 'red' as const },
   ]);
   const { toast } = useToast();
+  const auth = getAuth(app);
+  const user = auth.currentUser;
+  const [userAnswers, setUserAnswers] = useState({});
 
   useEffect(() => {
     // Show weekly prompt after 3 seconds (for demo purposes)
@@ -37,6 +42,14 @@ const Dashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [isGuest]);
+
+  useEffect(() => {
+    // Load user answers from local storage
+    const storedAnswers = localStorage.getItem('userAnswers');
+    if (storedAnswers) {
+      setUserAnswers(JSON.parse(storedAnswers));
+    }
+  }, []);
 
   const handleSearch = (query: string) => {
     console.log('Searching for:', query);
@@ -95,12 +108,10 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-safebite-text mb-2">
-                {isGuest ? 'Welcome, Guest' : 'Welcome back, Alex'}
+                {user?.displayName ? `Welcome back, ${user?.displayName}` : user?.email ? `Welcome back, ${user?.email}` : 'Welcome, Alex'}
               </h1>
               <p className="text-safebite-text-secondary">
-                {isGuest 
-                  ? "Explore SafeBite's features (limited in guest mode)" 
-                  : "Here's your health overview for today"}
+                Here's your health overview for today
               </p>
             </div>
             <div className="mt-4 sm:mt-0">

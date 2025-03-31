@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Progress } from "@/components/ui/progress";
@@ -17,115 +16,134 @@ interface Question {
 
 const questions: Question[] = [
   {
+    id: 'age',
+    type: 'radio',
+    question: 'What is your age?',
+    options: ['18-25', '26-35', '36-45', '46-55', '55+']
+  },
+  {
     id: 'gender',
     type: 'radio',
     question: 'What is your gender?',
-    options: ['Male', 'Female', 'Non-binary', 'Prefer not to say']
+    options: ['Male', 'Female', 'Other']
   },
   {
-    id: 'age',
-    type: 'slider',
-    question: 'How old are you?',
-    min: 18,
-    max: 80,
-    step: 1
-  },
-  {
-    id: 'weight',
-    type: 'slider',
-    question: 'What is your weight in kg?',
-    min: 40,
-    max: 150,
-    step: 1
-  },
-  {
-    id: 'height',
-    type: 'slider',
-    question: 'What is your height in cm?',
-    min: 140,
-    max: 220,
-    step: 1
-  },
-  {
-    id: 'activity',
-    type: 'radio',
-    question: 'How would you describe your activity level?',
-    options: [
-      'Sedentary (little or no exercise)',
-      'Lightly active (light exercise 1-3 days/week)',
-      'Moderately active (moderate exercise 3-5 days/week)',
-      'Very active (hard exercise 6-7 days/week)',
-      'Super active (very hard exercise & physical job or training twice a day)'
-    ]
-  },
-  {
-    id: 'diet_type',
-    type: 'radio',
-    question: 'Which diet do you follow?',
-    options: [
-      'Omnivore (eat everything)',
-      'Vegetarian',
-      'Vegan',
-      'Pescatarian',
-      'Keto',
-      'Paleo',
-      'Other'
-    ]
-  },
-  {
-    id: 'goal',
-    type: 'radio',
-    question: 'What is your primary health goal?',
-    options: [
-      'Lose weight',
-      'Gain muscle',
-      'Maintain weight',
-      'Improve overall health',
-      'Increase energy levels',
-      'Manage a health condition'
-    ]
-  },
-  {
-    id: 'allergies',
+    id: 'height_weight',
     type: 'text',
-    question: 'Do you have any food allergies or intolerances? (If none, type "None")'
+    question: 'What is your height and weight? (e.g., 170cm, 70kg)'
+  },
+  {
+    id: 'activity_level',
+    type: 'radio',
+    question: 'What is your activity level?',
+    options: ['Sedentary', 'Lightly Active', 'Active', 'Very Active']
+  },
+  {
+    id: 'health_conditions',
+    type: 'radio',
+    question: 'Do you have any known health conditions?',
+    options: ['Diabetes', 'Hypertension', 'Heart Issues', 'None']
+  },
+  {
+    id: 'dietary_preferences',
+    type: 'radio',
+    question: 'Do you have any dietary preferences?',
+    options: ['Veg', 'Vegan', 'Non-Veg', 'Keto', 'Gluten-Free', 'Other']
+  },
+  {
+    id: 'food_allergies',
+    type: 'text',
+    question: 'Do you have any food allergies? (Check common allergens or manually input)'
+  },
+  {
+    id: 'meals_per_day',
+    type: 'radio',
+    question: 'How many meals do you eat per day?',
+    options: ['2', '3', '4', '5+']
   },
   {
     id: 'water_intake',
-    type: 'slider',
-    question: 'How many glasses of water do you typically drink per day?',
-    min: 0,
-    max: 15,
-    step: 1
+    type: 'radio',
+    question: 'How much water do you drink daily?',
+    options: ['<1L', '1-2L', '2-3L', '3L+']
   },
   {
-    id: 'cooking',
+    id: 'outside_food',
     type: 'radio',
-    question: 'How often do you cook meals at home?',
-    options: [
-      'Almost never',
-      '1-2 times per week',
-      '3-4 times per week',
-      '5-6 times per week',
-      'Every day'
-    ]
+    question: 'How often do you eat outside or order food?',
+    options: ['Rarely', 'Weekly', 'Daily']
+  },
+  {
+    id: 'homemade_processed',
+    type: 'radio',
+    question: 'Do you prefer homemade or processed foods?',
+    options: ['Homemade', 'Processed', 'Mixed']
+  },
+  {
+    id: 'packaged_food',
+    type: 'radio',
+    question: 'How often do you eat packaged food?',
+    options: ['Rarely', 'Weekly', 'Daily']
+  },
+  {
+    id: 'food_priorities',
+    type: 'radio',
+    question: 'What do you prioritize while choosing food?',
+    options: ['Taste', 'Health', 'Price', 'Convenience']
+  },
+  {
+    id: 'sugary_drinks',
+    type: 'radio',
+    question: 'Do you consume sugary drinks often?',
+    options: ['Yes', 'No', 'Occasionally']
+  },
+  {
+    id: 'protein_source',
+    type: 'radio',
+    question: 'What’s your usual protein source?',
+    options: ['Veg', 'Dairy', 'Meat', 'Eggs', 'Mix']
+  },
+  {
+    id: 'calorie_tracking',
+    type: 'radio',
+    question: 'Do you track your calorie intake?',
+    options: ['Yes', 'No', 'Sometimes']
+  },
+  {
+    id: 'health_goals',
+    type: 'radio',
+    question: 'What are your health goals?',
+    options: ['Weight Loss', 'Muscle Gain', 'General Health', 'No Goal']
+  },
+  {
+    id: 'exercise_frequency',
+    type: 'radio',
+    question: 'How often do you exercise?',
+    options: ['Never', 'Weekly', '3-4 Times a Week', 'Daily']
+  },
+  {
+    id: 'diet_recommendations',
+    type: 'radio',
+    question: 'Are you looking for diet & meal plan recommendations?',
+    options: ['Yes', 'No']
+  },
+  {
+    id: 'reminders',
+    type: 'radio',
+    question: 'Would you like reminders for healthy habits?',
+    options: ['Yes', 'No']
+  },
+  {
+    id: 'food_safety_alerts',
+    type: 'radio',
+    question: 'Would you like food safety alerts for the products you buy?',
+    options: ['Yes', 'No']
   }
 ];
 
 const Questionnaire = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({
-    gender: 'Male',
-    age: 30,
-    weight: 70,
-    height: 170,
-    activity: '',
-    diet_type: '',
-    goal: '',
-    allergies: '',
-    water_intake: 8,
-    cooking: ''
-  });
+  const [answers, setAnswers] = useState<Record<string, any>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -137,6 +155,8 @@ const Questionnaire = () => {
     if (currentStep === questions.length - 1) {
       // Submit the questionnaire
       console.log('Questionnaire completed:', answers);
+      // Store answers in local storage
+      localStorage.setItem('userAnswers', JSON.stringify(answers));
       toast({
         title: "Questionnaire completed",
         description: "Thank you for sharing your information. Your dashboard is ready!",

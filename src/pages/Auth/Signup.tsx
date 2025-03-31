@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { UserPlus, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { getAuth, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { app } from "../../main";
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -17,10 +19,11 @@ const Signup = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
+  const auth = getAuth(app);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (!name || !email || !password || !confirmPassword) {
       setError('Please fill in all fields');
@@ -41,40 +44,36 @@ const Signup = () => {
     setError('');
 
     try {
-      // Mock signup for now
-      setTimeout(() => {
-        console.log('Signup successful:', { name, email });
-        toast({
-          title: "Account created",
-          description: "Welcome to SafeBite! Let's get started with some questions.",
-        });
-        navigate('/questionnaire');
-      }, 1500);
-    } catch (err) {
-      console.error('Signup error:', err);
-      setError('Failed to create account. Please try again.');
+      await createUserWithEmailAndPassword(auth, email, password);
+      toast({
+        title: "Account created",
+        description: "Welcome to SafeBite! Please answer a few questions to personalize your experience.",
+      });
+      // Redirect to questionnaire after signup
+      navigate('/questionnaire');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignup = () => {
+  const handleGoogleSignup = async () => {
     setIsLoading(true);
     setError('');
+    const provider = new GoogleAuthProvider();
 
     try {
-      // Mock Google signup for now
-      setTimeout(() => {
-        console.log('Google signup initiated');
-        toast({
-          title: "Account created",
-          description: "Welcome to SafeBite! Let's get started with some questions.",
-        });
-        navigate('/questionnaire');
-      }, 1500);
-    } catch (err) {
-      console.error('Google signup error:', err);
-      setError('Failed to sign up with Google. Please try again.');
+      await signInWithPopup(auth, provider);
+      toast({
+        title: "Account created",
+        description: "Welcome to SafeBite! Let's get started with some questions.",
+      });
+      navigate('/questionnaire');
+    } catch (error: any) {
+      console.error('Google signup error:', error);
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }

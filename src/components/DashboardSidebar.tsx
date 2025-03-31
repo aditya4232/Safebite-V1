@@ -6,31 +6,37 @@ import {
   Home, BarChart2, Pizza, Users, Settings, Menu, X, 
   Search, Heart, LogOut
 } from 'lucide-react';
-import { useGuestMode } from '@/hooks/useGuestMode';
 import { useToast } from '@/hooks/use-toast';
+import { getAuth, signOut } from "firebase/auth";
+import { app } from "../main";
 
 const DashboardSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { isGuest, exitGuestMode } = useGuestMode();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const auth = getAuth(app);
+  const user = auth.currentUser;
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
 
-  const handleLogout = () => {
-    if (isGuest) {
-      exitGuestMode();
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({
+        title: "Logged out successfully",
+        description: "Thank you for using SafeBite!",
+      });
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      console.error("Logout error:", error);
     }
-    
-    // Handle logout for any user type
-    toast({
-      title: "Logged out successfully",
-      description: "Thank you for using SafeBite!",
-    });
-    
-    navigate('/');
   };
 
   const navLinks = [
@@ -66,7 +72,7 @@ const DashboardSidebar = () => {
           <div className="p-6 border-b border-safebite-card-bg-alt">
             <h2 className="text-2xl font-bold gradient-text">SafeBite</h2>
             <p className="text-xs text-safebite-text-secondary mt-1">
-              {isGuest ? 'Guest Mode' : 'Smart Food Safety'}
+              Smart Food Safety
             </p>
           </div>
 
@@ -97,11 +103,11 @@ const DashboardSidebar = () => {
           <div className="p-4 border-t border-safebite-card-bg-alt">
             <div className="flex items-center space-x-3 mb-4">
               <div className="h-10 w-10 rounded-full bg-safebite-card-bg-alt flex items-center justify-center text-safebite-teal">
-                {isGuest ? 'G' : 'A'}
+                {user?.email?.charAt(0).toUpperCase() || 'A'}
               </div>
               <div>
-                <p className="text-safebite-text font-medium">{isGuest ? 'Guest User' : 'Alex Smith'}</p>
-                <p className="text-xs text-safebite-text-secondary">{isGuest ? 'Limited access' : 'Premium member'}</p>
+                <p className="text-safebite-text font-medium">{user?.displayName || user?.email || 'Alex Smith'}</p>
+                <p className="text-xs text-safebite-text-secondary">Premium member</p>
               </div>
             </div>
             
