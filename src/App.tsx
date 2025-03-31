@@ -14,6 +14,7 @@ import FoodSearch from "@/pages/FoodSearch";
 import Community from "@/pages/Community";
 import WeeklyQuestions from "@/pages/WeeklyQuestions";
 import Reports from "@/pages/Reports";
+import Recipes from "@/pages/Recipes";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/food-search" element={<FoodSearch />} />
           <Route path="/community" element={<Community />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/recipes" element={<Recipes />} />
           
           {/* Catch-all route for 404 */}
           <Route path="*" element={<NotFound />} />

@@ -36,10 +36,10 @@ const DashboardSidebar = () => {
   const navLinks = [
     { path: '/dashboard', name: 'Dashboard', icon: <Home size={20} /> },
     { path: '/food-search', name: 'Food Search', icon: <Search size={20} /> },
+    { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
     { path: '/community', name: 'Community', icon: <Users size={20} /> },
     { path: '/weekly-questions', name: 'Health Check', icon: <Heart size={20} /> },
     { path: '/reports', name: 'Reports', icon: <BarChart2 size={20} /> },
-    { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
     { path: '/settings', name: 'Settings', icon: <Settings size={20} /> },
   ];
 
