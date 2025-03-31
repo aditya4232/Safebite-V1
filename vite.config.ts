@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
+  base: '/SafeBite-V1/', // Change this to your repo name
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
