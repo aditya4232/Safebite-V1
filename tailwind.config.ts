@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,21 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// SafeBite specific colors
+				safebite: {
+					'dark-blue': '#0a0f1e',
+					'card-bg': '#101a35',
+					'card-bg-alt': '#1e2a4a',
+					'teal': '#00ffcc',
+					'purple': '#9400d3',
+					'text': '#e0e0e0',
+					'text-secondary': '#a0a0a0'
 				}
+			},
+			boxShadow: {
+				'neon-teal': '0 0 5px #00ffcc, 0 0 10px #00ffcc',
+				'neon-purple': '0 0 5px #9400d3, 0 0 10px #9400d3'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +99,36 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'pulse-teal': {
+					'0%, 100%': {
+						opacity: '1'
+					},
+					'50%': {
+						opacity: '0.7'
+					}
+				},
+				'gradient-text': {
+					'0%': {
+						'background-position': '0% 50%'
+					},
+					'50%': {
+						'background-position': '100% 50%'
+					},
+					'100%': {
+						'background-position': '0% 50%'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-teal': 'pulse-teal 2s ease-in-out infinite',
+				'gradient-text': 'gradient-text 3s ease infinite'
+			},
+			backgroundImage: {
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+				'sci-fi-pattern': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"
 			}
 		}
 	},

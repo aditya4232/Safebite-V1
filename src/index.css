@@ -1,92 +1,48 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 217 47% 15%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 163 100% 50%;
+    --primary-foreground: 222 47% 11%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 271 100% 41%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 217 47% 18%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 271 100% 41%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 217 47% 20%;
+    --input: 217 47% 20%;
+    --ring: 163 100% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 163 100% 50%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 271 100% 41%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 47% 20%;
+    --sidebar-ring: 163 100% 50%;
   }
 }
 
@@ -96,6 +52,63 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-safebite-dark-blue text-safebite-text selection:bg-safebite-teal selection:text-safebite-dark-blue;
+    background-image: radial-gradient(rgba(0, 255, 204, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+
+  input, textarea, select {
+    @apply bg-safebite-card-bg border-safebite-card-bg-alt focus:border-safebite-teal focus:ring-safebite-teal;
+  }
+
+  button {
+    @apply transition-all duration-200;
+  }
+}
+
+@layer components {
+  .neon-border {
+    @apply border border-safebite-teal shadow-neon-teal;
+  }
+
+  .neon-border-purple {
+    @apply border border-safebite-purple shadow-neon-purple;
+  }
+
+  .neon-text {
+    @apply text-safebite-teal;
+    text-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-safebite-teal to-safebite-purple bg-clip-text text-transparent animate-gradient-text bg-[length:200%_auto];
+  }
+
+  .sci-fi-card {
+    @apply bg-safebite-card-bg border border-safebite-card-bg-alt rounded-lg p-6 transition-all duration-300 hover:shadow-neon-teal hover:border-safebite-teal;
+  }
+
+  .sci-fi-button {
+    @apply bg-safebite-card-bg text-safebite-teal border border-safebite-teal rounded-md px-4 py-2 transition-all duration-300 hover:shadow-neon-teal hover:bg-safebite-teal hover:text-safebite-dark-blue;
+  }
+
+  .sci-fi-button-purple {
+    @apply bg-safebite-card-bg text-safebite-purple border border-safebite-purple rounded-md px-4 py-2 transition-all duration-300 hover:shadow-neon-purple hover:bg-safebite-purple hover:text-safebite-dark-blue;
+  }
+
+  .sci-fi-input {
+    @apply bg-safebite-card-bg border border-safebite-card-bg-alt text-safebite-text rounded-md px-4 py-2 focus:outline-none focus:border-safebite-teal focus:shadow-neon-teal;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
