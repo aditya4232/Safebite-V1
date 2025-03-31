@@ -67,7 +67,7 @@ const mockPosts: Post[] = [
       name: 'Elena Rodriguez',
       level: 3,
     },
-    content: 'Question for the community: Anyone know which yogurt brands have the least amount of added sugar? The SafeBite scanner has been eye-opening but I'm looking for specific recommendations!',
+    content: "Question for the community: Anyone know which yogurt brands have the least amount of added sugar? The SafeBite scanner has been eye-opening but I'm looking for specific recommendations!",
     timestamp: '1 day ago',
     likes: 18,
     comments: 15,
