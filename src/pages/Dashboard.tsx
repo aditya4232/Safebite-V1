@@ -11,6 +11,7 @@ import StatCard from '@/components/StatCard';
 import ProgressChart from '@/components/ProgressChart';
 import FoodSearchBar from '@/components/FoodSearchBar';
 import FoodItemCard from '@/components/FoodItemCard';
+import HealthBox from '@/components/HealthBox';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -74,6 +75,10 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
+      <div className="absolute top-0 left-0 right-0 p-1 text-center bg-red-500 text-white text-xs">
+        Under Development
+      </div>
+      
       <DashboardSidebar />
       
       <main className="md:ml-64 min-h-screen">
@@ -171,6 +176,11 @@ const Dashboard = () => {
             </div>
           </Card>
           
+          {/* HealthBox */}
+          <div className="mb-8">
+            <HealthBox />
+          </div>
+          
           {/* Search & Recent Foods */}
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-safebite-text mb-4">Food Search</h2>
@@ -250,6 +260,10 @@ const Dashboard = () => {
                 </div>
               </Card>
             </div>
+          </div>
+          
+          <div className="text-xs text-safebite-text-secondary mt-6 text-right">
+            Created by Aditya Shenvi
           </div>
         </div>
       </main>
