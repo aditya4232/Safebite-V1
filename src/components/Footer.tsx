@@ -1,6 +1,5 @@
-
 import { Link } from 'react-router-dom';
-import { Instagram, Twitter, Facebook, GitHub } from 'lucide-react';
+import { Instagram, Twitter, Facebook, Github } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 
 const Footer = () => {
@@ -24,7 +23,7 @@ const Footer = () => {
                 <Facebook size={20} />
               </a>
               <a href="#" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
-                <GitHub size={20} />
+                <Github size={20} />
               </a>
             </div>
           </div>
