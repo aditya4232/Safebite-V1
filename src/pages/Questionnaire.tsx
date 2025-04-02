@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Progress } from "@/components/ui/progress";
 import QuestionnaireStep from '@/components/QuestionnaireStep';
 import { useToast } from "@/hooks/use-toast";
+import { getAuth } from "firebase/auth";
+import { app } from "../main"; // Corrected import path
+import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { AlertCircle } from 'lucide-react';
+import Loader from '@/components/Loader'; // Import Loader
 
 interface Question {
   id: string;
@@ -14,6 +19,7 @@ interface Question {
   step?: number;
 }
 
+// Updated questions based on user feedback
 const questions: Question[] = [
   {
     id: 'age',
@@ -142,32 +148,116 @@ const questions: Question[] = [
 ];
 
 const Questionnaire = () => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  useEffect(() => {
+    // Initialize answers with default values
+    const defaultAnswers: Record<string, any> = {};
+    questions.forEach(q => {
+      if (q.type === 'radio') {
+        defaultAnswers[q.id] = undefined; // Initialize radio buttons with undefined
+      } else if (q.type === 'text') {
+        defaultAnswers[q.id] = '';
+      } else {
+        defaultAnswers[q.id] = null;
+      }
+    });
+    setAnswers(defaultAnswers);
+  }, []);
 
   const handleAnswer = (id: string, value: any) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
+    setError(''); // Clear error when user provides an answer
   };
 
-  const handleNext = () => {
-    if (currentStep === questions.length - 1) {
-      // Submit the questionnaire
-      console.log('Questionnaire completed:', answers);
-      // Store answers in local storage
-      localStorage.setItem('userAnswers', JSON.stringify(answers));
+  // Validation function for height and weight
+  const validateHeightWeight = (value: string): boolean => {
+    if (!value) return false; // Ensure value exists
+    return /^\d+(\.\d+)?cm, ?\d+(\.\d+)?kg$/.test(value.trim());
+  };
+
+  const handleNext = async () => {
+    setError(''); // Clear previous errors
+    const currentQuestion = questions[currentStep];
+    const currentAnswer = answers[currentQuestion.id];
+
+    // Check if the current question is answered
+    if (currentAnswer === undefined || currentAnswer === '') {
+      setError('Please answer this question before proceeding.');
       toast({
-        title: "Questionnaire completed",
-        description: "Thank you for sharing your information. Your dashboard is ready!",
+        title: "Missing Answer",
+        description: "Please answer the current question.",
+        variant: "destructive",
       });
-      navigate('/dashboard');
+      return;
+    }
+
+    // Validate height and weight format if it's the current question
+    if (currentQuestion.id === 'height_weight' && !validateHeightWeight(currentAnswer)) {
+      setError('Please enter height and weight in the correct format (e.g., 170cm, 70kg)');
+      toast({
+        title: "Invalid Format",
+        description: "Please enter height and weight in the format '170cm, 70kg'.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true); // Set loading state
+
+    if (currentStep === questions.length - 1) {
+      // Submit the questionnaire to Firestore
+      const user = auth.currentUser;
+      if (user) {
+        const uid = user.uid;
+        const userRef = doc(db, "users", uid);
+        try {
+          await setDoc(userRef, {
+            profile: answers,
+            questionnaireCompleted: true, // Flag to prevent asking again
+            lastWeeklyPrompt: null // Initialize weekly prompt timestamp
+          }, { merge: true }); // Use merge: true to update existing doc or create new
+          toast({
+            title: "Questionnaire completed!",
+            description: "Your profile is set up. Welcome to your dashboard!",
+          });
+          navigate('/dashboard');
+        } catch (error: any) {
+          toast({
+            title: "Error saving profile",
+            description: error.message,
+            variant: "destructive",
+          });
+          console.error("Error writing user profile to Firestore: ", error);
+          setError("Failed to save your profile. Please try again.");
+        } finally {
+          setIsLoading(false); // Reset loading state
+        }
+      } else {
+        // Handle case where user is somehow not logged in
+        toast({
+          title: "Authentication Error",
+          description: "You are not logged in. Please log in and try again.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        navigate('/auth/login');
+      }
     } else {
       setCurrentStep(prev => prev + 1);
+      setIsLoading(false); // Reset loading state for the next step
     }
   };
 
   const handleBack = () => {
+    setError(''); // Clear error on going back
     setCurrentStep(prev => Math.max(0, prev - 1));
   };
 
@@ -180,27 +270,43 @@ const Questionnaire = () => {
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Let's Get to Know You</h1>
             <p className="text-safebite-text-secondary">
-              Help us personalize your SafeBite experience by answering a few questions
+              {isLoading ? "Saving your profile..." : "Help us personalize your SafeBite experience."}
             </p>
           </div>
 
-          <div className="mb-6">
-            <div className="flex justify-between mb-2">
-              <span className="text-safebite-text-secondary text-sm">Question {currentStep + 1}/{questions.length}</span>
-              <span className="text-safebite-teal text-sm">{Math.floor(progress)}% Complete</span>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader size="lg" />
             </div>
-            <Progress value={progress} className="h-2 bg-safebite-card-bg-alt" />
-          </div>
+          ) : (
+            <>
+              <div className="mb-6">
+                <div className="flex justify-between mb-2">
+                  <span className="text-safebite-text-secondary text-sm">Question {currentStep + 1}/{questions.length}</span>
+                  <span className="text-safebite-teal text-sm">{Math.floor(progress)}% Complete</span>
+                </div>
+                <Progress value={progress} className="h-2 bg-safebite-card-bg-alt" />
+              </div>
 
-          <QuestionnaireStep
-            question={questions[currentStep]}
-            value={answers[questions[currentStep].id]}
-            onChange={handleAnswer}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={currentStep === 0}
-            isLast={currentStep === questions.length - 1}
-          />
+              {error && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-md flex items-center text-red-300">
+                  <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
+
+              <QuestionnaireStep
+                question={questions[currentStep]}
+                value={answers[questions[currentStep].id]}
+                onChange={handleAnswer}
+                onNext={handleNext}
+                onBack={handleBack}
+                isFirst={currentStep === 0}
+                isLast={currentStep === questions.length - 1}
+                isLoading={isLoading} // Pass loading state
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

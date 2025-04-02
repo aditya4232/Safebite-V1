@@ -16,6 +16,8 @@ import WeeklyQuestions from "@/pages/WeeklyQuestions";
 import Reports from "@/pages/Reports";
 import Recipes from "@/pages/Recipes";
 import NotFound from "@/pages/NotFound";
+import AdminLogin from "@/pages/Admin/Login";
+import AdminPanel from "@/pages/Admin/Panel";
 import { getAuth } from "firebase/auth";
 import { app } from "./main";
 
@@ -52,6 +54,10 @@ const App = () => (
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/panel" element={<AdminPanel />} />
           
           {/* Catch-all route for 404 */}
           <Route path="*" element={<NotFound />} />

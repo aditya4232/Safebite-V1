@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Import useEffect
+import { useLocation } from 'react-router-dom'; // Import useLocation
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,17 @@ const FoodSearch = () => {
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [showNoResults, setShowNoResults] = useState(false);
+  const location = useLocation(); // Get location object
+
+  // Effect to read query parameter on load
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const query = params.get('q');
+    if (query) {
+      setSearchQuery(query);
+      handleSearch(query); // Perform search automatically
+    }
+  }, [location.search]); // Rerun effect if search params change
 
   const mockFoodData: FoodItem[] = [
     {

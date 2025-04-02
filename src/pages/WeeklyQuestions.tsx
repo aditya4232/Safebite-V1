@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
+import { getAuth } from "firebase/auth";
+import { app } from "../main"; // Corrected import path
+import { getFirestore, doc, setDoc, Timestamp } from "firebase/firestore";
 
 // Types
 interface Question {
@@ -67,7 +70,10 @@ const WeeklyQuestions = () => {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const user = auth.currentUser;
+
   const currentQuestion = weeklyQuestions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / weeklyQuestions.length) * 100;
 
@@ -78,7 +84,8 @@ const WeeklyQuestions = () => {
       if (q.type === 'slider') {
         defaultAnswers[q.id] = q.min || 0;
       } else if (q.type === 'radio' && q.options) {
-        defaultAnswers[q.id] = q.options[0];
+        // Don't set a default for radio, let user choose
+        defaultAnswers[q.id] = undefined;
       } else {
         defaultAnswers[q.id] = '';
       }
@@ -87,6 +94,16 @@ const WeeklyQuestions = () => {
   }, []);
 
   const handleNext = () => {
+     // Check if the current question is answered
+     if (answers[currentQuestion.id] === undefined || answers[currentQuestion.id] === '') {
+       toast({
+         title: "Missing Answer",
+         description: "Please answer the current question before proceeding.",
+         variant: "destructive",
+       });
+       return;
+     }
+
     if (currentQuestionIndex < weeklyQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
@@ -108,28 +125,62 @@ const WeeklyQuestions = () => {
   };
 
   const handleSubmit = async () => {
+    // Final check if all questions are answered (though handled step-by-step)
+    const allAnswered = weeklyQuestions.every(q => answers[q.id] !== undefined && answers[q.id] !== '');
+    if (!allAnswered) {
+       toast({
+         title: "Incomplete",
+         description: "Please ensure all questions are answered.",
+         variant: "destructive",
+       });
+       return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate API call with timeout
-    setTimeout(() => {
-      console.log('Weekly answers submitted:', answers);
-      
-      // Update user profile with the answers
-      // Here you would typically send this data to your backend or Firebase
-      
-      setIsSubmitting(false);
-      setIsCompleted(true);
-      
+    console.log('Weekly answers submitted:', answers);
+
+    if (user) {
+      const uid = user.uid;
+      const userRef = doc(db, "users", uid);
+      try {
+        // Update the user's document with the weekly answers and a timestamp
+        await setDoc(userRef, {
+          weeklyCheckin: {
+            answers: answers,
+            timestamp: Timestamp.now() // Add a timestamp
+          }
+        }, { merge: true }); // Merge to avoid overwriting the profile
+
+        setIsCompleted(true);
+        toast({
+          title: "Weekly check-in completed!",
+          description: "Thank you for your updates. We've updated your recommendations.",
+        });
+
+        // After 2 seconds, redirect to dashboard
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+
+      } catch (error: any) {
+        toast({
+          title: "Error saving check-in",
+          description: error.message,
+          variant: "destructive",
+        });
+        console.error("Error writing weekly check-in to Firestore: ", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
       toast({
-        title: "Weekly check-in completed!",
-        description: "Thank you for your updates. We've updated your recommendations.",
+        title: "Authentication Error",
+        description: "You are not logged in. Please log in and try again.",
+        variant: "destructive",
       });
-      
-      // After 2 seconds, redirect to dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
-    }, 1500);
+      setIsSubmitting(false);
+      navigate('/auth/login');
+    }
   };
 
   const renderQuestionInput = () => {

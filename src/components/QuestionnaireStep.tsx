@@ -24,6 +24,7 @@ interface QuestionnaireStepProps {
   onBack?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  isLoading?: boolean; // Add isLoading prop
 }
 
 const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({
@@ -34,6 +35,7 @@ const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({
   onBack,
   isFirst = false,
   isLast = false,
+  isLoading = false, // Default isLoading to false
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -119,8 +121,9 @@ const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({
           type="button" 
           onClick={onNext}
           className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+          disabled={isLoading} // Disable button when loading
         >
-          {isLast ? 'Submit' : 'Next'}
+          {isLoading ? (isLast ? 'Submitting...' : 'Loading...') : (isLast ? 'Submit' : 'Next')}
         </Button>
       </div>
     </div>

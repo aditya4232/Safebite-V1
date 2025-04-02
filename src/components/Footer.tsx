@@ -55,6 +55,7 @@ const Footer = () => {
               <li><Link to="/terms" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Terms of Service</Link></li>
               <li><Link to="/cookies" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Cookie Policy</Link></li>
               <li><Link to="/data" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Data Protection</Link></li>
+              <li><Link to="/admin/login" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Admin Login</Link></li>
             </ul>
           </div>
         </div>

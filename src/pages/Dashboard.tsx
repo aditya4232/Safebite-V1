@@ -15,10 +15,23 @@ import { useGuestMode } from '@/hooks/useGuestMode';
 import GuestBanner from '@/components/GuestBanner';
 import { getAuth } from "firebase/auth";
 import { app } from "../main";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import Loader from '@/components/Loader'; // Import Loader
+import { CardHeader, CardTitle, CardContent } from "@/components/ui/card"; // Import Card components
+
+// Define food recommendations based on health goals
+const foodRecommendations: Record<string, string[]> = {
+  'Weight Loss': ['Sprouts', 'Ragi', 'Daliya', 'Makhana', 'Moong Dal Chilla'],
+  'Muscle Gain': ['Paneer Bhurji', 'Soya Chunks', 'Egg Bhurji', 'Chicken Tikka', 'Rajma Rice'],
+  'General Health': ['Walnuts', 'Almonds', 'Oats', 'Olive Oil', 'Steamed Vegetables'],
+  // Add more mappings as needed, e.g., for Diabetes, Heart-Healthy
+  'Diabetes': ['Bitter Gourd Juice', 'Oats Upma', 'Chia Seeds', 'Flaxseeds', 'Dalia'],
+  'Heart Issues': ['Walnuts', 'Almonds', 'Oats', 'Olive Oil', 'Steamed Vegetables'],
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { isGuest } = useGuestMode();
+  const { isGuest } = useGuestMode(); // Keep guest mode logic for now
   const [showWeeklyPrompt, setShowWeeklyPrompt] = useState(false);
   const [recentFoods, setRecentFoods] = useState([
     { id: 1, name: 'Greek Yogurt', calories: 120, nutritionScore: 'green' as const },
@@ -28,35 +41,81 @@ const Dashboard = () => {
   ]);
   const { toast } = useToast();
   const auth = getAuth(app);
+  const db = getFirestore(app);
   const user = auth.currentUser;
-  const [userAnswers, setUserAnswers] = useState({});
+  const [userProfile, setUserProfile] = useState<any>(null); // State for user profile
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // Loading state for profile
+  const [profileError, setProfileError] = useState(''); // Error state for profile loading
 
+  // Fetch user profile from Firestore
   useEffect(() => {
-    // Show weekly prompt after 3 seconds (for demo purposes)
-    // Only show for logged-in users, not guests
-    if (!isGuest) {
-      const timer = setTimeout(() => {
-        setShowWeeklyPrompt(true);
-      }, 3000);
+    const fetchUserProfile = async () => {
+      if (user && !isGuest) {
+        setIsLoadingProfile(true);
+        setProfileError('');
+        const userRef = doc(db, "users", user.uid);
+        try {
+          const docSnap = await getDoc(userRef);
+          if (docSnap.exists()) {
+            setUserProfile(docSnap.data().profile); // Assuming answers are stored under 'profile'
+            // Check if questionnaire is completed
+            if (!docSnap.data().questionnaireCompleted) {
+              navigate('/questionnaire'); // Redirect if not completed
+            }
+          } else {
+            console.log("No such document! Redirecting to questionnaire.");
+            // If no profile exists, redirect to questionnaire
+            navigate('/questionnaire');
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          setProfileError("Failed to load your profile. Please try again later.");
+          toast({
+            title: "Profile Load Error",
+            description: "Could not load your profile data.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingProfile(false);
+        }
+      } else if (!isGuest) {
+        // If user is null but not a guest, likely an auth issue, redirect to login
+        navigate('/auth/login');
+      } else {
+        // If it's a guest, stop loading
+        setIsLoadingProfile(false);
+      }
+    };
 
-      return () => clearTimeout(timer);
-    }
-  }, [isGuest]);
+    fetchUserProfile();
+  }, [user, db, navigate, isGuest, toast]);
 
+
+  // Weekly prompt logic
   useEffect(() => {
-    // Load user answers from local storage
-    const storedAnswers = localStorage.getItem('userAnswers');
-    if (storedAnswers) {
-      setUserAnswers(JSON.parse(storedAnswers));
+    if (!isGuest && userProfile) { // Only run if logged in and profile loaded
+      const lastPromptTime = localStorage.getItem('lastWeeklyPromptTime');
+      const now = Date.now();
+      const oneWeek = 7 * 24 * 60 * 60 * 1000; // Milliseconds in a week
+
+      if (!lastPromptTime || (now - parseInt(lastPromptTime, 10)) > oneWeek) {
+         // Show prompt after a delay (e.g., 3 seconds)
+         const timer = setTimeout(() => {
+            setShowWeeklyPrompt(true);
+            localStorage.setItem('lastWeeklyPromptTime', now.toString()); // Update timestamp when shown
+         }, 3000);
+         return () => clearTimeout(timer);
+      }
     }
-  }, []);
+  }, [isGuest, userProfile]); // Depend on userProfile to ensure it runs after profile load
 
   const handleSearch = (query: string) => {
     console.log('Searching for:', query);
     toast({
-      title: "Search initiated",
-      description: `Searching for "${query}"`,
+      title: "Navigating to Search",
+      description: `Looking for "${query}"`,
     });
+    navigate(`/food-search?q=${encodeURIComponent(query)}`);
   };
 
   const handleScan = () => {
@@ -108,10 +167,10 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-safebite-text mb-2">
-                {user?.displayName ? `Welcome back, ${user?.displayName}` : user?.email ? `Welcome back, ${user?.email}` : 'Welcome, Alex'}
+                {isGuest ? 'Welcome, Guest' : user?.displayName ? `Welcome back, ${user.displayName}` : user?.email ? `Welcome back, ${user.email}` : 'Welcome back!'}
               </h1>
               <p className="text-safebite-text-secondary">
-                Here's your health overview for today
+                {isLoadingProfile ? "Loading your profile..." : profileError ? profileError : isGuest ? "Explore SafeBite's features (limited in guest mode)" : userProfile?.health_goals ? `Your primary goal: ${userProfile.health_goals}` : "Here's your health overview for today"}
               </p>
             </div>
             <div className="mt-4 sm:mt-0">
@@ -247,47 +306,40 @@ const Dashboard = () => {
             />
           </div>
           
-          {/* Recommendations */}
-          <div className="mt-8">
-            <h2 className="text-2xl font-semibold text-safebite-text mb-4">AI Recommendations</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Recommendations based on Health Goal */}
+          {!isGuest && userProfile?.health_goals && foodRecommendations[userProfile.health_goals] && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-semibold text-safebite-text mb-4">Food Recommendations for {userProfile.health_goals}</h2>
               <Card className="sci-fi-card">
-                <div className="flex items-start">
-                  <div className="mr-4 text-2xl">🥗</div>
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2 text-safebite-text">Balanced Meals</h3>
-                    <p className="text-safebite-text-secondary mb-4">
-                      Your protein intake is good, but you could add more leafy greens for additional vitamins and minerals.
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      className="sci-fi-button"
-                    >
-                      View Meal Suggestions
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-              <Card className="sci-fi-card">
-                <div className="flex items-start">
-                  <div className="mr-4 text-2xl">💧</div>
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2 text-safebite-text">Hydration Tips</h3>
-                    <p className="text-safebite-text-secondary mb-4">
-                      You're behind on your water intake goal. Try setting reminders or infusing water with fruits for better taste.
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      className="sci-fi-button"
-                    >
-                      View Hydration Tips
-                    </Button>
-                  </div>
-                </div>
+                <CardHeader>
+                  <CardTitle>Try these healthy options:</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-disc list-inside text-safebite-text-secondary space-y-1">
+                    {foodRecommendations[userProfile.health_goals].map((food, index) => (
+                      <li key={index}>{food}</li>
+                    ))}
+                  </ul>
+                </CardContent>
               </Card>
             </div>
-          </div>
-          
+          )}
+
+          {/* Placeholder for AI Recommendations & Food Safety Alerts */}
+          <div className="mt-8">
+             <h2 className="text-2xl font-semibold text-safebite-text mb-4">AI Recommendations & Alerts</h2>
+             <Card className="sci-fi-card">
+               <CardHeader>
+                 <CardTitle>Coming Soon</CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <p className="text-safebite-text-secondary">
+                   Smart AI-based recommendations and food safety alerts tailored to your profile are under development.
+                 </p>
+               </CardContent>
+             </Card>
+           </div>
+
           <div className="text-xs text-safebite-text-secondary mt-6 text-right">
             Created by Aditya Shenvi
           </div>
