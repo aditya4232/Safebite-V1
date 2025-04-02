@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "@/pages/LandingPage";
+import Settings from "@/pages/Settings";
 import Login from "@/pages/Auth/Login";
 import Signup from "@/pages/Auth/Signup";
 import ForgotPassword from "@/pages/Auth/ForgotPassword";
@@ -18,8 +19,11 @@ import Recipes from "@/pages/Recipes";
 import NotFound from "@/pages/NotFound";
 import AdminLogin from "@/pages/Admin/Login";
 import AdminPanel from "@/pages/Admin/Panel";
+import AboutUs from "@/pages/AboutUs";
+import Features from "@/pages/Features";
 import { getAuth } from "firebase/auth";
 import { app } from "./main";
+import DevPopup from "@/components/DevPopup";
 
 const queryClient = new QueryClient();
 
@@ -38,27 +42,31 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <DevPopup />
       <BrowserRouter basename="/SafeBite-V1/">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/features" element={<Features />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/questionnaire" element={<Questionnaire />} />
           <Route path="/weekly-questions" element={<WeeklyQuestions />} />
-          
+
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/food-search" element={<ProtectedRoute><FoodSearch /></ProtectedRoute>} />
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/panel" element={<AdminPanel />} />
-          
+
           {/* Catch-all route for 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>

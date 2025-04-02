@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -21,20 +20,20 @@ const Navbar = () => {
               <span className="text-2xl font-bold gradient-text">SafeBite</span>
             </Link>
           </div>
-          
+
           <div className="hidden md:flex items-center space-x-6">
             <Link to="/" className="text-safebite-text hover:text-safebite-teal transition-colors">Home</Link>
             <Link to="/features" className="text-safebite-text hover:text-safebite-teal transition-colors">Features</Link>
             <Link to="/about" className="text-safebite-text hover:text-safebite-teal transition-colors">About</Link>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="sci-fi-button"
               onClick={() => navigate('/auth/login')}
             >
               <LogIn className="mr-2 h-4 w-4" />
               Login
             </Button>
-            <Button 
+            <Button
               className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
               onClick={() => navigate('/auth/signup')}
             >
@@ -42,7 +41,7 @@ const Navbar = () => {
               Sign Up
             </Button>
           </div>
-          
+
           <div className="md:hidden flex items-center">
             <button
               onClick={toggleMenu}
@@ -53,35 +52,36 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Mobile menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-safebite-card-bg border-b border-safebite-card-bg-alt">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
               onClick={() => setIsMenuOpen(false)}
             >
               Home
             </Link>
-            <Link 
-              to="/features" 
+            <Link
+              to="/features"
               className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
               onClick={() => setIsMenuOpen(false)}
             >
               Features
             </Link>
-            <Link 
-              to="/about" 
+            <Link
+              to="/about"
               className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
               onClick={() => setIsMenuOpen(false)}
             >
               About
             </Link>
+
             <div className="flex flex-col space-y-2 pt-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="sci-fi-button w-full justify-center"
                 onClick={() => {
                   navigate('/auth/login');
@@ -91,7 +91,7 @@ const Navbar = () => {
                 <LogIn className="mr-2 h-4 w-4" />
                 Login
               </Button>
-              <Button 
+              <Button
                 className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 w-full justify-center"
                 onClick={() => {
                   navigate('/auth/signup');

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +12,9 @@ import {
   MessageSquare, Send, Share2, ThumbsUp, 
   Award, Tag, ExternalLink, User, Users, Bell
 } from 'lucide-react';
+import { getAuth } from "firebase/auth";
+import { app } from "../main"; // Corrected import path
+import { getFirestore, collection, addDoc, orderBy, limit, onSnapshot, serverTimestamp, query } from "firebase/firestore";
 
 interface ChatMessage {
   id: string;
@@ -52,113 +54,70 @@ const Community = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { isGuest } = useGuestMode();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const user = auth.currentUser;
 
-  // Mock initial chat messages
   useEffect(() => {
-    const mockMessages: ChatMessage[] = [
-      {
-        id: '1',
-        username: 'NutritionExpert',
-        avatar: '',
-        text: 'Welcome to SafeBite Community! Ask questions about food safety or share your experiences.',
-        timestamp: new Date(Date.now() - 3600000 * 3),
-        isCurrentUser: false
-      },
-      {
-        id: '2',
-        username: 'HealthyEater21',
-        avatar: '',
-        text: 'Has anyone tried the new plant-based protein bars from GreenLife? Wondering if they\'re worth it.',
-        timestamp: new Date(Date.now() - 3600000 * 2),
-        isCurrentUser: false
-      },
-      {
-        id: '3',
-        username: 'FitnessFoodie',
-        avatar: '',
-        text: 'I just scanned them yesterday! They have good protein content but high in sugar.',
-        timestamp: new Date(Date.now() - 3600000),
-        isCurrentUser: false,
-        linkedProduct: {
-          name: 'GreenLife Plant Protein Bar',
-          image: 'https://source.unsplash.com/random/100x100/?protein'
-        }
+    let unsubscribe: () => void;
+
+    const fetchMessages = async () => {
+      const chatCollection = collection(db, "community", "general", "messages");
+      const q = query(chatCollection, orderBy("timestamp", "asc"), limit(50));
+
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const messages = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            username: data.username || 'Anonymous',
+            avatar: data.avatar || '',
+            text: data.text || '',
+            timestamp: data.timestamp?.toDate() || new Date(),
+            isCurrentUser: user ? data.userId === user.uid : false,
+            linkedProduct: data.linkedProduct
+          };
+        });
+        setChatMessages(messages);
+      });
+    };
+
+    fetchMessages();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
       }
-    ];
-
-    const mockPosts: ForumPost[] = [
-      {
-        id: '1',
-        username: 'DietSpecialist',
-        avatar: '',
-        title: 'Guide: Reading Food Labels for Hidden Sugars',
-        content: 'Sugar can be listed under many different names on ingredient lists. Here\'s how to identify them...',
-        timestamp: new Date(Date.now() - 86400000 * 2),
-        likes: 42,
-        replies: 15,
-        tags: ['Food Labels', 'Nutrition', 'Sugar']
-      },
-      {
-        id: '2',
-        username: 'OrganicChef',
-        avatar: '',
-        title: 'Are preservatives in packaged foods harmful?',
-        content: 'I\'ve been researching food preservatives and want to share what I found about their health impacts...',
-        timestamp: new Date(Date.now() - 86400000),
-        likes: 28,
-        replies: 22,
-        tags: ['Preservatives', 'Food Safety', 'Health']
-      },
-      {
-        id: '3',
-        username: 'WeightLossJourney',
-        avatar: '',
-        title: 'My 30-Day Experience with SafeBite Food Tracking',
-        content: 'I\'ve been using SafeBite to track everything I eat for a month. Here are my results...',
-        timestamp: new Date(Date.now() - 43200000),
-        likes: 56,
-        replies: 18,
-        tags: ['Success Story', 'Weight Loss', 'Tracking']
-      },
-    ];
-
-    setChatMessages(mockMessages);
-    setForumPosts(mockPosts);
-  }, []);
+    };
+  }, [db, user]);
 
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!messageInput.trim()) return;
 
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      username: isGuest ? 'Guest User' : 'You',
-      avatar: '',
+    const newMessage = {
+      userId: user?.uid,
+      username: user?.displayName || user?.email || 'Anonymous',
       text: messageInput,
-      timestamp: new Date(),
-      isCurrentUser: true
+      timestamp: serverTimestamp(),
     };
 
-    setChatMessages([...chatMessages, newMessage]);
-    setMessageInput('');
-
-    // Simulate response after a short delay
-    setTimeout(() => {
-      const botResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        username: 'HealthBot',
-        avatar: '',
-        text: 'Thank you for sharing! Anyone else have experience with this?',
-        timestamp: new Date(),
-        isCurrentUser: false
-      };
-
-      setChatMessages(prev => [...prev, botResponse]);
-    }, 1500);
+    try {
+      const chatCollection = collection(db, "community", "general", "messages");
+      await addDoc(chatCollection, newMessage);
+      setMessageInput('');
+    } catch (error: any) {
+      toast({
+        title: "Error sending message",
+        description: error.message,
+        variant: "destructive",
+      });
+      console.error("Error sending message to Firestore: ", error);
+    }
   };
 
   const handleLikePost = (postId: string) => {
@@ -214,7 +173,7 @@ const Community = () => {
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-safebite-text mb-2">Community</h1>
+              <h1 className="text-3xl font-bold text-safebite-text mb-2">Live Community Chat Beta</h1>
               <p className="text-safebite-text-secondary">
                 Connect with other users, share food discoveries, and get advice
               </p>
@@ -259,7 +218,7 @@ const Community = () => {
                 <div className="p-4 border-b border-safebite-card-bg-alt">
                   <h3 className="text-xl font-semibold text-safebite-text flex items-center">
                     <MessageSquare className="mr-2 h-5 w-5" />
-                    Live Community Chat
+                    Live Community Chat Beta
                     <Badge className="ml-2 bg-safebite-teal text-safebite-dark-blue">
                       {chatMessages.length} messages
                     </Badge>
@@ -369,14 +328,6 @@ const Community = () => {
                           <span>{post.linkedProduct.name}</span>
                         </div>
                       )}
-                      
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {post.tags.map((tag, idx) => (
-                          <Badge key={idx} variant="outline" className="border-safebite-teal text-safebite-teal">
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
                       
                       <div className="flex justify-between items-center">
                         <div className="flex space-x-2">

@@ -1,33 +1,27 @@
-import { useState, useEffect } from 'react'; // Import useEffect
-import { useLocation } from 'react-router-dom'; // Import useLocation
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { 
-  Search, Scan, AlertTriangle, CheckCircle, 
-  XCircle, ArrowRight 
+import {
+  AlertTriangle, CheckCircle, XCircle,
+  Leaf, Flame, Heart
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
 import FoodItemCard from '@/components/FoodItemCard';
+import { FoodItem, searchFoods } from '@/services/foodApiService';
+import { useToast } from "@/hooks/use-toast";
+import { getAuth } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { app } from "../main";
+import { addFoodToTracker, getRecentFoods } from '@/services/foodTrackerService';
 
-interface FoodItem {
-  id: number;
-  name: string;
-  image?: string;
-  calories: number;
-  nutritionScore: 'green' | 'yellow' | 'red';
-  details?: {
-    protein: number;
-    carbs: number;
-    fat: number;
-    sodium: number;
-    sugar: number;
-    calories?: number;
-    ingredients: string[];
-    allergens: string[];
-    additives: string[];
-  };
+interface HealthProfile {
+  health_goals?: string;
+  health_conditions?: string;
+  dietary_preferences?: string;
+  food_allergies?: string;
 }
 
 const FoodSearch = () => {
@@ -36,7 +30,21 @@ const FoodSearch = () => {
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [showNoResults, setShowNoResults] = useState(false);
-  const location = useLocation(); // Get location object
+  // User profile for personalized recommendations
+  const [userProfile, setUserProfile] = useState<HealthProfile | null>(null);
+  const [recommendations, setRecommendations] = useState<FoodItem[]>([]);
+  const [recentFoods, setRecentFoods] = useState<FoodItem[]>([]);
+  const [selectedMealType, setSelectedMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast');
+  const [showAddToTrackerModal, setShowAddToTrackerModal] = useState(false);
+  const [selectedFoodForTracker, setSelectedFoodForTracker] = useState<FoodItem | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [notes, setNotes] = useState('');
+  const location = useLocation();
+  // Navigation for redirects
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
   // Effect to read query parameter on load
   useEffect(() => {
@@ -46,114 +54,253 @@ const FoodSearch = () => {
       setSearchQuery(query);
       handleSearch(query); // Perform search automatically
     }
+
+    // Check if scan parameter is present
+    const scan = params.get('scan');
+    if (scan === 'true') {
+      handleScan();
+    }
+
+    // Fetch user profile for personalized recommendations
+    fetchUserProfile();
+
+    // Fetch recent foods
+    fetchRecentFoods();
   }, [location.search]); // Rerun effect if search params change
 
-  const mockFoodData: FoodItem[] = [
-    {
-      id: 1,
-      name: 'Organic Greek Yogurt',
-      calories: 120,
-      nutritionScore: 'green',
-      details: {
-        protein: 15,
-        carbs: 6,
-        fat: 4,
-        sodium: 50,
-        sugar: 5,
-        calories: 120,
-        ingredients: ['Milk', 'Live active cultures'],
-        allergens: ['Milk'],
-        additives: []
-      }
-    },
-    {
-      id: 2,
-      name: 'Whole Wheat Bread',
-      calories: 80,
-      nutritionScore: 'green',
-      details: {
-        protein: 4,
-        carbs: 15,
-        fat: 1,
-        sodium: 150,
-        sugar: 2,
-        calories: 80,
-        ingredients: ['Whole wheat flour', 'Water', 'Yeast', 'Salt'],
-        allergens: ['Wheat', 'Gluten'],
-        additives: []
-      }
-    },
-    {
-      id: 3,
-      name: 'Chocolate Chip Cookies',
-      calories: 180,
-      nutritionScore: 'red',
-      details: {
-        protein: 2,
-        carbs: 24,
-        fat: 9,
-        sodium: 100,
-        sugar: 15,
-        calories: 180,
-        ingredients: ['Wheat flour', 'Sugar', 'Butter', 'Chocolate chips'],
-        allergens: ['Wheat', 'Milk', 'Soy'],
-        additives: ['Artificial flavors', 'Preservatives']
-      }
-    },
-    {
-      id: 4,
-      name: 'Veggie Burger',
-      calories: 250,
-      nutritionScore: 'yellow',
-      details: {
-        protein: 12,
-        carbs: 30,
-        fat: 8,
-        sodium: 350,
-        sugar: 3,
-        calories: 250,
-        ingredients: ['Black beans', 'Brown rice', 'Onions', 'Spices'],
-        allergens: ['Soy'],
-        additives: ['Natural flavors']
-      }
+  // Fetch user's recent foods
+  const fetchRecentFoods = async () => {
+    try {
+      const foods = await getRecentFoods(4);
+      setRecentFoods(foods);
+    } catch (error) {
+      console.error('Error fetching recent foods:', error);
     }
-  ];
+  };
 
-  const handleSearch = (query: string) => {
+  // Fetch user profile from Firebase
+  const fetchUserProfile = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setUserProfile(userData.profile);
+
+        // Generate food recommendations based on profile
+        generateRecommendations(userData.profile);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    }
+  };
+
+  // Generate food recommendations based on user profile
+  const generateRecommendations = (profile: HealthProfile) => {
+    if (!profile) return;
+
+    let recommendationQueries: string[] = [];
+
+    // Based on health goals
+    if (profile.health_goals === 'Weight Loss') {
+      recommendationQueries.push('low calorie');
+      recommendationQueries.push('high protein');
+    } else if (profile.health_goals === 'Muscle Gain') {
+      recommendationQueries.push('high protein');
+      recommendationQueries.push('protein rich');
+    } else if (profile.health_goals === 'General Health') {
+      recommendationQueries.push('balanced meal');
+      recommendationQueries.push('nutrient rich');
+    }
+
+    // Based on health conditions
+    if (profile.health_conditions === 'Diabetes') {
+      recommendationQueries.push('low glycemic');
+      recommendationQueries.push('sugar free');
+    } else if (profile.health_conditions === 'Hypertension') {
+      recommendationQueries.push('low sodium');
+      recommendationQueries.push('heart healthy');
+    } else if (profile.health_conditions === 'Heart Issues') {
+      recommendationQueries.push('heart healthy');
+      recommendationQueries.push('omega 3');
+    }
+
+    // Based on dietary preferences
+    if (profile.dietary_preferences === 'Veg') {
+      recommendationQueries.push('vegetarian');
+    } else if (profile.dietary_preferences === 'Vegan') {
+      recommendationQueries.push('vegan');
+    } else if (profile.dietary_preferences === 'Keto') {
+      recommendationQueries.push('keto');
+    } else if (profile.dietary_preferences === 'Gluten-Free') {
+      recommendationQueries.push('gluten free');
+    }
+
+    // Get a random recommendation query
+    if (recommendationQueries.length > 0) {
+      const randomIndex = Math.floor(Math.random() * recommendationQueries.length);
+      const query = recommendationQueries[randomIndex];
+
+      // Fetch recommendations
+      fetchRecommendations(query);
+    }
+  };
+
+  // Fetch food recommendations
+  const fetchRecommendations = async (query: string) => {
+    try {
+      const results = await searchFoods(query);
+      // Filter to only include healthy options
+      const healthyOptions = results.filter(food => food.nutritionScore === 'green');
+      setRecommendations(healthyOptions.slice(0, 3));
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+    }
+  };
+
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
     setIsLoading(true);
     setSelectedFood(null);
-    
-    // Simulate API call with timeout
-    setTimeout(() => {
-      const results = mockFoodData.filter(food => 
-        food.name.toLowerCase().includes(query.toLowerCase())
-      );
-      
+    setShowNoResults(false);
+
+    try {
+      // Call the real API service
+      const results = await searchFoods(query);
+
       setSearchResults(results);
       setShowNoResults(results.length === 0);
+
+      // Show toast notification
+      toast({
+        title: "Search Complete",
+        description: `Found ${results.length} results for "${query}"`,
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Search Error",
+        description: "There was a problem with your search. Please try again.",
+        variant: "destructive"
+      });
+      setShowNoResults(true);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleScan = () => {
     // Simulate barcode scanning
     setIsLoading(true);
     setSelectedFood(null);
-    
-    setTimeout(() => {
-      // Return a random food item from our mock data
-      const randomIndex = Math.floor(Math.random() * mockFoodData.length);
-      const randomFood = mockFoodData[randomIndex];
-      
-      setSearchResults([randomFood]);
-      setShowNoResults(false);
-      setIsLoading(false);
-    }, 1500);
+
+    toast({
+      title: "Scanning Barcode",
+      description: "Scanning functionality is simulated in this demo",
+    });
+
+    // Simulate API call with timeout
+    setTimeout(async () => {
+      try {
+        // Simulate a random food search
+        const randomFoods = [
+          'apple', 'banana', 'yogurt', 'bread', 'cereal', 'milk', 'cheese', 'chicken',
+          'rice', 'pasta', 'potato', 'tomato', 'carrot', 'spinach', 'egg'
+        ];
+        const randomIndex = Math.floor(Math.random() * randomFoods.length);
+        const randomFood = randomFoods[randomIndex];
+
+        // Call the real API with the random food
+        const results = await searchFoods(randomFood);
+
+        if (results.length > 0) {
+          // Take the first result
+          setSearchResults([results[0]]);
+          setShowNoResults(false);
+
+          toast({
+            title: "Product Found",
+            description: `Scanned product identified as ${results[0].name}`,
+          });
+        } else {
+          setShowNoResults(true);
+          toast({
+            title: "Product Not Found",
+            description: "Could not identify the scanned product",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Scan error:', error);
+        setShowNoResults(true);
+        toast({
+          title: "Scan Error",
+          description: "There was a problem scanning the product",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }, 2000);
   };
 
   const handleFoodSelect = (food: FoodItem) => {
     setSelectedFood(food);
+  };
+
+  // Open the Add to Tracker modal
+  const handleAddToTracker = (food: FoodItem) => {
+    setSelectedFoodForTracker(food);
+    setShowAddToTrackerModal(true);
+    setQuantity(1);
+    setNotes('');
+  };
+
+  // Add the selected food to the tracker
+  const handleTrackerSubmit = async () => {
+    if (!selectedFoodForTracker) return;
+
+    setIsLoading(true);
+
+    try {
+      const success = await addFoodToTracker(
+        selectedFoodForTracker,
+        selectedMealType,
+        quantity,
+        notes
+      );
+
+      if (success) {
+        toast({
+          title: "Added to Tracker",
+          description: `${selectedFoodForTracker.name} added to your ${selectedMealType} tracker.`,
+        });
+
+        // Update recent foods
+        fetchRecentFoods();
+      } else {
+        toast({
+          title: "Error",
+          description: "Could not add food to tracker. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error adding food to tracker:', error);
+      toast({
+        title: "Error",
+        description: "Could not add food to tracker. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+      setShowAddToTrackerModal(false);
+      setSelectedFoodForTracker(null);
+    }
   };
 
   const renderSearchResults = () => {
@@ -174,8 +321,8 @@ const FoodSearch = () => {
           <p className="text-safebite-text-secondary mb-4">
             We couldn't find any food matching "{searchQuery}"
           </p>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="sci-fi-button"
             onClick={() => setShowNoResults(false)}
           >
@@ -208,7 +355,7 @@ const FoodSearch = () => {
     if (!selectedFood) return null;
 
     const { name, calories, nutritionScore, details } = selectedFood;
-    
+
     const scoreColors = {
       green: 'bg-green-500',
       yellow: 'bg-yellow-500',
@@ -272,9 +419,9 @@ const FoodSearch = () => {
             <div>
               <h4 className="text-lg font-medium text-safebite-text mb-2">Allergens</h4>
               <div className="flex flex-wrap gap-2">
-                {details.allergens.map(allergen => (
-                  <Badge 
-                    key={allergen} 
+                {details.allergens.map((allergen: string) => (
+                  <Badge
+                    key={allergen}
                     variant="outline"
                     className="border-yellow-500 text-yellow-500"
                   >
@@ -289,9 +436,9 @@ const FoodSearch = () => {
             <div>
               <h4 className="text-lg font-medium text-safebite-text mb-2">Additives</h4>
               <div className="flex flex-wrap gap-2">
-                {details.additives.map(additive => (
-                  <Badge 
-                    key={additive} 
+                {details.additives.map((additive: string) => (
+                  <Badge
+                    key={additive}
                     variant="outline"
                     className="border-red-500 text-red-500"
                   >
@@ -331,15 +478,125 @@ const FoodSearch = () => {
           )}
 
           <div className="flex justify-between">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="sci-fi-button"
               onClick={() => setSelectedFood(null)}
             >
               Back to Results
             </Button>
-            <Button className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80">
+            <Button
+              className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+              onClick={() => handleAddToTracker(selectedFood)}
+            >
               Add to Tracker
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add to Tracker Modal
+  const renderAddToTrackerModal = () => {
+    if (!showAddToTrackerModal || !selectedFoodForTracker) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-safebite-card-bg rounded-lg max-w-md w-full p-6 border border-safebite-card-bg-alt">
+          <h3 className="text-xl font-semibold text-safebite-text mb-4">Add to Food Tracker</h3>
+
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-safebite-text-secondary">Food:</span>
+              <span className="text-safebite-text font-medium">{selectedFoodForTracker.name}</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-safebite-text-secondary">Calories:</span>
+              <span className="text-safebite-text font-medium">{selectedFoodForTracker.calories} kcal</span>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-safebite-text-secondary mb-2">Meal Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={selectedMealType === 'breakfast' ? 'default' : 'outline'}
+                className={selectedMealType === 'breakfast' ? 'bg-safebite-teal text-safebite-dark-blue' : ''}
+                onClick={() => setSelectedMealType('breakfast')}
+              >
+                Breakfast
+              </Button>
+              <Button
+                variant={selectedMealType === 'lunch' ? 'default' : 'outline'}
+                className={selectedMealType === 'lunch' ? 'bg-safebite-teal text-safebite-dark-blue' : ''}
+                onClick={() => setSelectedMealType('lunch')}
+              >
+                Lunch
+              </Button>
+              <Button
+                variant={selectedMealType === 'dinner' ? 'default' : 'outline'}
+                className={selectedMealType === 'dinner' ? 'bg-safebite-teal text-safebite-dark-blue' : ''}
+                onClick={() => setSelectedMealType('dinner')}
+              >
+                Dinner
+              </Button>
+              <Button
+                variant={selectedMealType === 'snack' ? 'default' : 'outline'}
+                className={selectedMealType === 'snack' ? 'bg-safebite-teal text-safebite-dark-blue' : ''}
+                onClick={() => setSelectedMealType('snack')}
+              >
+                Snack
+              </Button>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-safebite-text-secondary mb-2">Quantity</label>
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+              >
+                -
+              </Button>
+              <span className="mx-4 text-safebite-text font-medium">{quantity}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setQuantity(quantity + 1)}
+              >
+                +
+              </Button>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-safebite-text-secondary mb-2">Notes (optional)</label>
+            <input
+              type="text"
+              className="w-full p-2 bg-safebite-card-bg-alt border border-safebite-card-bg rounded-md text-safebite-text"
+              placeholder="E.g., Before workout, With salad"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddToTrackerModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+              onClick={handleTrackerSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Adding...' : 'Add to Tracker'}
             </Button>
           </div>
         </div>
@@ -349,8 +606,9 @@ const FoodSearch = () => {
 
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
+      {renderAddToTrackerModal()}
       <DashboardSidebar />
-      
+
       <main className="md:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-8">
@@ -359,9 +617,9 @@ const FoodSearch = () => {
           </div>
 
           <div className="sci-fi-card mb-6">
-            <FoodSearchBar 
-              onSearch={handleSearch} 
-              onScan={handleScan} 
+            <FoodSearchBar
+              onSearch={handleSearch}
+              onScan={handleScan}
             />
           </div>
 
@@ -373,28 +631,114 @@ const FoodSearch = () => {
                 {searchResults.length > 0 ? 'Search Results' : 'Popular Searches'}
               </h2>
               {renderSearchResults()}
-              
+
               {(!searchResults.length && !showNoResults && !isLoading) && (
-                <div className="grid grid-cols-1 gap-4">
-                  <FoodItemCard
-                    name="Breakfast Cereal"
-                    calories={120}
-                    nutritionScore="yellow"
-                    onClick={() => handleSearch("cereal")}
-                  />
-                  <FoodItemCard
-                    name="Protein Bars"
-                    calories={200}
-                    nutritionScore="yellow"
-                    onClick={() => handleSearch("protein bar")}
-                  />
-                  <FoodItemCard
-                    name="Yogurt"
-                    calories={100}
-                    nutritionScore="green"
-                    onClick={() => handleSearch("yogurt")}
-                  />
-                </div>
+                <>
+                  {/* Personalized Recommendations */}
+                  {recommendations.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                        Recommended for You
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        {recommendations.map((food) => (
+                          <FoodItemCard
+                            key={food.id}
+                            name={food.name}
+                            calories={food.calories}
+                            nutritionScore={food.nutritionScore}
+                            onClick={() => handleFoodSelect(food)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Popular Categories */}
+                  <div className="mb-8">
+                    <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                      Popular Categories
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <Card
+                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                        onClick={() => handleSearch("healthy breakfast")}
+                      >
+                        <div className="flex flex-col items-center text-center">
+                          <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3">
+                            <Leaf className="h-6 w-6 text-green-500" />
+                          </div>
+                          <h4 className="font-medium text-safebite-text">Healthy Breakfast</h4>
+                        </div>
+                      </Card>
+
+                      <Card
+                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                        onClick={() => handleSearch("protein rich")}
+                      >
+                        <div className="flex flex-col items-center text-center">
+                          <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mb-3">
+                            <Flame className="h-6 w-6 text-red-500" />
+                          </div>
+                          <h4 className="font-medium text-safebite-text">Protein Rich</h4>
+                        </div>
+                      </Card>
+
+                      <Card
+                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                        onClick={() => handleSearch("heart healthy")}
+                      >
+                        <div className="flex flex-col items-center text-center">
+                          <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-3">
+                            <Heart className="h-6 w-6 text-purple-500" />
+                          </div>
+                          <h4 className="font-medium text-safebite-text">Heart Healthy</h4>
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+
+                  {/* Recent Foods */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                      Recent Foods
+                    </h3>
+                    {recentFoods.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-4">
+                        {recentFoods.map((food) => (
+                          <FoodItemCard
+                            key={food.id}
+                            name={food.name}
+                            calories={food.calories}
+                            nutritionScore={food.nutritionScore}
+                            onClick={() => handleFoodSelect(food)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4">
+                        <FoodItemCard
+                          name="Breakfast Cereal"
+                          calories={120}
+                          nutritionScore="yellow"
+                          onClick={() => handleSearch("cereal")}
+                        />
+                        <FoodItemCard
+                          name="Protein Bars"
+                          calories={200}
+                          nutritionScore="yellow"
+                          onClick={() => handleSearch("protein bar")}
+                        />
+                        <FoodItemCard
+                          name="Greek Yogurt"
+                          calories={100}
+                          nutritionScore="green"
+                          onClick={() => handleSearch("greek yogurt")}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}

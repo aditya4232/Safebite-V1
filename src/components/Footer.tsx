@@ -27,7 +27,7 @@ const Footer = () => {
               </a>
             </div>
           </div>
-          
+
           <div>
             <h4 className="text-md font-semibold text-safebite-text mb-4">Company</h4>
             <ul className="space-y-2">
@@ -37,7 +37,7 @@ const Footer = () => {
               <li><Link to="/contact" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Contact</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-md font-semibold text-safebite-text mb-4">Resources</h4>
             <ul className="space-y-2">
@@ -47,7 +47,7 @@ const Footer = () => {
               <li><Link to="/community" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Community</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-md font-semibold text-safebite-text mb-4">Legal</h4>
             <ul className="space-y-2">
@@ -59,13 +59,14 @@ const Footer = () => {
             </ul>
           </div>
         </div>
-        
+
         <Separator className="my-8 bg-safebite-card-bg-alt" />
-        
+
         <div className="flex flex-col md:flex-row justify-between items-center">
-          <p className="text-safebite-text-secondary text-sm">
-            &copy; {new Date().getFullYear()} SafeBite. All rights reserved.
-          </p>
+          <div className="text-safebite-text-secondary text-sm">
+            <p>&copy; {new Date().getFullYear()} SafeBite. All rights reserved.</p>
+            <p className="mt-1">A Special Engineering Project by <span className="text-safebite-teal font-medium">Aditya Shenvi</span> at IFHE Hyderabad</p>
+          </div>
           <div className="mt-4 md:mt-0">
             <ul className="flex space-x-6">
               <li><Link to="/privacy" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors text-sm">Privacy</Link></li>

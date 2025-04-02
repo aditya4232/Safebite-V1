@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Progress } from "@/components/ui/progress";
@@ -8,8 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import { getAuth } from "firebase/auth";
-import { app } from "../main"; // Corrected import path
-import { getFirestore, doc, setDoc, Timestamp } from "firebase/firestore";
+import { app } from "../main";
+import { getFirestore, doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
 
 // Types
 interface Question {
@@ -73,9 +72,45 @@ const WeeklyQuestions = () => {
   const auth = getAuth(app);
   const db = getFirestore(app);
   const user = auth.currentUser;
+  const [hasCompletedThisWeek, setHasCompletedThisWeek] = useState(false);
 
   const currentQuestion = weeklyQuestions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / weeklyQuestions.length) * 100;
+
+  useEffect(() => {
+    const checkWeeklyCompletion = async () => {
+      if (user) {
+        const userRef = doc(db, "users", user.uid);
+        try {
+          const docSnap = await getDoc(userRef);
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            if (userData.weeklyCheckin && userData.weeklyCheckin.timestamp) {
+              const lastCheckinTime = userData.weeklyCheckin.timestamp.toDate();
+              const now = new Date();
+              // Check if the last check-in was this week
+              const isSameWeek = (lastCheckinTime.getFullYear() === now.getFullYear() &&
+                                  lastCheckinTime.getMonth() === now.getMonth() &&
+                                  lastCheckinTime.getDate() >= now.getDate() - now.getDay() &&
+                                  lastCheckinTime.getDate() <= now.getDate() + (6 - now.getDay()));
+
+              setHasCompletedThisWeek(isSameWeek);
+              setIsCompleted(isSameWeek);
+            }
+          }
+        } catch (error: any) {
+          toast({
+            title: "Error checking progress",
+            description: error.message,
+            variant: "destructive",
+          });
+          console.error("Error checking weekly check-in status: ", error);
+        }
+      }
+    };
+
+    checkWeeklyCompletion();
+  }, [user, db, toast, navigate]);
 
   useEffect(() => {
     // Initialize answers with default values
@@ -148,7 +183,8 @@ const WeeklyQuestions = () => {
           weeklyCheckin: {
             answers: answers,
             timestamp: Timestamp.now() // Add a timestamp
-          }
+          },
+          lastWeeklyPrompt: Timestamp.now() // Update lastWeeklyPrompt timestamp
         }, { merge: true }); // Merge to avoid overwriting the profile
 
         setIsCompleted(true);
@@ -270,57 +306,72 @@ const WeeklyQuestions = () => {
           Under Development
         </div>
         
-        <h2 className="text-2xl font-bold gradient-text text-center mb-6">
-          Weekly Health Check-in
-        </h2>
-
-        {isSubmitting ? (
-          <div className="py-16 flex flex-col items-center">
-            <Loader size="lg" text="Submitting your answers..." />
+        {hasCompletedThisWeek ? (
+          <div className="text-center py-12">
+            <Check className="h-16 w-16 text-safebite-teal mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-safebite-text mb-2">You've already completed this week's check-in!</h3>
+            <p className="text-safebite-text-secondary mb-4">
+              Check back next week for another opportunity to update your health information.
+            </p>
+            <Button onClick={() => navigate('/dashboard')} className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80">
+              Return to Dashboard
+            </Button>
           </div>
         ) : (
           <>
-            <div className="mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="text-safebite-text-secondary text-sm">
-                  Question {currentQuestionIndex + 1} of {weeklyQuestions.length}
-                </span>
-                <span className="text-safebite-teal text-sm">{Math.floor(progress)}% Complete</span>
+            <h2 className="text-2xl font-bold gradient-text text-center mb-6">
+              Weekly Health Check-in
+            </h2>
+
+            {isSubmitting ? (
+              <div className="py-16 flex flex-col items-center">
+                <Loader size="lg" text="Submitting your answers..." />
               </div>
-              <Progress value={progress} className="h-2 bg-safebite-card-bg-alt" />
-            </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-safebite-text-secondary text-sm">
+                      Question {currentQuestionIndex + 1} of {weeklyQuestions.length}
+                    </span>
+                    <span className="text-safebite-teal text-sm">{Math.floor(progress)}% Complete</span>
+                  </div>
+                  <Progress value={progress} className="h-2 bg-safebite-card-bg-alt" />
+                </div>
 
-            <div className="mb-8">
-              <h3 className="text-xl font-medium text-safebite-text mb-6">
-                {currentQuestion?.text}
-              </h3>
-              {renderQuestionInput()}
-            </div>
+                <div className="mb-8">
+                  <h3 className="text-xl font-medium text-safebite-text mb-6">
+                    {currentQuestion?.text}
+                  </h3>
+                  {renderQuestionInput()}
+                </div>
 
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0}
-                className="sci-fi-button"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                onClick={handleNext}
-                className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
-              >
-                {currentQuestionIndex < weeklyQuestions.length - 1 ? (
-                  <>
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                ) : (
-                  'Complete'
-                )}
-              </Button>
-            </div>
+                <div className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={handlePrevious}
+                    disabled={currentQuestionIndex === 0}
+                    className="sci-fi-button"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    onClick={handleNext}
+                    className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+                  >
+                    {currentQuestionIndex < weeklyQuestions.length - 1 ? (
+                      <>
+                        Next
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    ) : (
+                      'Complete'
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
           </>
         )}
         
