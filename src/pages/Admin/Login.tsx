@@ -13,8 +13,8 @@ const AdminLogin = () => {
   const navigate = useNavigate();
 
   const handleLogin = () => {
-    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME;
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+    const adminUsername = process.env.VITE_ADMIN_USERNAME;
+    const adminPassword = process.env.VITE_ADMIN_PASSWORD;
 
     if (!adminUsername || !adminPassword) {
       setError('Admin credentials not configured.');
