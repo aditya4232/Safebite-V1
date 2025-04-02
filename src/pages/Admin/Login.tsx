@@ -5,27 +5,53 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from 'lucide-react';
+import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { app } from "../../main";
+import { useToast } from "@/hooks/use-toast";
+import Loader from '@/components/Loader';
 
 const AdminLogin = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = () => {
-    const adminUsername = process.env.VITE_ADMIN_USERNAME;
-    const adminPassword = process.env.VITE_ADMIN_PASSWORD;
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
 
-    if (!adminUsername || !adminPassword) {
-      setError('Admin credentials not configured.');
-      return;
-    }
+      // Check if the user is in Firestore "adminUsers" collection
+      const adminDoc = await getDoc(doc(db, "adminUsers", user.email));
 
-    if (username.trim() === adminUsername && password.trim() === adminPassword) {
-      // Successful login
-      navigate('/admin/panel');
-    } else {
-      setError('Invalid credentials');
+      if (adminDoc.exists()) {
+        localStorage.setItem("isAdmin", "true");
+        navigate('/admin/panel'); // Redirect
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "You are not authorized to access the admin panel.",
+          variant: "destructive",
+        });
+        setError("Access Denied: You are not an admin.");
+        await auth.signOut(); // Sign out unauthorized user
+      }
+    } catch (error: any) {
+      console.error("Admin login error:", error);
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -40,30 +66,15 @@ const AdminLogin = () => {
           </div>
         )}
         <div>
-          <Label htmlFor="username">Username</Label>
-          <Input
-            type="text"
-            id="username"
-            placeholder="Enter username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="sci-fi-input mb-4"
-          />
+          <Button
+            className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+            onClick={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? <Loader size="sm" className="mr-2" /> : null}
+            Sign In with Google
+          </Button>
         </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            type="password"
-            id="password"
-            placeholder="Enter password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="sci-fi-input mb-6"
-          />
-        </div>
-        <Button className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80" onClick={handleLogin}>
-          Sign In
-        </Button>
       </Card>
     </div>
   );
