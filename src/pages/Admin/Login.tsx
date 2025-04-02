@@ -16,7 +16,12 @@ const AdminLogin = () => {
     const adminUsername = import.meta.env.VITE_ADMIN_USERNAME;
     const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
-    if (username === adminUsername && password === adminPassword) {
+    if (!adminUsername || !adminPassword) {
+      setError('Admin credentials not configured.');
+      return;
+    }
+
+    if (username.trim() === adminUsername && password.trim() === adminPassword) {
       // Successful login
       navigate('/admin/panel');
     } else {
