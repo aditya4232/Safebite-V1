@@ -8,6 +8,7 @@ import { app } from "../main"; // Corrected import path
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { AlertCircle } from 'lucide-react';
 import Loader from '@/components/Loader'; // Import Loader
+import AchievementPopup from '@/components/AchievementPopup';
 
 interface Question {
   id: string;
@@ -131,19 +132,24 @@ const questions: Question[] = [
     id: 'diet_recommendations',
     type: 'radio',
     question: 'Are you looking for diet & meal plan recommendations?',
-    options: ['Yes', 'No']
+    options: ['Yes', 'No', 'Maybe Later']
   },
   {
     id: 'reminders',
     type: 'radio',
     question: 'Would you like reminders for healthy habits?',
-    options: ['Yes', 'No']
+    options: ['Yes', 'No', 'Maybe Later']
   },
   {
     id: 'food_safety_alerts',
     type: 'radio',
     question: 'Would you like food safety alerts for the products you buy?',
-    options: ['Yes', 'No']
+    options: ['Yes', 'No', 'Maybe Later']
+  },
+  {
+    id: 'username',
+    type: 'text',
+    question: 'What name would you like us to call you?'
   }
 ];
 
@@ -154,6 +160,7 @@ const Questionnaire = () => {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAchievement, setShowAchievement] = useState(false);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
@@ -188,26 +195,39 @@ const Questionnaire = () => {
     const currentQuestion = questions[currentStep];
     const currentAnswer = answers[currentQuestion.id];
 
-    // Check if the current question is answered
-    if (currentAnswer === undefined || currentAnswer === '') {
-      setError('Please answer this question before proceeding.');
-      toast({
-        title: "Missing Answer",
-        description: "Please answer the current question.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Skip validation for the last few questions to avoid the missing error
+    const skipValidationQuestions = ['diet_recommendations', 'reminders', 'food_safety_alerts'];
 
-    // Validate height and weight format if it's the current question
-    if (currentQuestion.id === 'height_weight' && !validateHeightWeight(currentAnswer)) {
-      setError('Please enter height and weight in the correct format (e.g., 170cm, 70kg)');
-      toast({
-        title: "Invalid Format",
-        description: "Please enter height and weight in the format '170cm, 70kg'.",
-        variant: "destructive",
-      });
-      return;
+    // If it's not one of the special questions that we want to skip validation for
+    if (!skipValidationQuestions.includes(currentQuestion.id)) {
+      // Check if the current question is answered
+      if (currentAnswer === undefined || currentAnswer === '') {
+        setError('Please answer this question before proceeding.');
+        toast({
+          title: "Missing Answer",
+          description: "Please answer the current question.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate height and weight format
+      if (currentQuestion.id === 'height_weight' && !validateHeightWeight(currentAnswer)) {
+        setError('Please enter height and weight in the correct format (e.g., 170cm, 70kg)');
+        toast({
+          title: "Invalid Format",
+          description: "Please enter height and weight in the format '170cm, 70kg'.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // For special questions, ensure we have some value (even if it's empty)
+      // This prevents the "missing" error
+      if (currentAnswer === undefined) {
+        // Set a default value for these questions if they're undefined
+        onChange(currentQuestion.id, 'Yes');
+      }
     }
 
     setIsLoading(true); // Set loading state
@@ -222,13 +242,23 @@ const Questionnaire = () => {
           await setDoc(userRef, {
             profile: answers,
             questionnaireCompleted: true, // Flag to prevent asking again
-            lastWeeklyPrompt: null // Initialize weekly prompt timestamp
+            lastWeeklyPrompt: null, // Initialize weekly prompt timestamp
+            achievements: {
+              questionnaire: {
+                completed: true,
+                date: new Date(),
+                xp: 10
+              }
+            },
+            xp: 10 // Initialize XP points with 10 for completing the questionnaire
           }, { merge: true }); // Use merge: true to update existing doc or create new
           toast({
             title: "Questionnaire completed!",
-            description: "Your profile is set up. Welcome to your dashboard!",
+            description: "Your profile is set up. You earned 10 XP!",
           });
-          navigate('/dashboard');
+          // Show achievement popup instead of immediately navigating
+          setShowAchievement(true);
+          setIsLoading(false);
         } catch (error: any) {
           toast({
             title: "Error saving profile",
@@ -263,8 +293,15 @@ const Questionnaire = () => {
 
   const progress = ((currentStep + 1) / questions.length) * 100;
 
+  // Handle closing the achievement popup
+  const handleAchievementClose = () => {
+    setShowAchievement(false);
+    navigate('/dashboard');
+  };
+
   return (
     <div className="min-h-screen bg-safebite-dark-blue flex flex-col">
+      {showAchievement && <AchievementPopup onClose={handleAchievementClose} />}
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-10">

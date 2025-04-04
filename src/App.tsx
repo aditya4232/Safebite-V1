@@ -21,6 +21,7 @@ import AdminLogin from "@/pages/Admin/Login";
 import AdminPanel from "@/pages/Admin/Panel";
 import AboutUs from "@/pages/AboutUs";
 import Features from "@/pages/Features";
+import FoodDelivery from "@/pages/FoodDelivery";
 import { getAuth } from "firebase/auth";
 import { app } from "./main";
 import DevPopup from "@/components/DevPopup";
@@ -58,6 +59,7 @@ const App = () => (
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/food-search" element={<ProtectedRoute><FoodSearch /></ProtectedRoute>} />
+          <Route path="/food-delivery" element={<ProtectedRoute><FoodDelivery /></ProtectedRoute>} />
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />

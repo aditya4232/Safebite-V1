@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Info, Zap, ArrowRight } from 'lucide-react';
+import { Bell, Info, Zap, ArrowRight, Trophy } from 'lucide-react';
 import Footer from '@/components/Footer';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatCard from '@/components/StatCard';
@@ -48,6 +48,7 @@ const Dashboard = () => {
   const [profileError, setProfileError] = useState(''); // Error state for profile loading
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newHealthGoal, setNewHealthGoal] = useState('');
+  const [userXP, setUserXP] = useState(10); // Default XP for all users in beta stage
   // Search functionality removed from dashboard
 
   const [caloriesToday, setCaloriesToday] = useState(1450);
@@ -313,6 +314,8 @@ const Dashboard = () => {
             const userData = docSnap.data();
             setUserProfile(userData.profile); // Assuming answers are stored under 'profile'
             updateStats(userData.profile, userData.weeklyCheckin); // Update stats based on profile data
+            // Set user XP if available, otherwise default to 10 for beta stage
+            setUserXP(userData.xp || 10);
             // Check if questionnaire is completed
             if (!userData.questionnaireCompleted) {
               navigate('/questionnaire'); // Redirect if not completed
@@ -480,10 +483,16 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="mt-4 sm:mt-0">
-              <Button variant="outline" className="mr-2 border-safebite-card-bg-alt hover:border-safebite-teal">
-                <Bell className="mr-2 h-5 w-5" />
-                <Badge className="ml-1 bg-safebite-teal text-safebite-dark-blue">3</Badge>
-              </Button>
+              <div className="flex items-center">
+                <div className="mr-4 flex items-center bg-safebite-card-bg-alt px-3 py-1 rounded-full">
+                  <Trophy className="h-4 w-4 text-yellow-400 mr-1" />
+                  <span className="text-safebite-text font-medium">{userXP} XP</span>
+                </div>
+                <Button variant="outline" className="mr-2 border-safebite-card-bg-alt hover:border-safebite-teal">
+                  <Bell className="mr-2 h-5 w-5" />
+                  <Badge className="ml-1 bg-safebite-teal text-safebite-dark-blue">3</Badge>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -765,6 +774,46 @@ const Dashboard = () => {
                     { color: 'bg-purple-500', text: `You're ${userProfile?.exercise_target ? userProfile.exercise_target - activeMinutes : 15} minutes short of your weekly exercise goal` },
                   ]}
                 />
+              </div>
+            </div>
+
+            {/* Coming Soon Section */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-safebite-text mb-4">Coming Soon</h2>
+              <div className="grid grid-cols-1 gap-6">
+                <div className="sci-fi-card relative overflow-hidden">
+                  {/* Glowing border effect */}
+                  <div className="absolute inset-0 border-2 border-orange-500 rounded-lg opacity-50 animate-pulse"></div>
+
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 mr-6">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                        <Zap className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-grow">
+                      <h3 className="text-xl font-semibold text-orange-500 mb-2">Zomato + Swiggy Integration</h3>
+                      <p className="text-safebite-text-secondary mb-4">
+                        We're working on integrating with popular food delivery platforms to provide nutritional information and health recommendations for restaurant meals.
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/30">
+                            Coming Soon
+                          </Badge>
+                          <span className="ml-3 text-xs text-safebite-text-secondary">Working on dataset</span>
+                        </div>
+                        <Button
+                          onClick={() => navigate('/food-delivery')}
+                          className="bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/20 animate-pulse"
+                        >
+                          <Zap className="mr-2 h-4 w-4" />
+                          Learn More
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -1,16 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
   AlertTriangle, CheckCircle, XCircle,
-  Leaf, Flame, Heart
+  Leaf, Flame, Heart, Zap, Database,
+  History, Tag, Star, Upload, Scan
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
 import FoodItemCard from '@/components/FoodItemCard';
-import { FoodItem, searchFoods } from '@/services/foodApiService';
+import FoodDetailView from '@/components/FoodDetailView';
+import FoodSearchHistory from '@/components/FoodSearchHistory';
+import FoodScannerUpload from '@/components/FoodScannerUpload';
+import ApiSourceSelector from '@/components/ApiSourceSelector';
+import {
+  FoodItem, searchFoods, searchByBarcode, searchByImage,
+  saveSearchHistory, getSearchHistory, toggleFavorite,
+  addTagToSearch, removeTagFromSearch, removeSearchHistoryItem
+} from '@/services/foodApiService';
 import { useToast } from "@/hooks/use-toast";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -39,6 +48,16 @@ const FoodSearch = () => {
   const [selectedFoodForTracker, setSelectedFoodForTracker] = useState<FoodItem | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
+
+  // New state for enhanced features
+  const [showScannerUpload, setShowScannerUpload] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showApiSelector, setShowApiSelector] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<any[]>([]);
+  const [activeApiSource, setActiveApiSource] = useState('Edamam');
+  const [favoriteItems, setFavoriteItems] = useState<{[key: string]: boolean}>({});
+  const [foodTags, setFoodTags] = useState<{[key: string]: string[]}>({});
+  const [currentHistoryId, setCurrentHistoryId] = useState<string>('');
   const location = useLocation();
   // Navigation for redirects
   const navigate = useNavigate();
@@ -66,7 +85,32 @@ const FoodSearch = () => {
 
     // Fetch recent foods
     fetchRecentFoods();
+
+    // Load search history
+    loadSearchHistory();
   }, [location.search]); // Rerun effect if search params change
+
+  // Load search history from localStorage
+  const loadSearchHistory = () => {
+    const history = getSearchHistory();
+    setSearchHistory(history);
+
+    // Extract favorites and tags
+    const favorites: {[key: string]: boolean} = {};
+    const tags: {[key: string]: string[]} = {};
+
+    history.forEach((item: any) => {
+      if (item.isFavorite) {
+        favorites[item.id] = true;
+      }
+      if (item.tags && item.tags.length > 0) {
+        tags[item.id] = item.tags;
+      }
+    });
+
+    setFavoriteItems(favorites);
+    setFoodTags(tags);
+  };
 
   // Fetch user's recent foods
   const fetchRecentFoods = async () => {
@@ -167,9 +211,17 @@ const FoodSearch = () => {
     setIsLoading(true);
     setSelectedFood(null);
     setShowNoResults(false);
+    setShowHistory(false);
 
     try {
-      // Call the real API service
+      // Save to search history
+      const historyId = saveSearchHistory(query);
+      setCurrentHistoryId(historyId);
+
+      // Reload search history
+      loadSearchHistory();
+
+      // Call the API service
       const results = await searchFoods(query);
 
       setSearchResults(results);
@@ -193,63 +245,190 @@ const FoodSearch = () => {
     }
   };
 
-  const handleScan = () => {
-    // Simulate barcode scanning
+  // Handle opening the scanner/upload modal
+  const handleOpenScannerUpload = () => {
+    setShowScannerUpload(true);
+  };
+
+  // Handle barcode scanning
+  const handleScan = async (imageData: string) => {
     setIsLoading(true);
     setSelectedFood(null);
+    setShowScannerUpload(false);
 
     toast({
-      title: "Scanning Barcode",
-      description: "Scanning functionality is simulated in this demo",
+      title: "Processing Barcode",
+      description: "Analyzing the scanned barcode...",
     });
 
-    // Simulate API call with timeout
-    setTimeout(async () => {
-      try {
-        // Simulate a random food search
-        const randomFoods = [
-          'apple', 'banana', 'yogurt', 'bread', 'cereal', 'milk', 'cheese', 'chicken',
-          'rice', 'pasta', 'potato', 'tomato', 'carrot', 'spinach', 'egg'
-        ];
-        const randomIndex = Math.floor(Math.random() * randomFoods.length);
-        const randomFood = randomFoods[randomIndex];
+    try {
+      // Simulate a barcode from the image
+      const simulatedBarcode = Math.floor(Math.random() * 1000000000000).toString();
 
-        // Call the real API with the random food
-        const results = await searchFoods(randomFood);
+      // Call the barcode search API
+      const results = await searchByBarcode(simulatedBarcode);
 
-        if (results.length > 0) {
-          // Take the first result
-          setSearchResults([results[0]]);
-          setShowNoResults(false);
+      if (results.length > 0) {
+        // Save to search history
+        const historyId = saveSearchHistory(`Barcode: ${simulatedBarcode}`);
+        setCurrentHistoryId(historyId);
+        loadSearchHistory();
 
-          toast({
-            title: "Product Found",
-            description: `Scanned product identified as ${results[0].name}`,
-          });
-        } else {
-          setShowNoResults(true);
-          toast({
-            title: "Product Not Found",
-            description: "Could not identify the scanned product",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error('Scan error:', error);
+        // Display results
+        setSearchResults(results);
+        setShowNoResults(false);
+
+        toast({
+          title: "Product Found",
+          description: `Scanned product identified as ${results[0].name}`,
+        });
+      } else {
         setShowNoResults(true);
         toast({
-          title: "Scan Error",
-          description: "There was a problem scanning the product",
+          title: "Product Not Found",
+          description: "Could not identify the scanned product",
           variant: "destructive"
         });
-      } finally {
-        setIsLoading(false);
       }
-    }, 2000);
+    } catch (error) {
+      console.error('Scan error:', error);
+      setShowNoResults(true);
+      toast({
+        title: "Scan Error",
+        description: "There was a problem scanning the product",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle image upload
+  const handleImageUpload = async (file: File) => {
+    setIsLoading(true);
+    setSelectedFood(null);
+    setShowScannerUpload(false);
+
+    toast({
+      title: "Processing Image",
+      description: "Analyzing the uploaded food image...",
+    });
+
+    try {
+      // Call the image search API
+      const results = await searchByImage(file);
+
+      if (results.length > 0) {
+        // Save to search history
+        const historyId = saveSearchHistory(`Image: ${file.name}`);
+        setCurrentHistoryId(historyId);
+        loadSearchHistory();
+
+        // Display results
+        setSearchResults(results);
+        setShowNoResults(false);
+
+        toast({
+          title: "Food Identified",
+          description: `Image identified as ${results[0].name}`,
+        });
+      } else {
+        setShowNoResults(true);
+        toast({
+          title: "Food Not Identified",
+          description: "Could not identify food in the image",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      setShowNoResults(true);
+      toast({
+        title: "Processing Error",
+        description: "There was a problem analyzing the image",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleFoodSelect = (food: FoodItem) => {
     setSelectedFood(food);
+    setShowHistory(false);
+  };
+
+  // Handle showing search history
+  const handleShowHistory = () => {
+    setShowHistory(!showHistory);
+  };
+
+  // Handle API source selection
+  const handleShowApiSelector = () => {
+    setShowApiSelector(!showApiSelector);
+  };
+
+  // Handle toggling API source
+  const handleToggleApiSource = (apiId: string) => {
+    // In a real implementation, this would enable/disable specific API sources
+    setActiveApiSource(apiId);
+  };
+
+  // Handle history item click
+  const handleHistoryItemClick = (query: string) => {
+    handleSearch(query);
+  };
+
+  // Handle toggling favorite status
+  const handleToggleFavorite = (id: string) => {
+    const newStatus = toggleFavorite(id);
+    setFavoriteItems(prev => ({
+      ...prev,
+      [id]: newStatus
+    }));
+  };
+
+  // Handle adding a tag
+  const handleAddTag = (id: string, tag: string) => {
+    if (addTagToSearch(id, tag)) {
+      setFoodTags(prev => {
+        const currentTags = prev[id] || [];
+        return {
+          ...prev,
+          [id]: [...currentTags, tag]
+        };
+      });
+    }
+  };
+
+  // Handle removing a tag
+  const handleRemoveTag = (id: string, tag: string) => {
+    if (removeTagFromSearch(id, tag)) {
+      setFoodTags(prev => {
+        const currentTags = prev[id] || [];
+        return {
+          ...prev,
+          [id]: currentTags.filter(t => t !== tag)
+        };
+      });
+    }
+  };
+
+  // Handle removing a history item
+  const handleRemoveHistoryItem = (id: string) => {
+    if (removeSearchHistoryItem(id)) {
+      setSearchHistory(prev => prev.filter(item => item.id !== id));
+      setFavoriteItems(prev => {
+        const newFavorites = { ...prev };
+        delete newFavorites[id];
+        return newFavorites;
+      });
+      setFoodTags(prev => {
+        const newTags = { ...prev };
+        delete newTags[id];
+        return newTags;
+      });
+    }
   };
 
   // Open the Add to Tracker modal
@@ -351,151 +530,7 @@ const FoodSearch = () => {
     return null;
   };
 
-  const renderFoodDetail = () => {
-    if (!selectedFood) return null;
 
-    const { name, calories, nutritionScore, details } = selectedFood;
-
-    const scoreColors = {
-      green: 'bg-green-500',
-      yellow: 'bg-yellow-500',
-      red: 'bg-red-500'
-    };
-
-    const scoreLabels = {
-      green: 'Good Choice',
-      yellow: 'Moderate',
-      red: 'Use Caution'
-    };
-
-    return (
-      <div className="sci-fi-card">
-        <div className="flex justify-between items-start mb-6">
-          <h3 className="text-2xl font-semibold text-safebite-text">{name}</h3>
-          <Badge className={`${scoreColors[nutritionScore]} text-white`}>
-            {scoreLabels[nutritionScore]}
-          </Badge>
-        </div>
-
-        <div className="space-y-6">
-          <div>
-            <h4 className="text-lg font-medium text-safebite-text mb-2">Nutrition Facts</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Calories</div>
-                <div className="text-safebite-text font-bold">{details?.calories || calories} kcal</div>
-              </div>
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Protein</div>
-                <div className="text-safebite-text font-bold">{details?.protein}g</div>
-              </div>
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Carbs</div>
-                <div className="text-safebite-text font-bold">{details?.carbs}g</div>
-              </div>
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Fat</div>
-                <div className="text-safebite-text font-bold">{details?.fat}g</div>
-              </div>
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Sodium</div>
-                <div className="text-safebite-text font-bold">{details?.sodium}mg</div>
-              </div>
-              <div className="p-3 bg-safebite-card-bg-alt rounded-md">
-                <div className="text-safebite-text-secondary text-sm">Sugar</div>
-                <div className="text-safebite-text font-bold">{details?.sugar}g</div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-medium text-safebite-text mb-2">Ingredients</h4>
-            <p className="text-safebite-text-secondary">
-              {details?.ingredients.join(', ')}
-            </p>
-          </div>
-
-          {details?.allergens && details.allergens.length > 0 && (
-            <div>
-              <h4 className="text-lg font-medium text-safebite-text mb-2">Allergens</h4>
-              <div className="flex flex-wrap gap-2">
-                {details.allergens.map((allergen: string) => (
-                  <Badge
-                    key={allergen}
-                    variant="outline"
-                    className="border-yellow-500 text-yellow-500"
-                  >
-                    <AlertTriangle className="mr-1 h-3 w-3" /> {allergen}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {details?.additives && details.additives.length > 0 && (
-            <div>
-              <h4 className="text-lg font-medium text-safebite-text mb-2">Additives</h4>
-              <div className="flex flex-wrap gap-2">
-                {details.additives.map((additive: string) => (
-                  <Badge
-                    key={additive}
-                    variant="outline"
-                    className="border-red-500 text-red-500"
-                  >
-                    {additive}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {nutritionScore === 'red' && (
-            <Card className="bg-red-500/10 border-red-500 p-4">
-              <div className="flex items-start">
-                <AlertTriangle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="text-md font-medium text-red-400 mb-1">Health Concern</h5>
-                  <p className="text-safebite-text-secondary text-sm">
-                    This product contains high levels of sugar and artificial additives which may impact your health goals.
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {nutritionScore === 'green' && (
-            <Card className="bg-green-500/10 border-green-500 p-4">
-              <div className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="text-md font-medium text-green-400 mb-1">Healthy Choice</h5>
-                  <p className="text-safebite-text-secondary text-sm">
-                    This product is a great fit for your health goals. It contains nutritious ingredients and minimal processing.
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <div className="flex justify-between">
-            <Button
-              variant="outline"
-              className="sci-fi-button"
-              onClick={() => setSelectedFood(null)}
-            >
-              Back to Results
-            </Button>
-            <Button
-              className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
-              onClick={() => handleAddToTracker(selectedFood)}
-            >
-              Add to Tracker
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Add to Tracker Modal
   const renderAddToTrackerModal = () => {
@@ -619,12 +654,37 @@ const FoodSearch = () => {
           <div className="sci-fi-card mb-6">
             <FoodSearchBar
               onSearch={handleSearch}
-              onScan={handleScan}
+              onScan={handleOpenScannerUpload}
+              onUpload={handleOpenScannerUpload}
+              onShowHistory={handleShowHistory}
+              onApiSelect={handleShowApiSelector}
+              activeApi={activeApiSource}
             />
           </div>
 
           {selectedFood ? (
-            renderFoodDetail()
+            <FoodDetailView
+              food={selectedFood}
+              onBack={() => setSelectedFood(null)}
+              onAddToTracker={handleAddToTracker}
+              onAddTag={(foodId, tag) => handleAddTag(foodId, tag)}
+              onToggleFavorite={(foodId) => handleToggleFavorite(foodId)}
+              isFavorite={favoriteItems[selectedFood.id] || false}
+              tags={foodTags[selectedFood.id] || []}
+            />
+          ) : showHistory ? (
+            <div className="sci-fi-card">
+              <FoodSearchHistory
+                historyItems={searchHistory}
+                recentFoods={recentFoods}
+                onHistoryItemClick={handleHistoryItemClick}
+                onFoodItemClick={handleFoodSelect}
+                onToggleFavorite={handleToggleFavorite}
+                onRemoveHistoryItem={handleRemoveHistoryItem}
+                onAddTag={handleAddTag}
+                onRemoveTag={handleRemoveTag}
+              />
+            </div>
           ) : (
             <div className="sci-fi-card">
               <h2 className="text-xl font-semibold text-safebite-text mb-4">
@@ -744,6 +804,43 @@ const FoodSearch = () => {
           )}
         </div>
       </main>
+
+      {/* Scanner/Upload Modal */}
+      {showScannerUpload && (
+        <FoodScannerUpload
+          onScan={handleScan}
+          onUpload={handleImageUpload}
+          onClose={() => setShowScannerUpload(false)}
+        />
+      )}
+
+      {/* API Source Selector Modal */}
+      {showApiSelector && (
+        <ApiSourceSelector
+          apiSources={[
+            {
+              id: 'Edamam',
+              name: 'Edamam Food Database',
+              description: 'Comprehensive nutrition data for packaged and whole foods',
+              isActive: activeApiSource === 'Edamam'
+            },
+            {
+              id: 'USDA',
+              name: 'USDA Food Database',
+              description: 'Official US government food composition data',
+              isActive: activeApiSource === 'USDA'
+            },
+            {
+              id: 'OpenFoodFacts',
+              name: 'Open Food Facts',
+              description: 'Open database of food products from around the world',
+              isActive: activeApiSource === 'OpenFoodFacts'
+            }
+          ]}
+          onToggleApi={handleToggleApiSource}
+          onClose={() => setShowApiSelector(false)}
+        />
+      )}
     </div>
   );
 };
