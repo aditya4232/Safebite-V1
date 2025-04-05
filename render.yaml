@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: safebite-backend
+    runtime: node
+    rootDir: ./
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        value: mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/safebite?retryWrites=true&w=majority
