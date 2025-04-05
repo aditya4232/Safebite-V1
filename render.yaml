@@ -2,7 +2,7 @@ services:
   - type: web
     name: safebite-backend
     runtime: node
-    rootDir: ./
+    rootDir: src
     plan: free
     buildCommand: npm install
     startCommand: npm start
