@@ -1,12 +1,17 @@
 // src/services/apiService.ts
 import { FoodItem } from './foodApiService';
 
-// API base URL - change this to your Render-deployed backend URL when available
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
+// API base URL - using Render-deployed backend URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://safebite-backend.onrender.com/api';
 
-// Flag to use mock data when API is not available
-// Set to false when your Render backend is deployed
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'false' ? false : true;
+// MongoDB URI
+const MONGODB_URI = import.meta.env.VITE_MONGODB_URI || 'mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/';
+
+// Log the API URL being used
+console.log('Using API URL:', API_BASE_URL);
+
+// Always use real data
+const USE_MOCK_DATA = false;
 
 // Interface for MongoDB product
 export interface MongoDBProduct {
@@ -36,8 +41,8 @@ export const convertProductToFoodItem = (product: MongoDBProduct): FoodItem => {
   // Calculate nutrition score if not already present
   let nutritionScore = product.nutritionScore || 'yellow';
   if (!product.nutritionScore) {
-    if (product.nutrients.protein > 15 && 
-        (product.nutrients.fiber || 0) > 3 && 
+    if (product.nutrients.protein > 15 &&
+        (product.nutrients.fiber || 0) > 3 &&
         (product.nutrients.sugar || 0) < 10) {
       nutritionScore = 'green';
     } else if (product.nutrients.fat > 20 || (product.nutrients.sugar || 0) > 15) {
@@ -76,212 +81,153 @@ export const convertProductToFoodItem = (product: MongoDBProduct): FoodItem => {
 
 // Search products in MongoDB via API
 export const searchProductsInMongoDB = async (query: string): Promise<FoodItem[]> => {
+  // Try multiple methods to get data from MongoDB
+  const results = await Promise.allSettled([
+    searchViaAPI(query),
+    searchViaRenderBackend(query)
+  ]);
+
+  // Check if any method succeeded
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value.length > 0) {
+      return result.value;
+    }
+  }
+
+  // If all methods failed or returned empty results, return empty array
+  console.warn('All MongoDB search methods failed or returned no results');
+  return [];
+};
+
+// Method 1: Search via configured API
+const searchViaAPI = async (query: string): Promise<FoodItem[]> => {
   try {
-    // If using mock data, return mock results
-    if (USE_MOCK_DATA) {
-      console.log('Using mock data for MongoDB search');
-      return getMockFoodItems(query);
-    }
-    
-    console.log('Searching MongoDB via API:', `${API_BASE_URL}/products/search?query=${encodeURIComponent(query)}`);
-    const response = await fetch(`${API_BASE_URL}/products/search?query=${encodeURIComponent(query)}`);
-    
+    const url = `${API_BASE_URL}/products/search?query=${encodeURIComponent(query)}`;
+    console.log('Searching MongoDB via API:', url);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      mode: 'cors', // Explicitly set CORS mode
+      credentials: 'omit', // Don't send credentials
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      console.warn(`API error: ${response.status} - ${response.statusText}`);
+      throw new Error(`API error: ${response.status} - ${response.statusText}`);
     }
-    
+
     const products: MongoDBProduct[] = await response.json();
-    console.log(`Found ${products.length} products from MongoDB`);
-    
+    console.log(`Found ${products.length} products from MongoDB via API`);
+
+    // Handle empty array case
+    if (!Array.isArray(products)) {
+      console.warn('API did not return an array:', products);
+      return [];
+    }
+
     // Convert to FoodItem format
     return products.map(product => convertProductToFoodItem(product));
   } catch (error) {
     console.error('Error searching MongoDB via API:', error);
-    // Fallback to mock data if API fails
-    console.log('Falling back to mock data');
-    return getMockFoodItems(query);
+    return [];
   }
 };
 
-// Get mock food items for testing
-const getMockFoodItems = (query: string): FoodItem[] => {
-  const normalizedQuery = query.toLowerCase();
-  
-  // Sample food items
-  const mockItems: FoodItem[] = [
-    {
-      id: 'mock-1',
-      name: 'Apple',
-      brand: 'Organic Farms',
-      calories: 95,
-      nutritionScore: 'green',
-      image: 'https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      nutrients: {
-        protein: 0.5,
-        carbs: 25,
-        fat: 0.3,
-        fiber: 4.4,
-        sugar: 19
+// Method 2: Search via Render backend directly
+const searchViaRenderBackend = async (query: string): Promise<FoodItem[]> => {
+  try {
+    console.log('Trying direct Render backend...');
+    const fallbackUrl = `https://safebite-backend.onrender.com/api/products/search?query=${encodeURIComponent(query)}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const fallbackResponse = await fetch(fallbackUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       },
-      details: {
-        protein: 0.5,
-        carbs: 25,
-        fat: 0.3,
-        sodium: 2,
-        sugar: 19,
-        calories: 95,
-        ingredients: ['Apple'],
-        allergens: [],
-        additives: []
-      },
-      source: 'Mock Database'
-    },
-    {
-      id: 'mock-2',
-      name: 'Chicken Breast',
-      brand: 'Premium Poultry',
-      calories: 165,
-      nutritionScore: 'green',
-      image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      nutrients: {
-        protein: 31,
-        carbs: 0,
-        fat: 3.6,
-        fiber: 0,
-        sugar: 0
-      },
-      details: {
-        protein: 31,
-        carbs: 0,
-        fat: 3.6,
-        sodium: 74,
-        sugar: 0,
-        calories: 165,
-        ingredients: ['Chicken Breast'],
-        allergens: [],
-        additives: []
-      },
-      source: 'Mock Database'
-    },
-    {
-      id: 'mock-3',
-      name: 'Chocolate Chip Cookies',
-      brand: 'Sweet Treats',
-      calories: 450,
-      nutritionScore: 'red',
-      image: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      nutrients: {
-        protein: 5,
-        carbs: 63,
-        fat: 21,
-        fiber: 2,
-        sugar: 35
-      },
-      details: {
-        protein: 5,
-        carbs: 63,
-        fat: 21,
-        sodium: 210,
-        sugar: 35,
-        calories: 450,
-        ingredients: ['Flour', 'Sugar', 'Butter', 'Chocolate Chips', 'Eggs', 'Vanilla Extract', 'Baking Soda', 'Salt'],
-        allergens: ['Gluten', 'Dairy', 'Eggs'],
-        additives: []
-      },
-      source: 'Mock Database'
-    },
-    {
-      id: 'mock-4',
-      name: 'Greek Yogurt',
-      brand: 'Healthy Dairy',
-      calories: 100,
-      nutritionScore: 'green',
-      image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      nutrients: {
-        protein: 17,
-        carbs: 6,
-        fat: 0.4,
-        fiber: 0,
-        sugar: 6
-      },
-      details: {
-        protein: 17,
-        carbs: 6,
-        fat: 0.4,
-        sodium: 65,
-        sugar: 6,
-        calories: 100,
-        ingredients: ['Milk', 'Live Active Cultures'],
-        allergens: ['Milk'],
-        additives: []
-      },
-      source: 'Mock Database'
-    },
-    {
-      id: 'mock-5',
-      name: 'Spinach',
-      brand: 'Fresh Greens',
-      calories: 23,
-      nutritionScore: 'green',
-      image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      nutrients: {
-        protein: 2.9,
-        carbs: 3.6,
-        fat: 0.4,
-        fiber: 2.2,
-        sugar: 0.4
-      },
-      details: {
-        protein: 2.9,
-        carbs: 3.6,
-        fat: 0.4,
-        sodium: 24,
-        sugar: 0.4,
-        calories: 23,
-        ingredients: ['Spinach'],
-        allergens: [],
-        additives: []
-      },
-      source: 'Mock Database'
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!fallbackResponse.ok) {
+      throw new Error(`Render API error: ${fallbackResponse.status}`);
     }
-  ];
-  
-  // Filter based on query
-  if (!query) {
-    return mockItems.slice(0, 3); // Return first 3 items if no query
+
+    const products: MongoDBProduct[] = await fallbackResponse.json();
+    console.log(`Found ${products.length} products from MongoDB via Render backend`);
+
+    if (!Array.isArray(products)) {
+      console.warn('Render API did not return an array:', products);
+      return [];
+    }
+
+    return products.map(product => convertProductToFoodItem(product));
+  } catch (fallbackError) {
+    console.error('Render backend search failed:', fallbackError);
+    return [];
   }
-  
-  return mockItems.filter(item => 
-    item.name.toLowerCase().includes(normalizedQuery) ||
-    item.brand?.toLowerCase().includes(normalizedQuery) ||
-    item.details?.ingredients?.some(ing => ing.toLowerCase().includes(normalizedQuery))
-  );
 };
+
+// No mock data - using real data from MongoDB
 
 // Get product by ID
 export const getProductById = async (id: string): Promise<FoodItem | null> => {
   try {
-    if (USE_MOCK_DATA) {
-      // Return a mock item if using mock data
-      const mockItems = getMockFoodItems('');
-      const mockItem = mockItems.find(item => item.id === id);
-      return mockItem || null;
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/products/${id}`);
-    
+    const url = `${API_BASE_URL}/products/${id}`;
+    console.log('Getting product by ID:', url);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(url, {
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       if (response.status === 404) {
         return null;
       }
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`API error: ${response.status} - ${response.statusText}`);
     }
-    
+
     const product: MongoDBProduct = await response.json();
-    
+
     return convertProductToFoodItem(product);
   } catch (error) {
     console.error('Error getting product by ID:', error);
+
+    // Try fallback to Render backend
+    if (!API_BASE_URL.includes('safebite-backend.onrender.com')) {
+      try {
+        console.log('Trying fallback to Render backend for product ID...');
+        const fallbackUrl = `https://safebite-backend.onrender.com/api/products/${id}`;
+        const fallbackResponse = await fetch(fallbackUrl);
+
+        if (fallbackResponse.ok) {
+          const product: MongoDBProduct = await fallbackResponse.json();
+          return convertProductToFoodItem(product);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+    }
+
     return null;
   }
 };
@@ -289,22 +235,52 @@ export const getProductById = async (id: string): Promise<FoodItem | null> => {
 // Get similar products
 export const getSimilarProducts = async (productId: string): Promise<FoodItem[]> => {
   try {
-    if (USE_MOCK_DATA) {
-      // Return some mock items if using mock data
-      return getMockFoodItems('').slice(0, 3);
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/products/${productId}/similar`);
-    
+    const url = `${API_BASE_URL}/products/${productId}/similar`;
+    console.log('Getting similar products:', url);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(url, {
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`API error: ${response.status} - ${response.statusText}`);
     }
-    
+
     const products: MongoDBProduct[] = await response.json();
-    
+
+    // Handle empty array case
+    if (!Array.isArray(products)) {
+      console.warn('API did not return an array for similar products:', products);
+      return [];
+    }
+
     return products.map(product => convertProductToFoodItem(product));
   } catch (error) {
     console.error('Error getting similar products:', error);
+
+    // Try fallback to Render backend
+    if (!API_BASE_URL.includes('safebite-backend.onrender.com')) {
+      try {
+        console.log('Trying fallback to Render backend for similar products...');
+        const fallbackUrl = `https://safebite-backend.onrender.com/api/products/${productId}/similar`;
+        const fallbackResponse = await fetch(fallbackUrl);
+
+        if (fallbackResponse.ok) {
+          const fallbackProducts: MongoDBProduct[] = await fallbackResponse.json();
+          if (Array.isArray(fallbackProducts)) {
+            return fallbackProducts.map(product => convertProductToFoodItem(product));
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+    }
+
     return [];
   }
 };

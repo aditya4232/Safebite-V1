@@ -4,7 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import QuestionnaireStep from '@/components/QuestionnaireStep';
 import { useToast } from "@/hooks/use-toast";
 import { getAuth } from "firebase/auth";
-import { app } from "../main"; // Corrected import path
+import { app } from "../firebase";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { AlertCircle } from 'lucide-react';
 import Loader from '@/components/Loader'; // Import Loader

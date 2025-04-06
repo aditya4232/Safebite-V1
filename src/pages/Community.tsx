@@ -8,12 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import DashboardSidebar from '@/components/DashboardSidebar';
 import { useToast } from '@/hooks/use-toast';
 import { useGuestMode } from '@/hooks/useGuestMode';
-import { 
-  MessageSquare, Send, Share2, ThumbsUp, 
+import {
+  MessageSquare, Send, Share2, ThumbsUp,
   Award, Tag, ExternalLink, User, Users, Bell
 } from 'lucide-react';
 import { getAuth } from "firebase/auth";
-import { app } from "../main"; // Corrected import path
+import { app } from "../firebase";
 import { getFirestore, collection, addDoc, orderBy, limit, onSnapshot, serverTimestamp, query } from "firebase/firestore";
 
 interface ChatMessage {
@@ -121,10 +121,10 @@ const Community = () => {
   };
 
   const handleLikePost = (postId: string) => {
-    setForumPosts(posts => 
-      posts.map(post => 
-        post.id === postId 
-          ? { ...post, likes: post.likes + 1 } 
+    setForumPosts(posts =>
+      posts.map(post =>
+        post.id === postId
+          ? { ...post, likes: post.likes + 1 }
           : post
       )
     );
@@ -144,11 +144,11 @@ const Community = () => {
 
   const handleSubscribe = () => {
     setIsSubscribed(!isSubscribed);
-    
+
     toast({
       title: isSubscribed ? "Unsubscribed from notifications" : "Subscribed to notifications",
-      description: isSubscribed 
-        ? "You'll no longer receive community updates" 
+      description: isSubscribed
+        ? "You'll no longer receive community updates"
         : "You'll receive notifications for new posts and replies",
     });
   };
@@ -166,9 +166,9 @@ const Community = () => {
       <div className="absolute top-0 left-0 right-0 p-1 text-center bg-red-500 text-white text-xs">
         Under Development
       </div>
-      
+
       <DashboardSidebar />
-      
+
       <main className="md:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -181,8 +181,8 @@ const Community = () => {
             <div className="mt-4 sm:mt-0">
               <Button
                 variant={isSubscribed ? "default" : "outline"}
-                className={isSubscribed 
-                  ? "bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80" 
+                className={isSubscribed
+                  ? "bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
                   : "sci-fi-button"
                 }
                 onClick={handleSubscribe}
@@ -192,19 +192,19 @@ const Community = () => {
               </Button>
             </div>
           </div>
-          
+
           <Tabs defaultValue="chat" className="mb-6" onValueChange={setActiveTab}>
             <div className="sci-fi-card mb-2 p-4">
               <TabsList className="grid grid-cols-2 gap-2">
-                <TabsTrigger 
-                  value="chat" 
+                <TabsTrigger
+                  value="chat"
                   className={activeTab === 'chat' ? "bg-safebite-teal text-safebite-dark-blue" : ""}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Live Chat
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="forum" 
+                <TabsTrigger
+                  value="forum"
                   className={activeTab === 'forum' ? "bg-safebite-teal text-safebite-dark-blue" : ""}
                 >
                   <Users className="mr-2 h-4 w-4" />
@@ -212,7 +212,7 @@ const Community = () => {
                 </TabsTrigger>
               </TabsList>
             </div>
-            
+
             <TabsContent value="chat" className="mt-0">
               <Card className="sci-fi-card min-h-[600px] flex flex-col">
                 <div className="p-4 border-b border-safebite-card-bg-alt">
@@ -224,18 +224,18 @@ const Community = () => {
                     </Badge>
                   </h3>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="space-y-4">
                     {chatMessages.map((message) => (
-                      <div 
+                      <div
                         key={message.id}
                         className={`flex ${message.isCurrentUser ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div 
+                        <div
                           className={`max-w-[80%] ${
-                            message.isCurrentUser 
-                              ? 'bg-safebite-teal text-safebite-dark-blue rounded-tl-lg rounded-tr-none' 
+                            message.isCurrentUser
+                              ? 'bg-safebite-teal text-safebite-dark-blue rounded-tl-lg rounded-tr-none'
                               : 'bg-safebite-card-bg-alt text-safebite-text rounded-tr-lg rounded-tl-none'
                           } rounded-bl-lg rounded-br-lg p-3`}
                         >
@@ -248,13 +248,13 @@ const Community = () => {
                             <span className="font-medium text-sm">{message.username}</span>
                             <span className="text-xs ml-2 opacity-70">{formatTime(message.timestamp)}</span>
                           </div>
-                          
+
                           <p>{message.text}</p>
-                          
+
                           {message.linkedProduct && (
                             <div className="mt-2 p-2 bg-safebite-card-bg rounded-md flex items-center">
-                              <img 
-                                src={message.linkedProduct.image} 
+                              <img
+                                src={message.linkedProduct.image}
                                 alt={message.linkedProduct.name}
                                 className="h-10 w-10 rounded-md object-cover mr-2"
                               />
@@ -267,7 +267,7 @@ const Community = () => {
                     <div ref={chatEndRef} />
                   </div>
                 </div>
-                
+
                 <div className="p-4 border-t border-safebite-card-bg-alt">
                   <div className="flex space-x-2">
                     <Input
@@ -277,7 +277,7 @@ const Community = () => {
                       onChange={(e) => setMessageInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     />
-                    <Button 
+                    <Button
                       onClick={handleSendMessage}
                       className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
                     >
@@ -290,7 +290,7 @@ const Community = () => {
                 </div>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="forum" className="mt-0">
               <div className="grid gap-6">
                 {forumPosts.map((post) => (
@@ -314,25 +314,25 @@ const Community = () => {
                           </Badge>
                         )}
                       </div>
-                      
+
                       <h3 className="text-xl font-semibold text-safebite-text mb-2">{post.title}</h3>
                       <p className="text-safebite-text-secondary mb-4">{post.content}</p>
-                      
+
                       {post.linkedProduct && (
                         <div className="mb-4 p-3 bg-safebite-card-bg-alt rounded-md flex items-center">
-                          <img 
-                            src={post.linkedProduct.image} 
+                          <img
+                            src={post.linkedProduct.image}
                             alt={post.linkedProduct.name}
                             className="h-12 w-12 rounded-md object-cover mr-3"
                           />
                           <span>{post.linkedProduct.name}</span>
                         </div>
                       )}
-                      
+
                       <div className="flex justify-between items-center">
                         <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             className="sci-fi-button"
                             onClick={() => handleLikePost(post.id)}
@@ -340,8 +340,8 @@ const Community = () => {
                             <ThumbsUp className="h-4 w-4 mr-1" />
                             {post.likes}
                           </Button>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             className="sci-fi-button"
                           >
@@ -349,8 +349,8 @@ const Community = () => {
                             {post.replies} Replies
                           </Button>
                         </div>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="sci-fi-button"
                           onClick={() => handleSharePost(post.id)}
@@ -365,7 +365,7 @@ const Community = () => {
               </div>
             </TabsContent>
           </Tabs>
-          
+
           <div className="text-xs text-safebite-text-secondary mt-6 text-right">
             Created by Aditya Shenvi
           </div>

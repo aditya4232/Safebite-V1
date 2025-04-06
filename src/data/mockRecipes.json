@@ -1,0 +1,404 @@
+[
+  {
+    "id": "local-recipe-1",
+    "title": "Vegetable Curry",
+    "image": "https://source.unsplash.com/random/300x200/?vegetable+curry",
+    "calories": 320,
+    "servings": 4,
+    "cookTime": 30,
+    "prepTime": 15,
+    "healthLabels": ["Vegetarian", "High-Fiber", "Low-Fat"],
+    "source": "Local",
+    "ingredients": [
+      "1 tablespoon vegetable oil",
+      "1 onion, chopped",
+      "2 cloves garlic, minced",
+      "1 tablespoon curry powder",
+      "1 teaspoon ground cumin",
+      "1/2 teaspoon turmeric",
+      "1 can (14 oz) diced tomatoes",
+      "1 can (14 oz) coconut milk",
+      "2 cups mixed vegetables (carrots, peas, potatoes, cauliflower)",
+      "Salt and pepper to taste",
+      "Fresh cilantro for garnish"
+    ],
+    "instructions": [
+      "Heat oil in a large pot over medium heat.",
+      "Add onion and garlic, sauté until soft, about 5 minutes.",
+      "Add curry powder, cumin, and turmeric. Stir for 1 minute until fragrant.",
+      "Add diced tomatoes and coconut milk, bring to a simmer.",
+      "Add mixed vegetables and cook until tender, about 15-20 minutes.",
+      "Season with salt and pepper to taste.",
+      "Garnish with fresh cilantro before serving."
+    ],
+    "nutrients": {
+      "protein": 8,
+      "carbs": 25,
+      "fat": 12,
+      "fiber": 6,
+      "sodium": 320
+    }
+  },
+  {
+    "id": "local-recipe-2",
+    "title": "Grilled Chicken Salad",
+    "image": "https://source.unsplash.com/random/300x200/?grilled+chicken+salad",
+    "calories": 350,
+    "servings": 2,
+    "cookTime": 20,
+    "prepTime": 10,
+    "healthLabels": ["High-Protein", "Low-Carb", "Gluten-Free"],
+    "source": "Local",
+    "ingredients": [
+      "2 boneless, skinless chicken breasts",
+      "2 tablespoons olive oil",
+      "1 teaspoon Italian seasoning",
+      "Salt and pepper to taste",
+      "6 cups mixed salad greens",
+      "1 cucumber, sliced",
+      "1 cup cherry tomatoes, halved",
+      "1/4 red onion, thinly sliced",
+      "1/4 cup balsamic vinaigrette"
+    ],
+    "instructions": [
+      "Preheat grill to medium-high heat.",
+      "Brush chicken with 1 tablespoon olive oil and season with Italian seasoning, salt, and pepper.",
+      "Grill chicken for 6-7 minutes per side until cooked through (internal temperature of 165°F).",
+      "Let chicken rest for 5 minutes, then slice.",
+      "In a large bowl, combine salad greens, cucumber, tomatoes, and red onion.",
+      "Toss with remaining olive oil and balsamic vinaigrette.",
+      "Top salad with sliced grilled chicken and serve."
+    ],
+    "nutrients": {
+      "protein": 30,
+      "carbs": 12,
+      "fat": 18,
+      "fiber": 4,
+      "sodium": 280
+    }
+  },
+  {
+    "id": "local-recipe-3",
+    "title": "Pasta Primavera",
+    "image": "https://source.unsplash.com/random/300x200/?pasta+primavera",
+    "calories": 420,
+    "servings": 4,
+    "cookTime": 25,
+    "prepTime": 15,
+    "healthLabels": ["Vegetarian", "High-Fiber"],
+    "source": "Local",
+    "ingredients": [
+      "12 oz whole grain pasta",
+      "2 tablespoons olive oil",
+      "3 cloves garlic, minced",
+      "1 red bell pepper, sliced",
+      "1 yellow squash, sliced",
+      "1 zucchini, sliced",
+      "1 cup cherry tomatoes, halved",
+      "1/4 cup grated Parmesan cheese",
+      "2 tablespoons fresh basil, chopped",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "Cook pasta according to package directions. Drain and set aside.",
+      "In a large skillet, heat olive oil over medium heat.",
+      "Add garlic and sauté for 30 seconds until fragrant.",
+      "Add bell pepper, squash, and zucchini. Cook for 5-7 minutes until vegetables are tender-crisp.",
+      "Add cherry tomatoes and cook for 2 more minutes.",
+      "Add cooked pasta to the skillet and toss to combine.",
+      "Stir in Parmesan cheese and basil.",
+      "Season with salt and pepper to taste."
+    ],
+    "nutrients": {
+      "protein": 15,
+      "carbs": 65,
+      "fat": 12,
+      "fiber": 8,
+      "sodium": 180
+    }
+  },
+  {
+    "id": "local-recipe-4",
+    "title": "Salmon with Roasted Vegetables",
+    "image": "https://source.unsplash.com/random/300x200/?salmon+vegetables",
+    "calories": 380,
+    "servings": 2,
+    "cookTime": 25,
+    "prepTime": 10,
+    "healthLabels": ["High-Protein", "Gluten-Free", "Dairy-Free"],
+    "source": "Local",
+    "ingredients": [
+      "2 salmon fillets (6 oz each)",
+      "2 tablespoons olive oil",
+      "1 lemon, sliced",
+      "2 cloves garlic, minced",
+      "1 teaspoon dried dill",
+      "1 cup broccoli florets",
+      "1 cup cauliflower florets",
+      "1 red onion, cut into wedges",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "Preheat oven to 400°F (200°C).",
+      "Place salmon fillets on a baking sheet lined with parchment paper.",
+      "In a small bowl, mix 1 tablespoon olive oil, garlic, and dill.",
+      "Brush salmon with the oil mixture and top with lemon slices.",
+      "In a separate bowl, toss vegetables with remaining olive oil, salt, and pepper.",
+      "Arrange vegetables around the salmon on the baking sheet.",
+      "Bake for 18-20 minutes until salmon is cooked through and vegetables are tender.",
+      "Serve immediately."
+    ],
+    "nutrients": {
+      "protein": 32,
+      "carbs": 14,
+      "fat": 22,
+      "fiber": 5,
+      "sodium": 220
+    }
+  },
+  {
+    "id": "local-recipe-5",
+    "title": "Quinoa Bowl with Roasted Vegetables",
+    "image": "https://source.unsplash.com/random/300x200/?quinoa+bowl",
+    "calories": 380,
+    "servings": 2,
+    "cookTime": 30,
+    "prepTime": 15,
+    "healthLabels": ["Vegan", "Gluten-Free", "High-Fiber"],
+    "source": "Local",
+    "ingredients": [
+      "1 cup quinoa, rinsed",
+      "2 cups vegetable broth",
+      "1 sweet potato, diced",
+      "1 red bell pepper, diced",
+      "1 zucchini, diced",
+      "1 red onion, diced",
+      "2 tablespoons olive oil",
+      "1 teaspoon cumin",
+      "1 teaspoon paprika",
+      "1/4 cup tahini",
+      "2 tablespoons lemon juice",
+      "1 clove garlic, minced",
+      "2 tablespoons water",
+      "Salt and pepper to taste",
+      "Fresh parsley for garnish"
+    ],
+    "instructions": [
+      "Preheat oven to 425°F (220°C).",
+      "Cook quinoa in vegetable broth according to package directions.",
+      "Toss sweet potato, bell pepper, zucchini, and red onion with olive oil, cumin, paprika, salt, and pepper.",
+      "Spread vegetables on a baking sheet and roast for 20-25 minutes until tender and slightly caramelized.",
+      "In a small bowl, whisk together tahini, lemon juice, garlic, water, salt, and pepper to make the dressing.",
+      "Divide quinoa between bowls, top with roasted vegetables.",
+      "Drizzle with tahini dressing and garnish with fresh parsley."
+    ],
+    "nutrients": {
+      "protein": 12,
+      "carbs": 52,
+      "fat": 16,
+      "fiber": 9,
+      "sodium": 280
+    }
+  },
+  {
+    "id": "local-recipe-6",
+    "title": "Chicken Stir-Fry",
+    "image": "https://source.unsplash.com/random/300x200/?chicken+stir+fry",
+    "calories": 350,
+    "servings": 4,
+    "cookTime": 15,
+    "prepTime": 15,
+    "healthLabels": ["High-Protein", "Dairy-Free"],
+    "source": "Local",
+    "ingredients": [
+      "1 lb boneless, skinless chicken breast, cut into strips",
+      "2 tablespoons vegetable oil",
+      "2 cloves garlic, minced",
+      "1 tablespoon ginger, minced",
+      "1 bell pepper, sliced",
+      "1 cup snow peas",
+      "1 carrot, julienned",
+      "1/4 cup soy sauce (low-sodium)",
+      "1 tablespoon honey",
+      "1 teaspoon sesame oil",
+      "2 green onions, sliced",
+      "1 tablespoon sesame seeds"
+    ],
+    "instructions": [
+      "Heat 1 tablespoon oil in a large wok or skillet over high heat.",
+      "Add chicken and stir-fry until no longer pink, about 5-6 minutes. Remove from wok.",
+      "Add remaining oil to the wok. Add garlic and ginger, stir-fry for 30 seconds.",
+      "Add bell pepper, snow peas, and carrot. Stir-fry for 3-4 minutes until vegetables are crisp-tender.",
+      "In a small bowl, mix soy sauce, honey, and sesame oil.",
+      "Return chicken to the wok, add sauce mixture, and toss to coat.",
+      "Cook for 1-2 minutes until everything is heated through.",
+      "Garnish with green onions and sesame seeds before serving."
+    ],
+    "nutrients": {
+      "protein": 28,
+      "carbs": 18,
+      "fat": 14,
+      "fiber": 3,
+      "sodium": 620
+    }
+  },
+  {
+    "id": "local-recipe-7",
+    "title": "Mediterranean Chickpea Salad",
+    "image": "https://source.unsplash.com/random/300x200/?chickpea+salad",
+    "calories": 320,
+    "servings": 4,
+    "cookTime": 0,
+    "prepTime": 15,
+    "healthLabels": ["Vegetarian", "High-Fiber", "High-Protein"],
+    "source": "Local",
+    "ingredients": [
+      "2 cans (15 oz each) chickpeas, drained and rinsed",
+      "1 cucumber, diced",
+      "1 pint cherry tomatoes, halved",
+      "1/2 red onion, finely diced",
+      "1/2 cup Kalamata olives, pitted and halved",
+      "1/2 cup feta cheese, crumbled",
+      "1/4 cup fresh parsley, chopped",
+      "3 tablespoons olive oil",
+      "2 tablespoons lemon juice",
+      "1 clove garlic, minced",
+      "1 teaspoon dried oregano",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "In a large bowl, combine chickpeas, cucumber, tomatoes, red onion, olives, feta cheese, and parsley.",
+      "In a small bowl, whisk together olive oil, lemon juice, garlic, oregano, salt, and pepper.",
+      "Pour dressing over the salad and toss to combine.",
+      "Refrigerate for at least 30 minutes before serving to allow flavors to meld.",
+      "Serve chilled or at room temperature."
+    ],
+    "nutrients": {
+      "protein": 12,
+      "carbs": 35,
+      "fat": 15,
+      "fiber": 10,
+      "sodium": 480
+    }
+  },
+  {
+    "id": "local-recipe-8",
+    "title": "Beef and Broccoli",
+    "image": "https://source.unsplash.com/random/300x200/?beef+broccoli",
+    "calories": 380,
+    "servings": 4,
+    "cookTime": 20,
+    "prepTime": 15,
+    "healthLabels": ["High-Protein", "Dairy-Free"],
+    "source": "Local",
+    "ingredients": [
+      "1 lb flank steak, thinly sliced against the grain",
+      "2 tablespoons vegetable oil",
+      "3 cups broccoli florets",
+      "1 red bell pepper, sliced",
+      "3 cloves garlic, minced",
+      "1 tablespoon ginger, minced",
+      "1/4 cup soy sauce (low-sodium)",
+      "2 tablespoons brown sugar",
+      "1 tablespoon cornstarch",
+      "1/4 cup water",
+      "1 teaspoon sesame oil",
+      "Green onions for garnish"
+    ],
+    "instructions": [
+      "In a small bowl, whisk together soy sauce, brown sugar, cornstarch, water, and sesame oil. Set aside.",
+      "Heat 1 tablespoon oil in a large skillet or wok over high heat.",
+      "Add beef and stir-fry until browned, about 3-4 minutes. Remove from skillet.",
+      "Add remaining oil to the skillet. Add garlic and ginger, stir-fry for 30 seconds.",
+      "Add broccoli and bell pepper. Stir-fry for 4-5 minutes until vegetables are tender-crisp.",
+      "Return beef to the skillet, add sauce mixture, and toss to coat.",
+      "Cook for 2-3 minutes until sauce thickens.",
+      "Garnish with green onions before serving."
+    ],
+    "nutrients": {
+      "protein": 32,
+      "carbs": 20,
+      "fat": 18,
+      "fiber": 4,
+      "sodium": 720
+    }
+  },
+  {
+    "id": "local-recipe-9",
+    "title": "Lentil Soup",
+    "image": "https://source.unsplash.com/random/300x200/?lentil+soup",
+    "calories": 280,
+    "servings": 6,
+    "cookTime": 40,
+    "prepTime": 15,
+    "healthLabels": ["Vegetarian", "High-Fiber", "High-Protein"],
+    "source": "Local",
+    "ingredients": [
+      "2 tablespoons olive oil",
+      "1 onion, chopped",
+      "2 carrots, diced",
+      "2 celery stalks, diced",
+      "3 cloves garlic, minced",
+      "1 teaspoon ground cumin",
+      "1/2 teaspoon dried thyme",
+      "1 bay leaf",
+      "2 cups green or brown lentils, rinsed",
+      "8 cups vegetable broth",
+      "1 can (14 oz) diced tomatoes",
+      "2 cups spinach, chopped",
+      "2 tablespoons lemon juice",
+      "Salt and pepper to taste",
+      "Fresh parsley for garnish"
+    ],
+    "instructions": [
+      "Heat olive oil in a large pot over medium heat.",
+      "Add onion, carrots, and celery. Sauté until vegetables are soft, about 5-7 minutes.",
+      "Add garlic, cumin, thyme, and bay leaf. Cook for 1 minute until fragrant.",
+      "Add lentils, vegetable broth, and diced tomatoes. Bring to a boil.",
+      "Reduce heat, cover, and simmer for 25-30 minutes until lentils are tender.",
+      "Stir in spinach and cook until wilted, about 2 minutes.",
+      "Remove bay leaf. Stir in lemon juice, salt, and pepper.",
+      "Garnish with fresh parsley before serving."
+    ],
+    "nutrients": {
+      "protein": 15,
+      "carbs": 40,
+      "fat": 6,
+      "fiber": 16,
+      "sodium": 480
+    }
+  },
+  {
+    "id": "local-recipe-10",
+    "title": "Berry Smoothie Bowl",
+    "image": "https://source.unsplash.com/random/300x200/?smoothie+bowl",
+    "calories": 320,
+    "servings": 1,
+    "cookTime": 0,
+    "prepTime": 10,
+    "healthLabels": ["Vegetarian", "High-Fiber", "Breakfast"],
+    "source": "Local",
+    "ingredients": [
+      "1 frozen banana",
+      "1 cup mixed frozen berries (strawberries, blueberries, raspberries)",
+      "1/2 cup Greek yogurt",
+      "1/4 cup almond milk",
+      "1 tablespoon honey or maple syrup (optional)",
+      "Toppings: sliced fresh fruit, granola, chia seeds, coconut flakes, nuts"
+    ],
+    "instructions": [
+      "In a blender, combine frozen banana, frozen berries, Greek yogurt, almond milk, and sweetener if using.",
+      "Blend until smooth and thick. Add more almond milk if needed, but keep it thick enough to eat with a spoon.",
+      "Pour into a bowl.",
+      "Top with sliced fresh fruit, granola, chia seeds, coconut flakes, and nuts.",
+      "Serve immediately."
+    ],
+    "nutrients": {
+      "protein": 15,
+      "carbs": 52,
+      "fat": 8,
+      "fiber": 10,
+      "sodium": 60
+    }
+  }
+]

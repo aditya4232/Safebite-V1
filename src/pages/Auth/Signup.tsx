@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { UserPlus, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { app } from "../../main";
+import { app } from "../../firebase";
 
 const Signup = () => {
   const [name, setName] = useState('');

@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Info, Zap, ArrowRight, Trophy } from 'lucide-react';
+import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope } from 'lucide-react';
 import Footer from '@/components/Footer';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatCard from '@/components/StatCard';
 import ProgressChart from '@/components/ProgressChart';
 // Food search components removed from dashboard
-import HealthBox from '@/components/HealthBox';
+// HealthBox moved to separate page
 import ActivityRecommendation from '@/components/ActivityRecommendation';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import FoodGroupChart from '@/components/FoodGroupChart';
@@ -18,12 +18,14 @@ import MacronutrientChart from '@/components/MacronutrientChart';
 import GuestBanner from '@/components/GuestBanner';
 import HealthInsights from '@/components/HealthInsights';
 import { getAuth } from "firebase/auth";
-import { app } from "../main";
+import { app } from "../firebase";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 // Import Loader when needed
 import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { generateHealthTips } from "@/services/healthTipsService";
 import TermsPopup from "@/components/TermsPopup";
+import NotificationsPanel from "@/components/NotificationsPanel";
+import { getAllNotifications } from "@/services/dashboardNotifications";
 
 // Define food recommendations based on health goals
 const foodRecommendations: Record<string, string[]> = {
@@ -48,6 +50,9 @@ const Dashboard = () => {
   const [profileError, setProfileError] = useState(''); // Error state for profile loading
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newHealthGoal, setNewHealthGoal] = useState('');
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [userXP, setUserXP] = useState(10); // Default XP for all users in beta stage
   // Search functionality removed from dashboard
 
@@ -348,6 +353,25 @@ const Dashboard = () => {
     fetchUserProfile();
   }, [user, db, navigate, isGuest, toast]);
 
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (isGuest || !user) return;
+
+      try {
+        const allNotifications = await getAllNotifications(user.uid, userProfile);
+        setNotifications(allNotifications);
+        setNotificationCount(allNotifications.filter(n => !n.read).length);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+
+    if (userProfile) {
+      fetchNotifications();
+    }
+  }, [user, userProfile, isGuest]);
+
 
   // Weekly prompt logic
   useEffect(() => {
@@ -451,6 +475,11 @@ const Dashboard = () => {
   return (
     <>
       <TermsPopup onAccept={handleTermsAccept} />
+      <NotificationsPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        userData={userProfile}
+      />
       <div className="min-h-screen bg-safebite-dark-blue">
         <div className="absolute top-0 left-0 right-0 p-1 text-center bg-red-500 text-white text-xs">
           Under Development
@@ -488,9 +517,15 @@ const Dashboard = () => {
                   <Trophy className="h-4 w-4 text-yellow-400 mr-1" />
                   <span className="text-safebite-text font-medium">{userXP} XP</span>
                 </div>
-                <Button variant="outline" className="mr-2 border-safebite-card-bg-alt hover:border-safebite-teal">
+                <Button
+                  variant="outline"
+                  className="mr-2 border-safebite-card-bg-alt hover:border-safebite-teal"
+                  onClick={() => setShowNotifications(true)}
+                >
                   <Bell className="mr-2 h-5 w-5" />
-                  <Badge className="ml-1 bg-safebite-teal text-safebite-dark-blue">3</Badge>
+                  {notificationCount > 0 && (
+                    <Badge className="ml-1 bg-safebite-teal text-safebite-dark-blue">{notificationCount}</Badge>
+                  )}
                 </Button>
               </div>
             </div>
@@ -596,29 +631,82 @@ const Dashboard = () => {
               />
           </div>
 
-            {/* Food Safety Alert */}
-            <Card className="mb-8 border-red-500 shadow-md bg-red-500/10 p-6">
-              <div className="flex items-start">
-                <div className="flex-shrink-0 mr-4">
-                  <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
-                    <Info size={28} />
+            {/* Food Safety Alert - Only show when there's an actual alert */}
+            {notifications.some(n => n.type === 'alert') && (
+              <Card className="mb-8 border-red-500 shadow-md bg-red-500/10 p-6">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 mr-4">
+                    <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                      <Info size={28} />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2 text-red-400">Food Safety Alert</h3>
+                    <p className="text-safebite-text-secondary mb-2">
+                      {notifications.find(n => n.type === 'alert')?.message ||
+                        'A recent product you scanned contains ingredients that may affect your health goals.'}
+                    </p>
+                    <Button
+                      variant="link"
+                      className="text-red-400 hover:text-red-300 p-0"
+                      onClick={() => setShowNotifications(true)}
+                    >
+                      View Details <ArrowRight className="ml-1 h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-red-400">Food Safety Alert</h3>
-                  <p className="text-safebite-text-secondary mb-2">
-                    A recent product you scanned contains high levels of artificial sweeteners and preservatives that may affect your health goals.
-                  </p>
-                  <Button variant="link" className="text-red-400 hover:text-red-300 p-0">
-                    View Details <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
-            {/* HealthBox */}
+            {/* Favorite Health Tools */}
             <div className="mb-8">
-              <HealthBox />
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-semibold text-safebite-text">Your Health Tools</h2>
+                <Button
+                  variant="outline"
+                  className="border-safebite-card-bg-alt hover:border-safebite-teal"
+                  onClick={() => navigate('/healthbox')}
+                >
+                  <Stethoscope className="mr-2 h-4 w-4" />
+                  View All Tools
+                </Button>
+              </div>
+
+              {userProfile?.favoriteHealthTools && userProfile.favoriteHealthTools.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {userProfile.favoriteHealthTools.slice(0, 4).map((tool) => (
+                    <Card
+                      key={tool.id}
+                      className="sci-fi-card cursor-pointer hover:border-safebite-teal transition-colors"
+                      onClick={() => navigate('/healthbox')}
+                    >
+                      <div className="p-4 flex flex-col items-center text-center">
+                        <div className="h-12 w-12 rounded-full bg-safebite-teal/20 flex items-center justify-center mb-3">
+                          <Stethoscope className="h-6 w-6 text-safebite-teal" />
+                        </div>
+                        <h3 className="font-medium text-safebite-text mb-1">{tool.id.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</h3>
+                        <p className="text-xs text-safebite-text-secondary">Last used: {new Date(tool.addedAt).toLocaleDateString()}</p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="sci-fi-card p-6 text-center">
+                  <div className="mb-4">
+                    <div className="h-16 w-16 rounded-full bg-safebite-card-bg-alt flex items-center justify-center mx-auto">
+                      <Stethoscope className="h-8 w-8 text-safebite-text-secondary" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-medium text-safebite-text mb-2">No Favorite Health Tools</h3>
+                  <p className="text-safebite-text-secondary mb-4">Visit the HealthBox to explore and save your favorite health tools.</p>
+                  <Button
+                    onClick={() => navigate('/healthbox')}
+                    className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+                  >
+                    Explore HealthBox
+                  </Button>
+                </Card>
+              )}
             </div>
 
             {/* Questionnaire Data Summary */}

@@ -4,63 +4,14 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Bot, Loader2 } from 'lucide-react';
 import Loader from '@/components/Loader';
 import { getAuth } from "firebase/auth";
-import { app } from "../main";
+import { app } from "../firebase";
 import { getFirestore, doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
+import { Question, getPersonalizedWeeklyQuestions, generateWeeklyInsights } from '@/services/weeklyQuestionsService';
 
-// Types
-interface Question {
-  id: string;
-  text: string;
-  type: 'radio' | 'slider' | 'text';
-  options?: string[];
-  min?: number;
-  max?: number;
-  step?: number;
-}
 
-const weeklyQuestions: Question[] = [
-  {
-    id: 'home_cooked',
-    text: 'How many home-cooked meals did you have this week?',
-    type: 'slider',
-    min: 0,
-    max: 21,
-    step: 1
-  },
-  {
-    id: 'water_intake',
-    text: 'On average, how many glasses of water did you drink daily?',
-    type: 'slider',
-    min: 0,
-    max: 15,
-    step: 1
-  },
-  {
-    id: 'junk_food',
-    text: 'How many times did you consume processed/junk food this week?',
-    type: 'slider',
-    min: 0,
-    max: 20,
-    step: 1
-  },
-  {
-    id: 'exercise',
-    text: 'How many minutes did you exercise this week in total?',
-    type: 'slider',
-    min: 0,
-    max: 1000,
-    step: 10
-  },
-  {
-    id: 'energy_level',
-    text: 'How would you rate your energy levels this week?',
-    type: 'radio',
-    options: ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
-  }
-];
 
 const WeeklyQuestions = () => {
   const navigate = useNavigate();
@@ -69,19 +20,26 @@ const WeeklyQuestions = () => {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [weeklyQuestions, setWeeklyQuestions] = useState<Question[]>([]);
+  const [weeklyInsights, setWeeklyInsights] = useState<string>('');
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const auth = getAuth(app);
   const db = getFirestore(app);
   const user = auth.currentUser;
   const [hasCompletedThisWeek, setHasCompletedThisWeek] = useState(false);
 
   const currentQuestion = weeklyQuestions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / weeklyQuestions.length) * 100;
+  const progress = weeklyQuestions.length > 0 ? ((currentQuestionIndex + 1) / weeklyQuestions.length) * 100 : 0;
 
   useEffect(() => {
-    const checkWeeklyCompletion = async () => {
+    const initializeWeeklyQuestions = async () => {
+      setIsLoading(true);
+
       if (user) {
         const userRef = doc(db, "users", user.uid);
         try {
+          // Check if user has already completed this week's questions
           const docSnap = await getDoc(userRef);
           if (docSnap.exists()) {
             const userData = docSnap.data();
@@ -96,20 +54,33 @@ const WeeklyQuestions = () => {
 
               setHasCompletedThisWeek(isSameWeek);
               setIsCompleted(isSameWeek);
+
+              // If completed, load the insights
+              if (isSameWeek && userData.weeklyCheckin.insights) {
+                setWeeklyInsights(userData.weeklyCheckin.insights);
+              }
             }
           }
+
+          // Load personalized questions
+          const personalizedQuestions = await getPersonalizedWeeklyQuestions();
+          setWeeklyQuestions(personalizedQuestions);
         } catch (error: any) {
           toast({
             title: "Error checking progress",
             description: error.message,
             variant: "destructive",
           });
-          console.error("Error checking weekly check-in status: ", error);
+          console.error("Error initializing weekly questions: ", error);
+        } finally {
+          setIsLoading(false);
         }
+      } else {
+        setIsLoading(false);
       }
     };
 
-    checkWeeklyCompletion();
+    initializeWeeklyQuestions();
   }, [user, db, toast, navigate]);
 
   useEffect(() => {
@@ -178,10 +149,22 @@ const WeeklyQuestions = () => {
       const uid = user.uid;
       const userRef = doc(db, "users", uid);
       try {
-        // Update the user's document with the weekly answers and a timestamp
+        // Generate AI insights from the answers
+        setIsGeneratingInsights(true);
+        let insights = "";
+        try {
+          insights = await generateWeeklyInsights(answers);
+          setWeeklyInsights(insights);
+        } catch (insightError) {
+          console.error("Error generating insights:", insightError);
+          insights = "We couldn't generate personalized insights at this time.";
+        }
+
+        // Update the user's document with the weekly answers, insights, and a timestamp
         await setDoc(userRef, {
           weeklyCheckin: {
             answers: answers,
+            insights: insights,
             timestamp: Timestamp.now() // Add a timestamp
           },
           lastWeeklyPrompt: Timestamp.now() // Update lastWeeklyPrompt timestamp
@@ -190,13 +173,13 @@ const WeeklyQuestions = () => {
         setIsCompleted(true);
         toast({
           title: "Weekly check-in completed!",
-          description: "Thank you for your updates. We've updated your recommendations.",
+          description: "Thank you for your updates. We've generated personalized insights for you.",
         });
 
-        // After 2 seconds, redirect to dashboard
+        // After 3 seconds, redirect to dashboard
         setTimeout(() => {
           navigate('/dashboard');
-        }, 2000);
+        }, 3000);
 
       } catch (error: any) {
         toast({
@@ -244,7 +227,7 @@ const WeeklyQuestions = () => {
             </div>
           </div>
         );
-      
+
       case 'radio':
         return (
           <div className="space-y-3 w-full">
@@ -263,7 +246,7 @@ const WeeklyQuestions = () => {
             ))}
           </div>
         );
-      
+
       default:
         return (
           <input
@@ -280,14 +263,38 @@ const WeeklyQuestions = () => {
   if (isCompleted) {
     return (
       <div className="min-h-screen bg-safebite-dark-blue flex items-center justify-center p-4">
-        <Card className="sci-fi-card max-w-md w-full text-center">
+        <Card className="sci-fi-card max-w-2xl w-full text-center">
           <div className="h-20 w-20 rounded-full bg-safebite-teal/20 flex items-center justify-center mx-auto mb-6">
             <Check className="h-10 w-10 text-safebite-teal" />
           </div>
           <h2 className="text-2xl font-bold text-safebite-text mb-2">Thank You!</h2>
           <p className="text-safebite-text-secondary mb-6">
-            Your weekly health check-in is complete. We've updated your recommendations based on your responses.
+            Your weekly health check-in is complete. We've generated personalized insights based on your responses.
           </p>
+
+          {isGeneratingInsights ? (
+            <div className="py-8 flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin text-safebite-teal mb-4" />
+              <p className="text-safebite-text-secondary">Generating your personalized insights...</p>
+            </div>
+          ) : weeklyInsights ? (
+            <div className="bg-safebite-card-bg-alt p-6 rounded-md mb-6 text-left">
+              <div className="flex items-center mb-4">
+                <Bot className="h-6 w-6 text-safebite-teal mr-2" />
+                <h3 className="text-xl font-medium text-safebite-text">Your Weekly Health Insights</h3>
+              </div>
+              <div className="text-safebite-text-secondary whitespace-pre-line">
+                {weeklyInsights.split('\n').map((line, index) => (
+                  <p key={index} className="mb-2">{line}</p>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-safebite-text-secondary mb-6">
+              We've updated your recommendations based on your responses.
+            </p>
+          )}
+
           <Button
             onClick={() => navigate('/dashboard')}
             className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
@@ -305,14 +312,35 @@ const WeeklyQuestions = () => {
         <div className="absolute top-0 right-0 left-0 p-2 text-center bg-red-500 text-white text-xs">
           Under Development
         </div>
-        
-        {hasCompletedThisWeek ? (
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Loader2 className="h-16 w-16 text-safebite-teal mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-semibold text-safebite-text mb-2">Loading your personalized questions...</h3>
+            <p className="text-safebite-text-secondary mb-4">
+              We're tailoring this week's questions based on your profile and previous responses.
+            </p>
+          </div>
+        ) : hasCompletedThisWeek ? (
           <div className="text-center py-12">
             <Check className="h-16 w-16 text-safebite-teal mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-safebite-text mb-2">You've already completed this week's check-in!</h3>
             <p className="text-safebite-text-secondary mb-4">
               Check back next week for another opportunity to update your health information.
             </p>
+            {weeklyInsights && (
+              <div className="bg-safebite-card-bg-alt p-6 rounded-md mb-6 text-left">
+                <div className="flex items-center mb-4">
+                  <Bot className="h-6 w-6 text-safebite-teal mr-2" />
+                  <h3 className="text-lg font-medium text-safebite-text">Your Weekly Health Insights</h3>
+                </div>
+                <div className="text-safebite-text-secondary whitespace-pre-line">
+                  {weeklyInsights.split('\n').map((line, index) => (
+                    <p key={index} className="mb-2">{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
             <Button onClick={() => navigate('/dashboard')} className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80">
               Return to Dashboard
             </Button>
@@ -374,7 +402,7 @@ const WeeklyQuestions = () => {
             )}
           </>
         )}
-        
+
         <div className="absolute bottom-2 right-2 text-xs text-safebite-text-secondary">
           Created by Aditya Shenvi
         </div>

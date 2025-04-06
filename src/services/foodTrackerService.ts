@@ -2,7 +2,7 @@
 import { FoodItem } from './foodApiService';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, arrayUnion, Timestamp } from "firebase/firestore";
-import { app } from "../main";
+import { app } from "../firebase";
 
 // Interface for tracked food with additional metadata
 export interface TrackedFood extends FoodItem {
@@ -10,6 +10,7 @@ export interface TrackedFood extends FoodItem {
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   quantity: number;
   notes?: string;
+  aiAnalysis?: string;
 }
 
 // Interface for a day's food log
@@ -30,18 +31,19 @@ export const addFoodToTracker = async (
   food: FoodItem,
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack',
   quantity: number = 1,
-  notes: string = ''
+  notes: string = '',
+  aiAnalysis: string = ''
 ): Promise<boolean> => {
   try {
     const auth = getAuth(app);
     const db = getFirestore(app);
     const user = auth.currentUser;
-    
+
     if (!user) {
       console.error('No user logged in');
       return false;
     }
-    
+
     // Create tracked food object
     const trackedFood: TrackedFood = {
       ...food,
@@ -49,32 +51,33 @@ export const addFoodToTracker = async (
       mealType,
       quantity,
       notes,
+      aiAnalysis,
       tracked: true
     };
-    
+
     // Get today's date as ISO string (YYYY-MM-DD)
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Reference to user's food tracker document
     const userRef = doc(db, "users", user.uid);
     const trackerRef = doc(db, "users", user.uid, "foodTracker", today);
-    
+
     // Get current tracker data for today if it exists
     const trackerSnap = await getDoc(trackerRef);
-    
+
     if (trackerSnap.exists()) {
       // Update existing tracker
       const trackerData = trackerSnap.data() as DayFoodLog;
-      
+
       // Add food to the appropriate meal array
       const updatedMealArray = [...trackerData[mealType], trackedFood];
-      
+
       // Calculate new totals
       const newTotalCalories = trackerData.totalCalories + (food.calories * quantity);
       const newTotalProtein = trackerData.totalProtein + ((food.nutrients?.protein || 0) * quantity);
       const newTotalCarbs = trackerData.totalCarbs + ((food.nutrients?.carbs || 0) * quantity);
       const newTotalFat = trackerData.totalFat + ((food.nutrients?.fat || 0) * quantity);
-      
+
       // Update the tracker document
       await setDoc(trackerRef, {
         [mealType]: updatedMealArray,
@@ -97,7 +100,7 @@ export const addFoodToTracker = async (
         totalCarbs: (food.nutrients?.carbs || 0) * quantity,
         totalFat: (food.nutrients?.fat || 0) * quantity
       };
-      
+
       // Save the new tracker
       await setDoc(trackerRef, {
         ...newTracker,
@@ -105,7 +108,7 @@ export const addFoodToTracker = async (
         lastUpdated: Timestamp.now()
       });
     }
-    
+
     // Add to recent foods list
     await setDoc(userRef, {
       recentFoods: arrayUnion({
@@ -116,7 +119,7 @@ export const addFoodToTracker = async (
         dateAdded: Timestamp.now()
       })
     }, { merge: true });
-    
+
     return true;
   } catch (error) {
     console.error('Error adding food to tracker:', error);
@@ -130,16 +133,16 @@ export const getFoodLogForDay = async (date: string = new Date().toISOString().s
     const auth = getAuth(app);
     const db = getFirestore(app);
     const user = auth.currentUser;
-    
+
     if (!user) {
       console.error('No user logged in');
       return null;
     }
-    
+
     // Reference to the day's food tracker document
     const trackerRef = doc(db, "users", user.uid, "foodTracker", date);
     const trackerSnap = await getDoc(trackerRef);
-    
+
     if (trackerSnap.exists()) {
       return trackerSnap.data() as DayFoodLog;
     } else {
@@ -168,26 +171,26 @@ export const getRecentFoods = async (limit: number = 5): Promise<FoodItem[]> => 
     const auth = getAuth(app);
     const db = getFirestore(app);
     const user = auth.currentUser;
-    
+
     if (!user) {
       console.error('No user logged in');
       return [];
     }
-    
+
     // Reference to user document
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
-    
+
     if (userSnap.exists() && userSnap.data().recentFoods) {
       // Get recent foods and sort by date
       const recentFoods = userSnap.data().recentFoods;
-      
+
       // Sort by date (newest first) and limit
       return recentFoods
         .sort((a: any, b: any) => b.dateAdded.seconds - a.dateAdded.seconds)
         .slice(0, limit);
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error getting recent foods:', error);
@@ -205,39 +208,39 @@ export const removeFoodFromTracker = async (
     const auth = getAuth(app);
     const db = getFirestore(app);
     const user = auth.currentUser;
-    
+
     if (!user) {
       console.error('No user logged in');
       return false;
     }
-    
+
     // Reference to the day's food tracker document
     const trackerRef = doc(db, "users", user.uid, "foodTracker", date);
     const trackerSnap = await getDoc(trackerRef);
-    
+
     if (trackerSnap.exists()) {
       const trackerData = trackerSnap.data() as DayFoodLog;
-      
+
       // Find the food in the meal array
       const mealArray = trackerData[mealType];
       const foodIndex = mealArray.findIndex(food => food.id === foodId);
-      
+
       if (foodIndex !== -1) {
         // Get the food to calculate nutrition adjustments
         const food = mealArray[foodIndex];
-        
+
         // Remove the food from the array
         const updatedMealArray = [
           ...mealArray.slice(0, foodIndex),
           ...mealArray.slice(foodIndex + 1)
         ];
-        
+
         // Calculate new totals
         const newTotalCalories = trackerData.totalCalories - (food.calories * food.quantity);
         const newTotalProtein = trackerData.totalProtein - ((food.nutrients?.protein || 0) * food.quantity);
         const newTotalCarbs = trackerData.totalCarbs - ((food.nutrients?.carbs || 0) * food.quantity);
         const newTotalFat = trackerData.totalFat - ((food.nutrients?.fat || 0) * food.quantity);
-        
+
         // Update the tracker document
         await setDoc(trackerRef, {
           [mealType]: updatedMealArray,
@@ -247,11 +250,11 @@ export const removeFoodFromTracker = async (
           totalFat: Math.max(0, newTotalFat),
           lastUpdated: Timestamp.now()
         }, { merge: true });
-        
+
         return true;
       }
     }
-    
+
     return false;
   } catch (error) {
     console.error('Error removing food from tracker:', error);

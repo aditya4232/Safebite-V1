@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  AlertTriangle, CheckCircle, XCircle, 
-  Leaf, Flame, Heart, Tag, Star, Share2, 
-  Bookmark, Clock, ArrowLeft, Plus, Zap
+import {
+  AlertTriangle, CheckCircle, XCircle,
+  Leaf, Flame, Heart, Tag, Star, Share2,
+  Bookmark, Clock, ArrowLeft, Plus, Zap,
+  Bot, Loader2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,8 @@ interface FoodDetailViewProps {
   onToggleFavorite: (foodId: string) => void;
   isFavorite?: boolean;
   tags?: string[];
+  aiAnalysis?: string;
+  isAnalysisLoading?: boolean;
 }
 
 const FoodDetailView: React.FC<FoodDetailViewProps> = ({
@@ -27,25 +30,27 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
   onAddTag,
   onToggleFavorite,
   isFavorite = false,
-  tags = []
+  tags = [],
+  aiAnalysis = '',
+  isAnalysisLoading = false
 }) => {
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
-  
+
   const { name, calories, nutritionScore, details, brand, apiSource, source } = food;
-  
+
   const scoreColors = {
     green: 'bg-green-500',
     yellow: 'bg-yellow-500',
     red: 'bg-red-500'
   };
-  
+
   const scoreLabels = {
     green: 'Good Choice',
     yellow: 'Moderate',
     red: 'Use Caution'
   };
-  
+
   const handleAddTag = () => {
     if (newTag.trim()) {
       onAddTag(food.id, newTag.trim());
@@ -53,7 +58,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
       setShowTagInput(false);
     }
   };
-  
+
   return (
     <div className="sci-fi-card">
       <div className="flex justify-between items-start mb-4">
@@ -66,7 +71,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
         </Button>
-        
+
         <div className="flex space-x-2">
           <Button
             variant="ghost"
@@ -93,7 +98,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           </Button>
         </div>
       </div>
-      
+
       {showTagInput && (
         <div className="mb-4 flex">
           <input
@@ -117,13 +122,13 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           </Button>
         </div>
       )}
-      
+
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-4">
           {tags.map((tag) => (
-            <Badge 
-              key={tag} 
-              variant="outline" 
+            <Badge
+              key={tag}
+              variant="outline"
               className="text-xs bg-safebite-card-bg-alt text-safebite-text-secondary"
             >
               {tag}
@@ -131,7 +136,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           ))}
         </div>
       )}
-      
+
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-2xl font-semibold text-safebite-text">{name}</h3>
@@ -143,14 +148,15 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           {scoreLabels[nutritionScore]}
         </Badge>
       </div>
-      
+
       <Tabs defaultValue="nutrition" className="w-full mb-6">
-        <TabsList className="grid grid-cols-3 mb-4">
+        <TabsList className="grid grid-cols-4 mb-4">
           <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
           <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
           <TabsTrigger value="health">Health</TabsTrigger>
+          <TabsTrigger value="ai-analysis">AI Analysis</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="nutrition" className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
@@ -178,13 +184,13 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               <div className="text-safebite-text font-bold">{details?.sugar || food.nutrients?.sugar || 0}g</div>
             </div>
           </div>
-          
+
           <div className="p-3 bg-safebite-card-bg-alt/50 rounded-md">
             <div className="text-safebite-text-secondary text-sm mb-1">Nutrition Score</div>
             <div className="h-2 bg-safebite-card-bg-alt rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full ${
-                  nutritionScore === 'green' ? 'bg-green-500' : 
+                  nutritionScore === 'green' ? 'bg-green-500' :
                   nutritionScore === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'
                 }`}
                 style={{ width: nutritionScore === 'green' ? '90%' : nutritionScore === 'yellow' ? '50%' : '20%' }}
@@ -196,12 +202,12 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               <span>Excellent</span>
             </div>
           </div>
-          
+
           <div className="text-xs text-safebite-text-secondary text-right">
             Data source: {apiSource || source || 'Unknown'}
           </div>
         </TabsContent>
-        
+
         <TabsContent value="ingredients" className="space-y-4">
           {details?.ingredients && details.ingredients.length > 0 ? (
             <div>
@@ -215,7 +221,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               <p className="text-safebite-text-secondary">No ingredient information available</p>
             </div>
           )}
-          
+
           {details?.additives && details.additives.length > 0 && (
             <div>
               <h4 className="text-lg font-medium text-safebite-text mb-2">Additives</h4>
@@ -233,7 +239,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             </div>
           )}
         </TabsContent>
-        
+
         <TabsContent value="health" className="space-y-4">
           {details?.allergens && details.allergens.length > 0 && (
             <div>
@@ -251,7 +257,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               </div>
             </div>
           )}
-          
+
           {nutritionScore === 'red' && (
             <Card className="bg-red-500/10 border-red-500 p-4">
               <div className="flex items-start">
@@ -265,7 +271,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               </div>
             </Card>
           )}
-          
+
           {nutritionScore === 'green' && (
             <Card className="bg-green-500/10 border-green-500 p-4">
               <div className="flex items-start">
@@ -279,7 +285,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               </div>
             </Card>
           )}
-          
+
           {nutritionScore === 'yellow' && (
             <Card className="bg-yellow-500/10 border-yellow-500 p-4">
               <div className="flex items-start">
@@ -294,8 +300,55 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="ai-analysis" className="space-y-4">
+          {isAnalysisLoading ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-safebite-teal mb-4" />
+              <p className="text-safebite-text-secondary">Analyzing food item...</p>
+            </div>
+          ) : aiAnalysis ? (
+            <div className="bg-safebite-card-bg-alt p-4 rounded-md">
+              <div className="flex items-center mb-4">
+                <Bot className="h-5 w-5 text-safebite-teal mr-2" />
+                <h4 className="text-lg font-medium text-safebite-text">AI Nutritional Analysis</h4>
+              </div>
+              <div className="text-safebite-text-secondary">
+                {aiAnalysis.split('\n').map((line, index) => {
+                  // Check if line is a heading (starts with number and period or has a colon)
+                  if (/^\d+\.\s/.test(line) || line.includes(':')) {
+                    return (
+                      <h5 key={index} className="font-semibold text-safebite-teal mt-3 mb-1">
+                        {line}
+                      </h5>
+                    );
+                  }
+                  // Check if line is a bullet point
+                  else if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                    return (
+                      <div key={index} className="flex items-start ml-2 mb-1">
+                        <span className="text-safebite-teal mr-2">•</span>
+                        <p>{line.replace(/^[•\-]\s*/, '')}</p>
+                      </div>
+                    );
+                  }
+                  // Regular paragraph
+                  else if (line.trim()) {
+                    return <p key={index} className="mb-2">{line}</p>;
+                  }
+                  // Empty line
+                  return <div key={index} className="h-2"></div>;
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-safebite-text-secondary">No AI analysis available</p>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Card className="p-4 border border-orange-500/30 bg-safebite-card-bg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/10 rounded-bl-full"></div>
@@ -310,7 +363,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               </p>
             </div>
           </div>
-          <Button 
+          <Button
             disabled
             className="w-full mt-3 bg-orange-500/20 text-orange-500 hover:bg-orange-500/30 cursor-not-allowed"
           >
@@ -318,7 +371,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             Coming Soon
           </Button>
         </Card>
-        
+
         <Card className="p-4 border border-safebite-teal/30 bg-safebite-card-bg">
           <div className="flex items-center mb-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-safebite-teal to-blue-500 flex items-center justify-center mr-3">
@@ -331,7 +384,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
               </p>
             </div>
           </div>
-          <Button 
+          <Button
             className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
             onClick={() => onAddToTracker(food)}
           >
@@ -340,7 +393,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
           </Button>
         </Card>
       </div>
-      
+
       <div className="flex justify-between">
         <Button
           variant="outline"

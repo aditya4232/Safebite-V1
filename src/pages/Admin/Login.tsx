@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle } from 'lucide-react';
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../../main";
+import { app } from "../../firebase";
 import { useToast } from "@/hooks/use-toast";
 import Loader from '@/components/Loader';
 

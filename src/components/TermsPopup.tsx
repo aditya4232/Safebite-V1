@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
-import { app } from "../main";
+import { app } from "../firebase";
 import { useToast } from "@/hooks/use-toast";
 
 interface TermsPopupProps {

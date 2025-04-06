@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth } from "firebase/auth";
-import { app } from "../../main";
+import { app } from "../../firebase";
 import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 const AdminPanel = () => {

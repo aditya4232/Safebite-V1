@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { 
-  Home, BarChart2, Pizza, Users, Settings, Menu, X, 
-  Search, Heart, LogOut
+import {
+  Home, BarChart2, Pizza, Users, Settings, Menu, X,
+  Search, Heart, LogOut, Activity, Calculator, Stethoscope,
+  Zap, BookOpen, Bot
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, signOut } from "firebase/auth";
-import { app } from "../main";
+import { app } from "../firebase";
 
 const DashboardSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -44,6 +45,7 @@ const DashboardSidebar = () => {
     { path: '/food-search', name: 'Food Search', icon: <Search size={20} /> },
     { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
     { path: '/community', name: 'Community', icon: <Users size={20} /> },
+    { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" /> },
     { path: '/weekly-questions', name: 'Health Check', icon: <Heart size={20} /> },
     { path: '/reports', name: 'Reports', icon: <BarChart2 size={20} /> },
     { path: '/settings', name: 'Settings', icon: <Settings size={20} /> },
@@ -110,9 +112,9 @@ const DashboardSidebar = () => {
                 <p className="text-xs text-safebite-text-secondary">Premium member</p>
               </div>
             </div>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               className="w-full sci-fi-button flex items-center justify-center"
               onClick={handleLogout}
             >

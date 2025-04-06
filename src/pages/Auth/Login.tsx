@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import Loader from '@/components/Loader';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { app } from "../../main"; // Assuming you have initialized Firebase in main.tsx
+import { app } from "../../firebase";
 
 const Login = () => {
   const [email, setEmail] = useState('');

@@ -20,7 +20,7 @@ import {
   shareToSocialMedia
 } from '@/services/gamification';
 import { getAuth } from "firebase/auth";
-import { app } from "../main";
+import { app } from "../firebase";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 const Reports = () => {

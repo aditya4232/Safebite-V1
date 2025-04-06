@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import {
   AlertTriangle, CheckCircle, XCircle,
   Leaf, Flame, Heart, Zap, Database,
-  History, Tag, Star, Upload, Scan
+  History, Tag, Star, Upload, Scan,
+  Bot, AlertCircle
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
@@ -15,16 +16,19 @@ import FoodDetailView from '@/components/FoodDetailView';
 import FoodSearchHistory from '@/components/FoodSearchHistory';
 import FoodScannerUpload from '@/components/FoodScannerUpload';
 import ApiSourceSelector from '@/components/ApiSourceSelector';
+import FoodChatBot from '@/components/FoodChatBot';
 import {
   FoodItem, searchFoods, searchByBarcode, searchByImage,
   saveSearchHistory, getSearchHistory, toggleFavorite,
-  addTagToSearch, removeTagFromSearch, removeSearchHistoryItem
+  addTagToSearch, removeTagFromSearch, removeSearchHistoryItem,
+  getApiStatus
 } from '@/services/foodApiService';
 import { useToast } from "@/hooks/use-toast";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../main";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { app } from "../firebase";
 import { addFoodToTracker, getRecentFoods } from '@/services/foodTrackerService';
+import { getFoodRecommendations, analyzeFoodItem } from '@/services/geminiService';
 
 interface HealthProfile {
   health_goals?: string;
@@ -47,6 +51,14 @@ const FoodSearch = () => {
   const [showAddToTrackerModal, setShowAddToTrackerModal] = useState(false);
   const [selectedFoodForTracker, setSelectedFoodForTracker] = useState<FoodItem | null>(null);
   const [quantity, setQuantity] = useState(1);
+  // API status tracking
+  const [apiStatuses, setApiStatuses] = useState(getApiStatus());
+  const [preferredApi, setPreferredApi] = useState<string | undefined>(undefined);
+  // AI analysis
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+  // Show API status panel
+  const [showApiStatus, setShowApiStatus] = useState(false);
   const [notes, setNotes] = useState('');
 
   // New state for enhanced features
@@ -136,74 +148,158 @@ const FoodSearch = () => {
         setUserProfile(userData.profile);
 
         // Generate food recommendations based on profile
-        generateRecommendations(userData.profile);
+        await generateRecommendations(userData.profile);
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
     }
   };
 
-  // Generate food recommendations based on user profile
-  const generateRecommendations = (profile: HealthProfile) => {
+  // Generate food recommendations based on user profile and ML model
+  const generateRecommendations = async (profile: HealthProfile) => {
     if (!profile) return;
 
-    let recommendationQueries: string[] = [];
+    try {
+      // First try to get ML-based recommendations
+      const mlRecommendations = await getFoodRecommendations();
 
-    // Based on health goals
-    if (profile.health_goals === 'Weight Loss') {
-      recommendationQueries.push('low calorie');
-      recommendationQueries.push('high protein');
-    } else if (profile.health_goals === 'Muscle Gain') {
-      recommendationQueries.push('high protein');
-      recommendationQueries.push('protein rich');
-    } else if (profile.health_goals === 'General Health') {
-      recommendationQueries.push('balanced meal');
-      recommendationQueries.push('nutrient rich');
-    }
+      if (mlRecommendations && mlRecommendations.length > 0) {
+        // Use ML recommendations to search for foods
+        const query = mlRecommendations.slice(0, 3).join(' ');
+        fetchRecommendations(query);
+        return;
+      }
 
-    // Based on health conditions
-    if (profile.health_conditions === 'Diabetes') {
-      recommendationQueries.push('low glycemic');
-      recommendationQueries.push('sugar free');
-    } else if (profile.health_conditions === 'Hypertension') {
-      recommendationQueries.push('low sodium');
-      recommendationQueries.push('heart healthy');
-    } else if (profile.health_conditions === 'Heart Issues') {
-      recommendationQueries.push('heart healthy');
-      recommendationQueries.push('omega 3');
-    }
+      // Fallback to profile-based recommendations
+      let recommendationQueries: string[] = [];
 
-    // Based on dietary preferences
-    if (profile.dietary_preferences === 'Veg') {
-      recommendationQueries.push('vegetarian');
-    } else if (profile.dietary_preferences === 'Vegan') {
-      recommendationQueries.push('vegan');
-    } else if (profile.dietary_preferences === 'Keto') {
-      recommendationQueries.push('keto');
-    } else if (profile.dietary_preferences === 'Gluten-Free') {
-      recommendationQueries.push('gluten free');
-    }
+      // Based on health goals
+      if (profile.health_goals === 'Weight Loss') {
+        recommendationQueries.push('low calorie');
+        recommendationQueries.push('high protein');
+      } else if (profile.health_goals === 'Muscle Gain') {
+        recommendationQueries.push('high protein');
+        recommendationQueries.push('protein rich');
+      } else if (profile.health_goals === 'General Health') {
+        recommendationQueries.push('balanced meal');
+        recommendationQueries.push('nutrient rich');
+      }
 
-    // Get a random recommendation query
-    if (recommendationQueries.length > 0) {
-      const randomIndex = Math.floor(Math.random() * recommendationQueries.length);
-      const query = recommendationQueries[randomIndex];
+      // Based on health conditions
+      if (profile.health_conditions === 'Diabetes') {
+        recommendationQueries.push('low glycemic');
+        recommendationQueries.push('sugar free');
+      } else if (profile.health_conditions === 'Hypertension') {
+        recommendationQueries.push('low sodium');
+        recommendationQueries.push('heart healthy');
+      } else if (profile.health_conditions === 'Heart Issues') {
+        recommendationQueries.push('heart healthy');
+        recommendationQueries.push('omega 3');
+      }
 
-      // Fetch recommendations
-      fetchRecommendations(query);
+      // Based on dietary preferences
+      if (profile.dietary_preferences === 'Veg') {
+        recommendationQueries.push('vegetarian');
+      } else if (profile.dietary_preferences === 'Vegan') {
+        recommendationQueries.push('vegan');
+      } else if (profile.dietary_preferences === 'Keto') {
+        recommendationQueries.push('keto');
+      } else if (profile.dietary_preferences === 'Gluten-Free') {
+        recommendationQueries.push('gluten free');
+      }
+
+      // Get a random recommendation query
+      if (recommendationQueries.length > 0) {
+        const randomIndex = Math.floor(Math.random() * recommendationQueries.length);
+        const query = recommendationQueries[randomIndex];
+
+        // Fetch recommendations
+        fetchRecommendations(query);
+      }
+    } catch (error) {
+      console.error('Error generating ML recommendations:', error);
+      // Fallback to a simple healthy food search
+      fetchRecommendations('healthy food');
     }
   };
 
-  // Fetch food recommendations
+  // Fetch food recommendations using Gemini AI
   const fetchRecommendations = async (query: string) => {
     try {
+      // First try to get AI-based recommendations
+      const aiRecommendationsText = await getFoodRecommendations(query);
+      console.log('AI Recommendations:', aiRecommendationsText);
+
+      // Extract food names from AI recommendations
+      const foodNames = extractFoodNamesFromAIResponse(aiRecommendationsText);
+
+      if (foodNames.length > 0) {
+        // Search for each recommended food
+        const recommendationPromises = foodNames.map(food => searchFoods(food));
+        const recommendationResults = await Promise.all(recommendationPromises);
+
+        // Flatten results and take the first item from each search
+        const topRecommendations = recommendationResults
+          .map(results => results.length > 0 ? results[0] : null)
+          .filter(item => item !== null) as FoodItem[];
+
+        if (topRecommendations.length > 0) {
+          setRecommendations(topRecommendations);
+          return;
+        }
+      }
+
+      // Fallback to regular search if AI recommendations fail
       const results = await searchFoods(query);
       // Filter to only include healthy options
       const healthyOptions = results.filter(food => food.nutritionScore === 'green');
       setRecommendations(healthyOptions.slice(0, 3));
     } catch (error) {
       console.error('Error fetching recommendations:', error);
+      // Final fallback
+      try {
+        const results = await searchFoods('healthy ' + query);
+        setRecommendations(results.slice(0, 3));
+      } catch (fallbackError) {
+        console.error('Fallback recommendation error:', fallbackError);
+      }
     }
+  };
+
+  // Helper function to extract food names from AI response
+  const extractFoodNamesFromAIResponse = (text: string): string[] => {
+    // Simple extraction - look for food names at the beginning of lines or after numbers
+    const lines = text.split('\n');
+    const foodNames: string[] = [];
+
+    for (const line of lines) {
+      // Look for lines that start with numbers or have food names after colons
+      if (/^\d+\.\s+([A-Za-z\s]+)/.test(line)) {
+        const match = line.match(/^\d+\.\s+([A-Za-z\s]+)/);
+        if (match && match[1]) {
+          foodNames.push(match[1].trim());
+        }
+      } else if (line.includes(':')) {
+        const parts = line.split(':');
+        if (parts.length > 1 && parts[0].trim().length < 20) { // Avoid long descriptions
+          foodNames.push(parts[0].trim());
+        }
+      }
+    }
+
+    // If no structured format found, just take the first few words of each line
+    if (foodNames.length === 0) {
+      for (const line of lines) {
+        if (line.trim().length > 0) {
+          const words = line.trim().split(' ').slice(0, 3).join(' ');
+          if (words.length > 3 && !foodNames.includes(words)) {
+            foodNames.push(words);
+          }
+        }
+      }
+    }
+
+    return foodNames.slice(0, 3); // Return up to 3 food names
   };
 
   const handleSearch = async (query: string) => {
@@ -212,6 +308,7 @@ const FoodSearch = () => {
     setSelectedFood(null);
     setShowNoResults(false);
     setShowHistory(false);
+    setAiAnalysis(''); // Clear any previous AI analysis
 
     try {
       // Save to search history
@@ -221,8 +318,14 @@ const FoodSearch = () => {
       // Reload search history
       loadSearchHistory();
 
-      // Call the API service
-      const results = await searchFoods(query);
+      // Update API statuses before search
+      setApiStatuses(getApiStatus());
+
+      // Call the API service with preferred API if set
+      const results = await searchFoods(query, preferredApi);
+
+      // Update API statuses after search
+      setApiStatuses(getApiStatus());
 
       setSearchResults(results);
       setShowNoResults(results.length === 0);
@@ -230,7 +333,7 @@ const FoodSearch = () => {
       // Show toast notification
       toast({
         title: "Search Complete",
-        description: `Found ${results.length} results for "${query}"`,
+        description: `Found ${results.length} results for "${query}" using ${results.length > 0 ? results[0].apiSource : 'APIs'}`,
       });
     } catch (error) {
       console.error('Search error:', error);
@@ -240,6 +343,9 @@ const FoodSearch = () => {
         variant: "destructive"
       });
       setShowNoResults(true);
+
+      // Update API statuses after error
+      setApiStatuses(getApiStatus());
     } finally {
       setIsLoading(false);
     }
@@ -353,9 +459,67 @@ const FoodSearch = () => {
     }
   };
 
-  const handleFoodSelect = (food: FoodItem) => {
+  const handleFoodSelect = async (food: FoodItem) => {
     setSelectedFood(food);
     setShowHistory(false);
+
+    // Get AI analysis of the food item
+    if (food) {
+      setIsAnalysisLoading(true);
+      try {
+        // Get AI analysis
+        const analysis = await analyzeFoodItem(food);
+        setAiAnalysis(analysis);
+
+        // Save this food selection to user's history
+        saveUserFoodSelection(food, analysis);
+
+        // Show toast notification about AI analysis
+        toast({
+          title: "AI Analysis Ready",
+          description: "Check the AI Analysis tab for personalized insights",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error('Error getting AI analysis:', error);
+        setAiAnalysis('Unable to analyze this food item at the moment.');
+      } finally {
+        setIsAnalysisLoading(false);
+      }
+    }
+  };
+
+  // Save user's food selection to Firebase for ML learning
+  const saveUserFoodSelection = async (food: FoodItem, analysis: string) => {
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.log('User not logged in, skipping food selection tracking');
+        return;
+      }
+
+      const db = getFirestore(app);
+      const userRef = doc(db, 'users', user.uid);
+      const foodSelectionsRef = doc(db, 'users', user.uid, 'foodSelections', `${Date.now()}`);
+
+      // Save the food selection with analysis
+      await setDoc(foodSelectionsRef, {
+        foodId: food.id,
+        foodName: food.name,
+        nutritionScore: food.nutritionScore,
+        calories: food.calories,
+        nutrients: food.nutrients,
+        aiAnalysis: analysis,
+        timestamp: new Date().toISOString(),
+        source: food.apiSource || food.source
+      });
+
+      console.log('Food selection saved to user profile');
+    } catch (error) {
+      console.error('Error saving food selection:', error);
+    }
   };
 
   // Handle showing search history
@@ -450,7 +614,8 @@ const FoodSearch = () => {
         selectedFoodForTracker,
         selectedMealType,
         quantity,
-        notes
+        notes,
+        aiAnalysis // Include AI analysis when adding to tracker
       );
 
       if (success) {
@@ -671,6 +836,8 @@ const FoodSearch = () => {
               onToggleFavorite={(foodId) => handleToggleFavorite(foodId)}
               isFavorite={favoriteItems[selectedFood.id] || false}
               tags={foodTags[selectedFood.id] || []}
+              aiAnalysis={aiAnalysis}
+              isAnalysisLoading={isAnalysisLoading}
             />
           ) : showHistory ? (
             <div className="sci-fi-card">
@@ -814,30 +981,44 @@ const FoodSearch = () => {
         />
       )}
 
+      {/* AI Chatbot */}
+      <FoodChatBot initialMessage="Hi! I'm your SafeBite AI assistant. Ask me anything about food, nutrition, or the foods you're searching for!" />
+
       {/* API Source Selector Modal */}
       {showApiSelector && (
         <ApiSourceSelector
           apiSources={[
             {
-              id: 'Edamam',
+              id: 'mongodb',
+              name: 'SafeBite Database',
+              description: 'Our curated database of food products and recipes',
+              isActive: preferredApi === 'mongodb'
+            },
+            {
+              id: 'calorieninjas',
+              name: 'CalorieNinjas API',
+              description: 'Detailed nutrition data with image recognition capabilities',
+              isActive: preferredApi === 'calorieninjas'
+            },
+            {
+              id: 'openfoodfacts',
+              name: 'Open Food Facts',
+              description: 'Global community-driven food product database',
+              isActive: preferredApi === 'openfoodfacts'
+            },
+            {
+              id: 'edamam',
               name: 'Edamam Food Database',
               description: 'Comprehensive nutrition data for packaged and whole foods',
-              isActive: activeApiSource === 'Edamam'
-            },
-            {
-              id: 'USDA',
-              name: 'USDA Food Database',
-              description: 'Official US government food composition data',
-              isActive: activeApiSource === 'USDA'
-            },
-            {
-              id: 'OpenFoodFacts',
-              name: 'Open Food Facts',
-              description: 'Open database of food products from around the world',
-              isActive: activeApiSource === 'OpenFoodFacts'
+              isActive: preferredApi === 'edamam'
             }
           ]}
-          onToggleApi={handleToggleApiSource}
+          onToggleApi={(apiId) => {
+            setPreferredApi(apiId);
+            setShowApiSelector(false);
+            // Refresh API status
+            setApiStatuses(getApiStatus());
+          }}
           onClose={() => setShowApiSelector(false)}
         />
       )}

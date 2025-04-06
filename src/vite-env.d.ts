@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_CALORIENINJAS_API_KEY: string;
   readonly VITE_FATSECRET_CONSUMER_KEY: string;
   readonly VITE_FATSECRET_CONSUMER_SECRET: string;
+  readonly VITE_GOOGLE_GENAI_API_KEY: string;
+  readonly VITE_MONGODB_URI: string;
 }
 
 interface ImportMeta {
@@ -25,5 +27,7 @@ declare var process: {
     readonly VITE_CALORIENINJAS_API_KEY: string;
     readonly VITE_FATSECRET_CONSUMER_KEY: string;
     readonly VITE_FATSECRET_CONSUMER_SECRET: string;
+    readonly VITE_GOOGLE_GENAI_API_KEY: string;
+    readonly VITE_MONGODB_URI: string;
   };
 }
