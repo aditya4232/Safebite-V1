@@ -9,7 +9,8 @@ const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+// Render sets PORT env variable automatically
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -33,19 +34,19 @@ async function connectToMongoDB() {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    
+
     await client.connect();
     console.log('Connected to MongoDB successfully');
     db = client.db(DB_NAME);
-    
+
     // Check if products collection exists and has data
     const collections = await db.listCollections().toArray();
     const hasProductsCollection = collections.some(c => c.name === 'products');
-    
+
     if (hasProductsCollection) {
       const count = await db.collection('products').countDocuments();
       console.log(`Found ${count} documents in products collection`);
-      
+
       // If collection exists but is empty, import data
       if (count === 0) {
         await importSampleData();
@@ -56,19 +57,19 @@ async function connectToMongoDB() {
       await db.createCollection('products');
       await importSampleData();
     }
-    
+
     // Create text index for better search if it doesn't exist
     try {
-      await db.collection('products').createIndex({ 
-        name: 'text', 
-        'ingredients': 'text', 
-        'category': 'text' 
+      await db.collection('products').createIndex({
+        name: 'text',
+        'ingredients': 'text',
+        'category': 'text'
       });
       console.log('Text index created or already exists');
     } catch (error) {
       console.warn('Could not create text index:', error);
     }
-    
+
     return client;
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
@@ -82,14 +83,14 @@ async function importSampleData() {
   try {
     const productsCollection = db.collection('products');
     let products = [];
-    
+
     // Try to import from CSV if available
     const csvFilePath = path.join(__dirname, '../Dataset-food&recipes/UK_fct.csv');
-    
+
     if (fs.existsSync(csvFilePath)) {
       console.log('Importing data from CSV file:', csvFilePath);
       const jsonArray = await csv().fromFile(csvFilePath);
-      
+
       products = jsonArray.map((item, index) => {
         // Extract nutrients and convert to numbers
         const calories = parseFloat(item.calories || '0');
@@ -99,7 +100,7 @@ async function importSampleData() {
         const fiber = item.fiber ? parseFloat(item.fiber) : undefined;
         const sugar = item.sugar ? parseFloat(item.sugar) : undefined;
         const sodium = item.sodium ? parseFloat(item.sodium) : undefined;
-        
+
         // Calculate nutrition score
         let nutritionScore = 'yellow';
         if (protein > 15 && (fiber || 0) > 3 && (sugar || 0) < 10) {
@@ -107,12 +108,12 @@ async function importSampleData() {
         } else if (fat > 20 || (sugar || 0) > 15) {
           nutritionScore = 'red';
         }
-        
+
         // Parse ingredients, allergens, and additives if available
         const ingredients = item.ingredients ? item.ingredients.split(',').map(i => i.trim()) : [];
         const allergens = item.allergens ? item.allergens.split(',').map(a => a.trim()) : [];
         const additives = item.additives ? item.additives.split(',').map(a => a.trim()) : [];
-        
+
         return {
           name: item.name || `Food Item ${index}`,
           brand: item.brand || 'Generic',
@@ -133,7 +134,7 @@ async function importSampleData() {
           source: 'CSV Import'
         };
       });
-      
+
       console.log(`Parsed ${products.length} products from CSV`);
     } else {
       // Use sample data if CSV not available
@@ -231,7 +232,7 @@ async function importSampleData() {
         }
       ];
     }
-    
+
     if (products.length > 0) {
       // Insert products into MongoDB
       const result = await productsCollection.insertMany(products);
@@ -251,11 +252,11 @@ async function importSampleData() {
 app.get('/api/products/search', async (req, res) => {
   try {
     const { query } = req.query;
-    
+
     if (!query) {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
-    
+
     const products = await db.collection('products').find({
       $or: [
         { $text: { $search: query } },
@@ -264,7 +265,7 @@ app.get('/api/products/search', async (req, res) => {
         { 'category': { $regex: query, $options: 'i' } }
       ]
     }).limit(20).toArray();
-    
+
     res.json(products);
   } catch (error) {
     console.error('Error searching products:', error);
@@ -276,13 +277,13 @@ app.get('/api/products/search', async (req, res) => {
 app.get('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const product = await db.collection('products').findOne({ _id: id });
-    
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    
+
     res.json(product);
   } catch (error) {
     console.error('Error getting product:', error);
@@ -294,20 +295,20 @@ app.get('/api/products/:id', async (req, res) => {
 app.get('/api/products/:id/similar', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get the product first to find its category
     const product = await db.collection('products').findOne({ _id: id });
-    
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    
+
     // Find similar products in the same category
     const similarProducts = await db.collection('products').find({
       category: product.category,
       _id: { $ne: id }
     }).limit(5).toArray();
-    
+
     res.json(similarProducts);
   } catch (error) {
     console.error('Error getting similar products:', error);
@@ -320,12 +321,12 @@ async function startServer() {
   let client;
   try {
     client = await connectToMongoDB();
-    
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`API available at http://localhost:${PORT}/api`);
     });
-    
+
     // Handle shutdown
     process.on('SIGINT', async () => {
       if (client) {
