@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope } from 'lucide-react';
+import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope, Sparkles, Bot } from 'lucide-react';
 import Footer from '@/components/Footer';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatCard from '@/components/StatCard';
@@ -17,6 +17,9 @@ import FoodGroupChart from '@/components/FoodGroupChart';
 import MacronutrientChart from '@/components/MacronutrientChart';
 import GuestBanner from '@/components/GuestBanner';
 import HealthInsights from '@/components/HealthInsights';
+import ProductRecommendations from '@/components/ProductRecommendations';
+import AIRecommendations from '@/components/AIRecommendations';
+import FoodRecommendations from '@/components/FoodRecommendations';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -481,8 +484,12 @@ const Dashboard = () => {
         userData={userProfile}
       />
       <div className="min-h-screen bg-safebite-dark-blue">
-        <div className="absolute top-0 left-0 right-0 p-1 text-center bg-red-500 text-white text-xs">
-          Under Development
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1.5 px-4 flex items-center justify-center z-50">
+          <div className="flex items-center space-x-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4 text-yellow-300" />
+            <span>SafeBite v2.1 - Under Active Development</span>
+            <Sparkles className="h-4 w-4 text-yellow-300" />
+          </div>
         </div>
 
         <DashboardSidebar />
@@ -496,7 +503,13 @@ const Dashboard = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-safebite-text mb-2">
-                  {isGuest ? 'Welcome, Guest' : user?.displayName ? `Welcome back, ${user.displayName}` : user?.email ? `Welcome back, ${user.email}` : 'Welcome back!'}
+                  {isGuest ? (
+                    'Welcome, Guest'
+                  ) : (
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple">
+                      Welcome back, {userProfile?.displayName || user?.displayName || userProfile?.name || user?.email?.split('@')[0] || 'Friend'}
+                    </span>
+                  )}
                 </h1>
                 <p className="text-safebite-text-secondary">
                 {isLoadingProfile ? "Loading your profile..." : profileError ? profileError : isGuest ? "Explore SafeBite's features (limited in guest mode)" : (
@@ -657,6 +670,34 @@ const Dashboard = () => {
                 </div>
               </Card>
             )}
+
+            {/* AI Recommendations and Product Recommendations */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              {/* AI Recommendations */}
+              <AIRecommendations userId={user?.uid} />
+
+              {/* Product Recommendations */}
+              <ProductRecommendations
+                userId={user?.uid}
+                preferences={userProfile?.dietary_preferences ? [userProfile.dietary_preferences] : []}
+              />
+            </div>
+
+            {/* Food and Activity Recommendations */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              {/* Food Recommendations */}
+              <FoodRecommendations
+                userId={user?.uid}
+                healthGoal={userProfile?.health_goals}
+              />
+
+              {/* Activity Recommendation */}
+              <ActivityRecommendation
+                userId={user?.uid}
+                activityLevel={userProfile?.activity_level}
+                weeklyAnswers={userProfile?.weeklyCheckin?.answers}
+              />
+            </div>
 
             {/* Favorite Health Tools */}
             <div className="mb-8">

@@ -9,7 +9,7 @@ import {
   Calculator, Activity, Heart, Droplet, Scale, Utensils, Brain,
   Microscope, Pill, Stethoscope, Syringe, Bug, Zap, Search,
   PieChart, Clock, AlertTriangle, Flame, Dumbbell, Thermometer, Star, Plus,
-  Settings, BookOpen, Bookmark, CheckCircle, ShieldAlert, Eye, XCircle, Loader2
+  Settings, BookOpen, Bookmark, CheckCircle, ShieldAlert, Eye, XCircle, Loader2, Sparkles
 } from 'lucide-react';
 import { trackHealthBoxInteraction } from '@/services/mlService';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,7 @@ const HealthBox = () => {
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [favoriteTools, setFavoriteTools] = useState<FavoriteTool[]>([]);
+  const { toast } = useToast();
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showDashboardSettings, setShowDashboardSettings] = useState(false);
 
@@ -399,8 +400,12 @@ const HealthBox = () => {
 
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
-      <div className="absolute top-0 left-0 right-0 p-1 text-center bg-red-500 text-white text-xs">
-        Under Development
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1.5 px-4 flex items-center justify-center z-50">
+        <div className="flex items-center space-x-2 text-sm font-medium">
+          <Sparkles className="h-4 w-4 text-yellow-300" />
+          <span>SafeBite v2.1 - Under Active Development</span>
+          <Sparkles className="h-4 w-4 text-yellow-300" />
+        </div>
       </div>
 
       <DashboardSidebar />

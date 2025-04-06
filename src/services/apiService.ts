@@ -4,6 +4,9 @@ import { FoodItem } from './foodApiService';
 // API base URL - using Render-deployed backend URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://safebite-backend.onrender.com/api';
 
+// Ensure we're using the latest backend URL
+console.log('Backend API URL:', API_BASE_URL);
+
 // MongoDB URI
 const MONGODB_URI = import.meta.env.VITE_MONGODB_URI || 'mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/';
 
@@ -112,12 +115,15 @@ const searchViaAPI = async (query: string): Promise<FoodItem[]> => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Origin': window.location.origin
       },
       mode: 'cors', // Explicitly set CORS mode
       credentials: 'omit', // Don't send credentials
       signal: controller.signal
     });
+
+    console.log('API response status:', response.status);
 
     clearTimeout(timeoutId);
 
