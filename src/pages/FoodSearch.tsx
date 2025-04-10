@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
+import ImprovedFoodSearch from '@/components/ImprovedFoodSearch';
 import FoodItemCard from '@/components/FoodItemCard';
 import FoodDetailView from '@/components/FoodDetailView';
 import FoodSearchHistory from '@/components/FoodSearchHistory';
@@ -817,7 +818,24 @@ const FoodSearch = () => {
             <p className="text-safebite-text-secondary">Search for foods, scan barcodes, and get detailed nutrition information</p>
           </div>
 
-          <div className="sci-fi-card mb-6">
+          {/* Improved Food Search Component */}
+          <ImprovedFoodSearch
+            onSelectFood={(food) => {
+              setSelectedFood(food as any);
+              setShowNoResults(false);
+              setShowScannerUpload(false);
+              setShowHistory(false);
+              setShowApiSelector(false);
+              setShowChatBot(false);
+
+              // Track this interaction
+              trackUserInteraction('food_selected', { foodId: food._id, foodName: food.name || food.product || food.food_name || food.recipe_name });
+            }}
+            className="mb-6"
+          />
+
+          {/* Legacy Food Search Bar */}
+          <div className="sci-fi-card mb-6 hidden">
             <FoodSearchBar
               onSearch={handleSearch}
               onScan={handleOpenScannerUpload}

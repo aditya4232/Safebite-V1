@@ -268,6 +268,75 @@ def search_food():
         logger.error(f"Error searching food: {e}")
         return jsonify({"error": str(e)}), 500
 
+# Food search API using MongoDB
+@app.route("/api/food/search", methods=["GET"])
+def search_food():
+    try:
+        query = request.args.get("query", "")
+        if not query:
+            return jsonify({"error": "Query parameter is required"}), 400
+
+        # Search in MongoDB first
+        results = list(mongo.db.products.find(
+            {"$text": {"$search": query}},
+            {"score": {"$meta": "textScore"}}
+        ).sort([("score", {"$meta": "textScore"})]).limit(20))
+
+        # If no results from MongoDB, search in Grocery Products
+        if not results:
+            results = list(mongo.db["Grocery Products"].find(
+                {"$text": {"$search": query}},
+                {"score": {"$meta": "textScore"}}
+            ).sort([("score", {"$meta": "textScore"})]).limit(20))
+
+        return jsonify({
+            "items": results,
+            "query": query,
+            "count": len(results)
+        })
+    except Exception as e:
+        logger.error(f"Error searching food: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Community messages API
+@app.route("/api/messages", methods=["GET"])
+def get_messages():
+    try:
+        # Get messages from MongoDB
+        messages = list(mongo.db.messages.find().sort("timestamp", -1).limit(100))
+        return jsonify(messages)
+    except Exception as e:
+        logger.error(f"Error fetching messages: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Add a new message
+@app.route("/api/messages", methods=["POST"])
+def add_message():
+    try:
+        # Get message data from request
+        message_data = request.json
+
+        # Validate message data
+        if not message_data or not message_data.get("text") or not message_data.get("user"):
+            return jsonify({"error": "Invalid message data"}), 400
+
+        # Add timestamp if not provided
+        if "timestamp" not in message_data:
+            from datetime import datetime, timezone
+            message_data["timestamp"] = datetime.now(timezone.utc)
+
+        # Insert message into MongoDB
+        result = mongo.db.messages.insert_one(message_data)
+
+        # Return the inserted message
+        return jsonify({
+            "_id": str(result.inserted_id),
+            **message_data
+        }), 201
+    except Exception as e:
+        logger.error(f"Error adding message: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)

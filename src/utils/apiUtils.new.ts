@@ -4,40 +4,11 @@ export const API_BASE_URL = 'https://safebite-backend.onrender.com';
 // For local development, uncomment the line below
 // export const API_BASE_URL = 'http://localhost:5000';
 
-// Backup API URL in case the main one is down
-export const BACKUP_API_URL = 'https://safebite-api.onrender.com';
-
 /**
  * Check if the API is available
- * @returns Promise<{ isAvailable: boolean, activeUrl: string }> - API status and active URL
- */
-export const checkApiStatus = async (): Promise<{ isAvailable: boolean, activeUrl: string }> => {
-  // Try main API first
-  const mainApiStatus = await tryApiEndpoint(API_BASE_URL);
-  if (mainApiStatus) {
-    console.log('Main API is available');
-    return { isAvailable: true, activeUrl: API_BASE_URL };
-  }
-
-  // If main API is down, try backup API
-  console.log('Main API is down, trying backup API...');
-  const backupApiStatus = await tryApiEndpoint(BACKUP_API_URL);
-  if (backupApiStatus) {
-    console.log('Backup API is available');
-    return { isAvailable: true, activeUrl: BACKUP_API_URL };
-  }
-
-  // Both APIs are down
-  console.warn('Both main and backup APIs are down');
-  return { isAvailable: false, activeUrl: API_BASE_URL };
-};
-
-/**
- * Try to connect to an API endpoint
- * @param baseUrl - API base URL to try
  * @returns Promise<boolean> - True if API is available, false otherwise
  */
-async function tryApiEndpoint(baseUrl: string): Promise<boolean> {
+export const checkApiStatus = async (): Promise<boolean> => {
   try {
     // Use AbortController to set a timeout
     const controller = new AbortController();
@@ -47,7 +18,7 @@ async function tryApiEndpoint(baseUrl: string): Promise<boolean> {
     // First try /status, then fall back to / if that fails
     let response;
     try {
-      response = await fetch(`${baseUrl}/status`, {
+      response = await fetch(`${API_BASE_URL}/status`, {
         signal: controller.signal,
         method: 'GET',
         headers: {
@@ -55,20 +26,14 @@ async function tryApiEndpoint(baseUrl: string): Promise<boolean> {
         }
       });
     } catch (error) {
-      console.log(`Error fetching ${baseUrl}/status, trying root endpoint`);
-      try {
-        response = await fetch(`${baseUrl}/`, {
-          signal: controller.signal,
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
-      } catch (rootError) {
-        console.error(`Error fetching ${baseUrl}/: ${rootError}`);
-        clearTimeout(timeoutId);
-        return false;
-      }
+      console.log('Error fetching /status, trying root endpoint');
+      response = await fetch(`${API_BASE_URL}/`, {
+        signal: controller.signal,
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
     }
 
     // Clear the timeout
@@ -95,7 +60,7 @@ async function tryApiEndpoint(baseUrl: string): Promise<boolean> {
     console.error('Error checking API status:', error);
     return false;
   }
-}
+};
 
 /**
  * Fetch products from the API with fallback
@@ -115,12 +80,11 @@ export const fetchProductsWithFallback = async (
 ): Promise<{ products: any[], total: number, page: number, totalPages: number }> => {
   try {
     // Check if API is available first
-    const { isAvailable, activeUrl } = await checkApiStatus();
+    const isApiAvailable = await checkApiStatus();
 
-    if (!isAvailable) {
-      console.warn('API is not available, returning empty data');
-      // Return empty data instead of fallback data
-      return { products: [], total: 0, page: 1, totalPages: 1 };
+    if (!isApiAvailable) {
+      console.warn('API is not available, using fallback data');
+      return fallbackData;
     }
 
     // API is available, try to fetch products
@@ -164,12 +128,12 @@ export const fetchProductsWithFallback = async (
 
     try {
       // First try the new API endpoint format
-      const url = `${activeUrl}/api/${collection}?page=${page}&limit=${limit}${
+      const url = `${API_BASE_URL}/api/${collection}?page=${page}&limit=${limit}${
         search ? `&search=${encodeURIComponent(search)}` : ''
       }`;
-
+      
       console.log(`Fetching from new endpoint: ${url}`);
-
+      
       const response = await fetch(url, {
         signal: controller.signal,
         method: 'GET',
@@ -177,21 +141,21 @@ export const fetchProductsWithFallback = async (
           'Accept': 'application/json',
         }
       });
-
+      
       const result = await processResponse(response);
       clearTimeout(timeoutId);
       return result;
     } catch (error) {
       console.warn(`Error fetching from new endpoint: ${error}`);
-
+      
       // Fall back to legacy endpoint if new one fails
       try {
-        const legacyUrl = collection === 'products'
-          ? `${activeUrl}/products`
-          : `${activeUrl}/grocery-products`;
-
+        const legacyUrl = collection === 'products' 
+          ? `${API_BASE_URL}/products` 
+          : `${API_BASE_URL}/grocery-products`;
+        
         console.log(`Falling back to legacy endpoint: ${legacyUrl}`);
-
+        
         const legacyResponse = await fetch(legacyUrl, {
           signal: controller.signal,
           method: 'GET',
@@ -199,21 +163,19 @@ export const fetchProductsWithFallback = async (
             'Accept': 'application/json',
           }
         });
-
+        
         const result = await processResponse(legacyResponse);
         clearTimeout(timeoutId);
         return result;
       } catch (legacyError) {
         console.error(`Error fetching from legacy endpoint: ${legacyError}`);
         clearTimeout(timeoutId);
-        // Return empty data instead of fallback data
-        return { products: [], total: 0, page: 1, totalPages: 1 };
+        return fallbackData;
       }
     }
   } catch (error) {
     console.error(`Error fetching ${collection}:`, error);
-    // Return empty data instead of fallback data
-    return { products: [], total: 0, page: 1, totalPages: 1 };
+    return fallbackData;
   }
 };
 
@@ -222,17 +184,24 @@ export const fetchProductsWithFallback = async (
  * @param page - Page number for pagination
  * @param limit - Number of items per page
  * @param search - Optional search query
+ * @param fallbackData - Data to use if API is unavailable
  * @returns Promise with recipe data and pagination info
  */
 export const fetchRecipesWithFallback = async (
   page: number = 1,
   limit: number = 20,
-  search: string = ''
+  search: string = '',
+  fallbackData: any = { recipes: [], total: 0, page: 1, totalPages: 1 }
 ): Promise<{ recipes: any[], total: number, page: number, totalPages: number }> => {
   try {
     // Use the products fetch function but rename the result
-    const result = await fetchProductsWithFallback('products', page, limit, search);
-
+    const result = await fetchProductsWithFallback('products', page, limit, search, {
+      products: fallbackData.recipes,
+      total: fallbackData.total,
+      page: fallbackData.page,
+      totalPages: fallbackData.totalPages
+    });
+    
     // Convert the result to the expected format
     return {
       recipes: result.products,
@@ -242,8 +211,7 @@ export const fetchRecipesWithFallback = async (
     };
   } catch (error) {
     console.error('Error fetching recipes:', error);
-    // Return empty data instead of fallback data
-    return { recipes: [], total: 0, page: 1, totalPages: 1 };
+    return fallbackData;
   }
 };
 

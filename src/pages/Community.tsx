@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import DashboardSidebar from '@/components/DashboardSidebar';
+import CommunityMessages from '@/components/CommunityMessages';
 import { useToast } from '@/hooks/use-toast';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import {

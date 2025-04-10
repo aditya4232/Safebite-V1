@@ -3,16 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Info, RefreshCw, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
-import { checkApiStatus, API_BASE_URL } from '@/utils/apiUtils';
+import { checkApiStatus, API_BASE_URL, BACKUP_API_URL } from '@/utils/apiUtils';
 import ApiStatusIndicator from '@/components/ApiStatusIndicator';
 
 interface ApiStatusProps {
-  onStatusChange?: (isAvailable: boolean) => void;
+  onStatusChange?: (isAvailable: boolean, activeUrl: string) => void;
   className?: string;
 }
 
 const ApiStatus = ({ onStatusChange, className = '' }: ApiStatusProps) => {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [activeUrl, setActiveUrl] = useState<string>(API_BASE_URL);
   const [isChecking, setIsChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const { toast } = useToast();
@@ -20,26 +21,27 @@ const ApiStatus = ({ onStatusChange, className = '' }: ApiStatusProps) => {
   const checkStatus = async () => {
     setIsChecking(true);
     try {
-      const status = await checkApiStatus();
-      setIsAvailable(status);
+      const { isAvailable, activeUrl: url } = await checkApiStatus();
+      setIsAvailable(isAvailable);
+      setActiveUrl(url);
       setLastChecked(new Date());
 
       if (onStatusChange) {
-        onStatusChange(status);
+        onStatusChange(isAvailable, url);
       }
 
       toast({
-        title: status ? 'API is online' : 'API is offline',
-        description: status
-          ? 'Connected to the SafeBite backend API'
-          : 'Using fallback data instead of live API',
-        variant: status ? 'default' : 'destructive',
+        title: isAvailable ? 'API is online' : 'API is offline',
+        description: isAvailable
+          ? `Connected to the SafeBite API (${url === API_BASE_URL ? 'Primary' : 'Backup'})`
+          : 'Unable to connect to any API server',
+        variant: isAvailable ? 'default' : 'destructive',
       });
     } catch (error) {
       console.error('Error checking API status:', error);
       setIsAvailable(false);
       if (onStatusChange) {
-        onStatusChange(false);
+        onStatusChange(false, API_BASE_URL);
       }
     } finally {
       setIsChecking(false);
@@ -101,7 +103,7 @@ const ApiStatus = ({ onStatusChange, className = '' }: ApiStatusProps) => {
               asChild
             >
               <a
-                href={`${API_BASE_URL}/status`}
+                href={`${activeUrl}/status`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
