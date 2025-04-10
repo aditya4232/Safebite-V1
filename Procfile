@@ -1,1 +1,1 @@
-web: cd server && npm install && npm start
+web: gunicorn app:app
