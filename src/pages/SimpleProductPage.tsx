@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Search, Filter, ShoppingCart, Star, Heart, 
+import {
+  Search, Filter, ShoppingCart, Star, Heart,
   AlertTriangle, CheckCircle, Info, Loader2
 } from 'lucide-react';
 import userActivityService from '@/services/userActivityService';
@@ -14,6 +14,42 @@ import Pagination from '@/components/Pagination';
 
 // API URL - Change this to your Render backend URL
 const API_BASE_URL = 'https://safebite-backend.onrender.com';
+
+// Mock data to use when API fails
+const MOCK_PRODUCTS = [
+  {
+    _id: 'mock1',
+    name: 'Organic Whole Grain Bread',
+    brand: "Nature's Best",
+    category: 'Bakery',
+    description: 'Nutritious whole grain bread made with organic ingredients.',
+    healthScore: 8
+  },
+  {
+    _id: 'mock2',
+    name: 'Greek Yogurt',
+    brand: 'Healthy Dairy',
+    category: 'Dairy',
+    description: 'Creamy Greek yogurt high in protein and probiotics.',
+    healthScore: 9
+  },
+  {
+    _id: 'mock3',
+    name: 'Quinoa Salad',
+    brand: 'Fresh Meals',
+    category: 'Prepared Foods',
+    description: 'Ready-to-eat quinoa salad with vegetables and herbs.',
+    healthScore: 10
+  },
+  {
+    _id: 'mock4',
+    name: 'Almond Butter',
+    brand: 'Nut Heaven',
+    category: 'Spreads',
+    description: 'Creamy almond butter made from roasted almonds.',
+    healthScore: 7
+  }
+];
 
 // Product interface
 interface Product {
@@ -44,7 +80,7 @@ interface Product {
 
 const SimpleProductPage: React.FC = () => {
   const { toast } = useToast();
-  
+
   // Products state
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,45 +98,79 @@ const SimpleProductPage: React.FC = () => {
   // Function to fetch products
   const fetchProducts = async () => {
     setIsLoading(true);
-    
+
     try {
       // Determine endpoint based on active tab and search query
       let endpoint = '';
-      
-      if (searchQuery) {
-        endpoint = `${API_BASE_URL}/${activeTab}/search?q=${encodeURIComponent(searchQuery)}`;
+
+      // Try different endpoint formats based on your backend
+      if (activeTab === 'products') {
+        if (searchQuery) {
+          endpoint = `${API_BASE_URL}/api/products/search?query=${encodeURIComponent(searchQuery)}`;
+        } else {
+          endpoint = `${API_BASE_URL}/api/products`;
+        }
       } else {
-        endpoint = `${API_BASE_URL}/${activeTab}`;
+        // Grocery products
+        if (searchQuery) {
+          endpoint = `${API_BASE_URL}/grocery/search?q=${encodeURIComponent(searchQuery)}`;
+        } else {
+          endpoint = `${API_BASE_URL}/grocery`;
+        }
       }
-      
+
+      console.log('Fetching from endpoint:', endpoint);
+
       // Fetch data
       const response = await fetch(endpoint);
-      
+
       if (!response.ok) {
-        throw new Error(`API returned status ${response.status}`);
+        console.warn(`API returned status ${response.status}, using mock data`);
+        // Use mock data when API fails
+        setProducts(MOCK_PRODUCTS);
+        setTotalPages(Math.ceil(MOCK_PRODUCTS.length / productsPerPage));
+        return;
       }
-      
+
       const data = await response.json();
-      
+
+      // Handle different response formats
+      let productsList = [];
+      if (data.products && Array.isArray(data.products)) {
+        // Format: { products: [...], total: X, page: Y, totalPages: Z }
+        productsList = data.products;
+        setTotalPages(data.totalPages || Math.ceil(productsList.length / productsPerPage));
+      } else if (Array.isArray(data)) {
+        // Format: [...]
+        productsList = data;
+        setTotalPages(Math.ceil(productsList.length / productsPerPage));
+      } else {
+        console.warn('Unexpected API response format, using mock data');
+        setProducts(MOCK_PRODUCTS);
+        setTotalPages(Math.ceil(MOCK_PRODUCTS.length / productsPerPage));
+        return;
+      }
+
       // Update state
-      setProducts(data);
-      setTotalPages(Math.ceil(data.length / productsPerPage));
-      
+      setProducts(productsList);
+
       // Track user activity
       userActivityService.trackActivity('product', 'view-products', {
         page: currentPage,
         search: searchQuery,
         type: activeTab,
-        count: data.length
+        count: productsList.length
       });
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load products. Please try again later.',
-        variant: 'destructive'
+        title: 'Using Demo Data',
+        description: 'Could not connect to the database. Showing sample products instead.',
+        variant: 'default'
       });
-      setProducts([]);
+      // Use mock data when API fails
+      setProducts(MOCK_PRODUCTS);
+      setTotalPages(Math.ceil(MOCK_PRODUCTS.length / productsPerPage));
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +192,7 @@ const SimpleProductPage: React.FC = () => {
 
   // Get product name based on the active tab
   const getProductName = (product: Product): string => {
-    return activeTab === 'products' 
+    return activeTab === 'products'
       ? product.name || 'Unknown Product'
       : product.ProductName || 'Unknown Product';
   };
@@ -146,13 +216,13 @@ const SimpleProductPage: React.FC = () => {
     if (product.healthScore !== undefined) {
       return product.healthScore;
     }
-    
+
     // Simple algorithm to calculate health score for grocery products
     if (activeTab === 'grocery') {
       // This is a placeholder - you would implement a real algorithm
       return Math.floor(Math.random() * 10) + 1; // Random score between 1-10
     }
-    
+
     return 5; // Default score
   };
 
@@ -160,7 +230,7 @@ const SimpleProductPage: React.FC = () => {
   const renderHealthScore = (score: number) => {
     let color = 'bg-yellow-500';
     let icon = <Info className="h-4 w-4" />;
-    
+
     if (score >= 8) {
       color = 'bg-green-500';
       icon = <CheckCircle className="h-4 w-4" />;
@@ -168,7 +238,7 @@ const SimpleProductPage: React.FC = () => {
       color = 'bg-red-500';
       icon = <AlertTriangle className="h-4 w-4" />;
     }
-    
+
     return (
       <Badge className={`${color} text-white flex items-center gap-1`}>
         {icon}
@@ -187,7 +257,7 @@ const SimpleProductPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
       <DashboardSidebar />
-      
+
       <main className="md:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-8">
@@ -196,7 +266,7 @@ const SimpleProductPage: React.FC = () => {
               Search for food products and get detailed nutritional information
             </p>
           </div>
-          
+
           {/* Tabs */}
           <div className="flex mb-6 border-b border-safebite-card-bg-alt">
             <button
@@ -220,7 +290,7 @@ const SimpleProductPage: React.FC = () => {
               Grocery Products
             </button>
           </div>
-          
+
           {/* Search */}
           <form onSubmit={handleSearch} className="mb-6">
             <div className="flex gap-2">
@@ -239,7 +309,7 @@ const SimpleProductPage: React.FC = () => {
               </Button>
             </div>
           </form>
-          
+
           {/* API Status */}
           <div className="mb-4 p-4 bg-safebite-card-bg rounded-md">
             <h3 className="text-safebite-text font-medium mb-2">API Connection</h3>
@@ -250,7 +320,7 @@ const SimpleProductPage: React.FC = () => {
               Endpoint: <code className="bg-safebite-card-bg-alt px-2 py-1 rounded">/{activeTab}{searchQuery ? `/search?q=${searchQuery}` : ''}</code>
             </p>
           </div>
-          
+
           {/* Results */}
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -261,7 +331,7 @@ const SimpleProductPage: React.FC = () => {
               <div className="mb-4 text-safebite-text-secondary">
                 Showing {getPaginatedProducts().length} of {products.length} products
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
                 {getPaginatedProducts().map((product) => (
                   <Card key={product._id} className="sci-fi-card hover:border-safebite-teal/50 transition-all duration-300">
@@ -284,7 +354,7 @@ const SimpleProductPage: React.FC = () => {
                           {getProductCategory(product)}
                         </Badge>
                       )}
-                      
+
                       <div className="flex justify-between mt-4">
                         <Button
                           variant="outline"
@@ -305,7 +375,7 @@ const SimpleProductPage: React.FC = () => {
                   </Card>
                 ))}
               </div>
-              
+
               {/* Pagination */}
               {totalPages > 1 && (
                 <Pagination

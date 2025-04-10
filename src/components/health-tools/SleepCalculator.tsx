@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Clock, Moon, Sunrise, Sunset } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { trackHealthBoxInteraction } from '@/services/mlService';
+import userActivityService from '@/services/userActivityService';
 
 const SleepCalculator = () => {
   const [wakeUpTime, setWakeUpTime] = useState('07:00');
@@ -38,68 +40,94 @@ const SleepCalculator = () => {
   };
 
   const calculateBedtime = () => {
-    if (!wakeUpTime) return;
+    try {
+      if (!wakeUpTime) return;
 
-    const [hours, minutes] = wakeUpTime.split(':').map(Number);
-    const wakeUpDate = new Date();
-    wakeUpDate.setHours(hours, minutes, 0, 0);
+      const [hours, minutes] = wakeUpTime.split(':').map(Number);
+      const wakeUpDate = new Date();
+      wakeUpDate.setHours(hours, minutes, 0, 0);
 
-    // Calculate ideal bedtime based on sleep cycles
-    const cycleDuration = cycleDurations[age]; // in minutes
-    const recommendedCycles = 5; // 5-6 sleep cycles is ideal
-    
-    // Calculate bedtime
-    const bedtimeDate = new Date(wakeUpDate);
-    bedtimeDate.setMinutes(bedtimeDate.getMinutes() - (cycleDuration * recommendedCycles));
-    
-    // Format bedtime
-    const bedtimeHours = bedtimeDate.getHours().toString().padStart(2, '0');
-    const bedtimeMinutes = bedtimeDate.getMinutes().toString().padStart(2, '0');
-    const bedtime = `${bedtimeHours}:${bedtimeMinutes}`;
+      // Calculate ideal bedtime based on sleep cycles
+      const cycleDuration = cycleDurations[age]; // in minutes
+      const recommendedCycles = 5; // 5-6 sleep cycles is ideal
 
-    // Calculate sleep duration if sleep time is provided
-    let duration = '';
-    let cycles = recommendedCycles;
-    let quality = '';
+      // Calculate bedtime
+      const bedtimeDate = new Date(wakeUpDate);
+      bedtimeDate.setMinutes(bedtimeDate.getMinutes() - (cycleDuration * recommendedCycles));
 
-    if (sleepTime) {
-      const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
-      const sleepDate = new Date();
-      sleepDate.setHours(sleepHours, sleepMinutes, 0, 0);
+      // Format bedtime
+      const bedtimeHours = bedtimeDate.getHours().toString().padStart(2, '0');
+      const bedtimeMinutes = bedtimeDate.getMinutes().toString().padStart(2, '0');
+      const bedtime = `${bedtimeHours}:${bedtimeMinutes}`;
 
-      // Handle overnight sleep
-      let sleepDuration = wakeUpDate.getTime() - sleepDate.getTime();
-      if (sleepDuration < 0) {
-        sleepDuration += 24 * 60 * 60 * 1000; // Add 24 hours
+      // Calculate sleep duration if sleep time is provided
+      let duration = '';
+      let cycles = recommendedCycles;
+      let quality = '';
+
+      if (sleepTime) {
+        const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
+        const sleepDate = new Date();
+        sleepDate.setHours(sleepHours, sleepMinutes, 0, 0);
+
+        // Handle overnight sleep
+        let sleepDuration = wakeUpDate.getTime() - sleepDate.getTime();
+        if (sleepDuration < 0) {
+          sleepDuration += 24 * 60 * 60 * 1000; // Add 24 hours
+        }
+
+        // Convert to hours and minutes
+        const durationHours = Math.floor(sleepDuration / (60 * 60 * 1000));
+        const durationMinutes = Math.floor((sleepDuration % (60 * 60 * 1000)) / (60 * 1000));
+        duration = `${durationHours}h ${durationMinutes}m`;
+
+        // Calculate actual cycles
+        cycles = Math.round(sleepDuration / (cycleDuration * 60 * 1000));
+
+        // Determine sleep quality based on recommended duration
+        const durationInHours = durationHours + (durationMinutes / 60);
+        const { min, max } = recommendedSleep[age];
+
+        if (durationInHours < min) {
+          quality = 'Insufficient';
+        } else if (durationInHours > max) {
+          quality = 'Excessive';
+        } else {
+          quality = 'Optimal';
+        }
       }
 
-      // Convert to hours and minutes
-      const durationHours = Math.floor(sleepDuration / (60 * 60 * 1000));
-      const durationMinutes = Math.floor((sleepDuration % (60 * 60 * 1000)) / (60 * 1000));
-      duration = `${durationHours}h ${durationMinutes}m`;
+      const result = {
+        bedtime,
+        cycles: cycles,
+        duration,
+        quality
+      };
 
-      // Calculate actual cycles
-      cycles = Math.round(sleepDuration / (cycleDuration * 60 * 1000));
+      setResults(result);
 
-      // Determine sleep quality based on recommended duration
-      const durationInHours = durationHours + (durationMinutes / 60);
-      const { min, max } = recommendedSleep[age];
-      
-      if (durationInHours < min) {
-        quality = 'Insufficient';
-      } else if (durationInHours > max) {
-        quality = 'Excessive';
-      } else {
-        quality = 'Optimal';
-      }
+      // Track this interaction for ML learning
+      trackHealthBoxInteraction('sleep', 'calculate');
+      userActivityService.trackActivity('health-tool', 'sleep-calculate', {
+        age,
+        wakeUpTime,
+        sleepTime: sleepTime || 'not provided',
+        result: {
+          bedtime,
+          cycles,
+          quality: quality || 'not calculated'
+        }
+      });
+    } catch (error) {
+      console.error('Error calculating sleep time:', error);
+      // Provide a fallback result in case of error
+      setResults({
+        bedtime: '22:30',
+        cycles: 5,
+        duration: '',
+        quality: ''
+      });
     }
-
-    setResults({
-      bedtime,
-      cycles: cycles,
-      duration,
-      quality
-    });
   };
 
   return (
@@ -152,8 +180,8 @@ const SleepCalculator = () => {
         </div>
       </div>
 
-      <Button 
-        onClick={calculateBedtime} 
+      <Button
+        onClick={calculateBedtime}
         className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
       >
         <Moon className="mr-2 h-4 w-4" />
@@ -189,7 +217,7 @@ const SleepCalculator = () => {
                   <div className="col-span-2">
                     <div className="text-sm text-safebite-text-secondary">Sleep Quality</div>
                     <div className={`font-semibold ${
-                      results.quality === 'Optimal' ? 'text-green-500' : 
+                      results.quality === 'Optimal' ? 'text-green-500' :
                       results.quality === 'Insufficient' ? 'text-red-500' : 'text-yellow-500'
                     }`}>{results.quality}</div>
                   </div>

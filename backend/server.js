@@ -29,6 +29,10 @@ mongoose.connect(MONGODB_URI, {
 app.use('/api/products', productsRoutes);
 app.use('/api/groceryProducts', groceryProductsRoutes);
 
+// Direct routes for compatibility
+app.use('/products', productsRoutes);
+app.use('/grocery', groceryProductsRoutes);
+
 // Status endpoint
 app.get('/status', (req, res) => {
   res.json({ status: 'API is running', version: '1.0.0' });
@@ -41,7 +45,10 @@ app.get('/', (req, res) => {
     endpoints: {
       status: '/status',
       products: '/api/products',
-      groceryProducts: '/api/groceryProducts'
+      productsSearch: '/api/products/search',
+      groceryProducts: '/api/groceryProducts',
+      directProducts: '/products',
+      directGrocery: '/grocery'
     }
   });
 });

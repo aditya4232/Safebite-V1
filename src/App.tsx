@@ -17,7 +17,7 @@ import Community from "@/pages/Community";
 import WeeklyQuestions from "@/pages/WeeklyQuestions";
 import Reports from "@/pages/Reports";
 import Recipes from "@/pages/Recipes";
-import HealthBox from "@/pages/HealthBox";
+import HealthBox from "@/pages/HealthBox-simplified";
 import ProductRecommendationsPage from "@/pages/ProductRecommendations";
 import ProductPage from "@/pages/ProductPage";
 import SimpleProductPage from "@/pages/SimpleProductPage";
