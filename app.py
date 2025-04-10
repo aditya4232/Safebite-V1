@@ -21,6 +21,34 @@ app.json_encoder = CustomJSONEncoder
 app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/safebite")
 mongo = PyMongo(app)
 
+# Create text indexes for search functionality
+# Flask 2.0+ doesn't support before_first_request, so we use a different approach
+def create_indexes():
+    try:
+        # Create text index for products collection
+        mongo.db.products.create_index([
+            ("recipe_name", "text"),
+            ("food_name", "text"),
+            ("recipe_code", "text")
+        ])
+        print("Created text index for products collection")
+
+        # Create text index for Grocery Products collection
+        mongo.db["Grocery Products"].create_index([
+            ("product", "text"),
+            ("brand", "text"),
+            ("category", "text"),
+            ("description", "text")
+        ])
+        print("Created text index for Grocery Products collection")
+    except Exception as e:
+        print(f"Error creating indexes: {e}")
+        # Continue even if index creation fails (might already exist)
+
+# Create indexes when the app starts
+with app.app_context():
+    create_indexes()
+
 @app.route("/")
 def home():
     return jsonify({"status": "API is running", "version": "1.0.0"})
