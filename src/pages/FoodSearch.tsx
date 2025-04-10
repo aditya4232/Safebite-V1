@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle, XCircle,
   Leaf, Flame, Heart, Zap, Database,
   History, Tag, Star, Upload, Scan,
-  Bot, AlertCircle
+  Bot, AlertCircle, Camera
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
@@ -15,6 +15,7 @@ import FoodItemCard from '@/components/FoodItemCard';
 import FoodDetailView from '@/components/FoodDetailView';
 import FoodSearchHistory from '@/components/FoodSearchHistory';
 import FoodScannerUpload from '@/components/FoodScannerUpload';
+import ImageNutritionAnalysis from '@/components/ImageNutritionAnalysis';
 import ApiSourceSelector from '@/components/ApiSourceSelector';
 import FoodChatBot from '@/components/FoodChatBot';
 import {
@@ -825,6 +826,15 @@ const FoodSearch = () => {
               onApiSelect={handleShowApiSelector}
               activeApi={activeApiSource}
             />
+          </div>
+
+          {/* CalorieNinjas Image Analysis */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-safebite-text mb-4 flex items-center">
+              <Camera className="mr-2 h-5 w-5 text-safebite-teal" />
+              New! Image Nutrition Analysis
+            </h2>
+            <ImageNutritionAnalysis isGuest={!auth.currentUser} />
           </div>
 
           {selectedFood ? (

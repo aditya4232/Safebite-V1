@@ -10,7 +10,7 @@ interface DevPopupProps {
 
 const DevPopup: React.FC<DevPopupProps> = ({
   developerName = "Aditya Shenvi",
-  version = "v2.1"
+  version = "v2.2"
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -42,21 +42,25 @@ const DevPopup: React.FC<DevPopupProps> = ({
   if (!isOpen) return null;
 
   const changelogItems = [
-    "Enhanced food search with multi-API integration",
-    "Added food tracker functionality",
-    "Improved questionnaire data processing",
-    "Added About Us and Features pages",
-    "Enhanced UI with developer information",
-    "Fixed dashboard data display issues",
-    "Added weekly check-in data visualization"
+    "Added Product Recommendations page with MongoDB integration",
+    "Implemented user activity tracking for ML personalization",
+    "Added fitness wearable data import functionality",
+    "Fixed Healthbox component errors and improved UI",
+    "Added guest mode for testing without authentication",
+    "Improved Firebase security and error handling",
+    "Enhanced dashboard with real-time data visualization",
+    "Added login prompts for guest users"
   ];
 
   const apiCredits = [
+    { name: "SafeBite Backend API", url: "https://safebite-backend.onrender.com" },
+    { name: "MongoDB Atlas", url: "https://www.mongodb.com/atlas/database" },
     { name: "Edamam Food Database API", url: "https://www.edamam.com/" },
     { name: "CalorieNinjas API", url: "https://calorieninjas.com/" },
     { name: "FatSecret Platform API", url: "https://platform.fatsecret.com/" },
     { name: "Open Food Facts", url: "https://world.openfoodfacts.org/" },
-    { name: "Unsplash Images", url: "https://unsplash.com/" }
+    { name: "Unsplash Images", url: "https://unsplash.com/" },
+    { name: "Firebase", url: "https://firebase.google.com/" }
   ];
 
   return (

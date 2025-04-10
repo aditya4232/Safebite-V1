@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Home, BarChart2, Pizza, Users, Settings, Menu, X,
   Search, Heart, LogOut, Activity, Calculator, Stethoscope,
-  Zap, BookOpen, Bot
+  Zap, BookOpen, Bot, ShoppingCart, Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, signOut } from "firebase/auth";
@@ -44,6 +44,7 @@ const DashboardSidebar = () => {
     { path: '/dashboard', name: 'Dashboard', icon: <Home size={20} /> },
     { path: '/food-search', name: 'Food Search', icon: <Search size={20} /> },
     { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
+    { path: '/product-recommendations', name: 'Products', icon: <ShoppingCart size={20} className="text-safebite-purple" /> },
     { path: '/community', name: 'Community', icon: <Users size={20} /> },
     { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" /> },
     { path: '/weekly-questions', name: 'Health Check', icon: <Heart size={20} /> },

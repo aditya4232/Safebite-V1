@@ -301,3 +301,16 @@ export const trackPreferenceChange = (preference: string, value: any) =>
 
 export const getFoodRecommendations = () =>
   userMLService.getFoodRecommendations();
+
+// New function to track general user interactions
+export const trackUserInteraction = async (action: string, data: any = {}) => {
+  try {
+    // Track using the userMLService if user is logged in
+    await userMLService.trackActivity(action, data);
+
+    // Also log to console for debugging
+    console.log(`Tracked user interaction: ${action}`, data);
+  } catch (error) {
+    console.error('Error tracking user interaction:', error);
+  }
+};

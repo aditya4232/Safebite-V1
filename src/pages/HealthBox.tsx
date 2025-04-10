@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { trackHealthBoxInteraction } from '@/services/mlService';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { app } from "../firebase";

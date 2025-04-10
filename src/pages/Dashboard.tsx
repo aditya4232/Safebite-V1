@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope, Sparkles, Bot } from 'lucide-react';
+import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope, Sparkles, Bot, RefreshCw, Activity } from 'lucide-react';
 import Footer from '@/components/Footer';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatCard from '@/components/StatCard';
@@ -20,6 +20,8 @@ import HealthInsights from '@/components/HealthInsights';
 import ProductRecommendations from '@/components/ProductRecommendations';
 import AIRecommendations from '@/components/AIRecommendations';
 import FoodRecommendations from '@/components/FoodRecommendations';
+import FitnessImport from '@/components/FitnessImport';
+import LoginPrompt from '@/components/LoginPrompt';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -41,8 +43,10 @@ const foodRecommendations: Record<string, string[]> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { isGuest } = useGuestMode(); // Keep guest mode logic for now
+  const { isGuest, enterEmergencyGuestMode } = useGuestMode(); // Use guest mode for permission errors
   const [showWeeklyPrompt, setShowWeeklyPrompt] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginPromptFeature, setLoginPromptFeature] = useState('');
   // Recent foods removed from dashboard
   const { toast } = useToast();
   const auth = getAuth(app);
@@ -401,6 +405,29 @@ const Dashboard = () => {
     setShowWeeklyPrompt(false);
   };
 
+  // Function to show login prompt for guest users
+  const showLoginPromptForFeature = (feature: string) => {
+    if (isGuest) {
+      setLoginPromptFeature(feature);
+      setShowLoginPrompt(true);
+      return true; // Prompt was shown
+    }
+    return false; // No prompt needed
+  };
+
+  // Function to handle chart clicks for guest users
+  const handleChartClick = () => {
+    if (isGuest) {
+      showLoginPromptForFeature('detailed health analytics');
+    } else {
+      // Handle chart click for logged-in users
+      toast({
+        title: "Analytics Feature",
+        description: "Detailed analytics are being developed. Check back soon!",
+      });
+    }
+  };
+
   const [weeklyProgressData, setWeeklyProgressData] = useState([
     { date: 'Mon', value: 1200 },
     { date: 'Tue', value: 1350 },
@@ -497,7 +524,8 @@ const Dashboard = () => {
         <main className="md:ml-64 min-h-screen">
           <div className="p-4 sm:p-6 md:p-8">
             {/* Guest Banner */}
-            {isGuest && <GuestBanner />}
+            {/* Only show guest banner for users who explicitly chose guest mode, not for authenticated users */}
+            {isGuest && localStorage.getItem('userType') === 'guest' && <GuestBanner />}
 
           {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -906,6 +934,12 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* Fitness Import Section */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-safebite-text mb-4">Fitness Data Import</h2>
+              <FitnessImport />
+            </div>
+
             {/* Coming Soon Section */}
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-safebite-text mb-4">Coming Soon</h2>
@@ -999,6 +1033,13 @@ const Dashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* Login prompt modal */}
+      <LoginPrompt
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        feature={loginPromptFeature}
+      />
     </>
   );
 };

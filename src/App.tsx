@@ -18,6 +18,7 @@ import WeeklyQuestions from "@/pages/WeeklyQuestions";
 import Reports from "@/pages/Reports";
 import Recipes from "@/pages/Recipes";
 import HealthBox from "@/pages/HealthBox";
+import ProductRecommendationsPage from "@/pages/ProductRecommendations";
 import NotFound from "@/pages/NotFound";
 import AdminLogin from "@/pages/Admin/Login";
 import AdminPanel from "@/pages/Admin/Panel";
@@ -64,6 +65,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/food-search" element={<ProtectedRoute><FoodSearch /></ProtectedRoute>} />
           <Route path="/food-delivery" element={<ProtectedRoute><FoodDelivery /></ProtectedRoute>} />
+          <Route path="/product-recommendations" element={<ProtectedRoute><ProductRecommendationsPage /></ProtectedRoute>} />
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/healthbox" element={<ProtectedRoute><HealthBox /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
