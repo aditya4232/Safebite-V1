@@ -24,43 +24,69 @@ app.json_encoder = CustomJSONEncoder
 
 # MongoDB Atlas connection (from Render Env Variable or fallback)
 app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/safebite")
-mongo = PyMongo(app)
+
+# Initialize PyMongo with error handling
+try:
+    mongo = PyMongo(app)
+    logger.info("Successfully connected to MongoDB Atlas")
+except Exception as e:
+    logger.error(f"Failed to connect to MongoDB: {e}")
+    # We'll continue and handle connection errors in each route
 
 # Create text indexes for search functionality
 # Flask 2.0+ doesn't support before_first_request, so we use a different approach
 def create_indexes():
     try:
-        # Create text index for products collection if it doesn't exist
+        # Check existing indexes for products collection
         existing_indexes = mongo.db.products.index_information()
-        if not any("text" in idx.get("key", {}) for idx in existing_indexes.values()):
-            mongo.db.products.create_index([
-                ("recipe_name", "text"),
-                ("food_name", "text"),
-                ("recipe_code", "text")
-            ])
-            logger.info("Created text index for products collection")
-        else:
-            logger.info("Text index already exists for products collection")
+        has_text_index = any("text" in str(idx.get("key", {})) for idx in existing_indexes.values())
 
-        # Create text index for Grocery Products collection if it doesn't exist
-        existing_indexes = mongo.db["Grocery Products"].index_information()
-        if not any("text" in idx.get("key", {}) for idx in existing_indexes.values()):
-            mongo.db["Grocery Products"].create_index([
-                ("product", "text"),
-                ("brand", "text"),
-                ("category", "text"),
-                ("description", "text")
-            ])
-            logger.info("Created text index for Grocery Products collection")
+        if has_text_index:
+            logger.info("Text index already exists for products collection")
         else:
+            try:
+                # Try to create a text index if none exists
+                mongo.db.products.create_index([
+                    ("name", "text"),
+                    ("recipe_name", "text"),
+                    ("food_name", "text"),
+                    ("category", "text"),
+                    ("description", "text")
+                ])
+                logger.info("Created text index for products collection")
+            except Exception as e:
+                logger.warning(f"Could not create text index for products: {e}")
+
+        # Check existing indexes for Grocery Products collection
+        grocery_collection = mongo.db["Grocery Products"]
+        existing_indexes = grocery_collection.index_information()
+        has_text_index = any("text" in str(idx.get("key", {})) for idx in existing_indexes.values())
+
+        if has_text_index:
             logger.info("Text index already exists for Grocery Products collection")
+        else:
+            try:
+                # Try to create a text index if none exists
+                grocery_collection.create_index([
+                    ("product", "text"),
+                    ("brand", "text"),
+                    ("category", "text"),
+                    ("description", "text")
+                ])
+                logger.info("Created text index for Grocery Products collection")
+            except Exception as e:
+                logger.warning(f"Could not create text index for Grocery Products: {e}")
     except Exception as e:
-        logger.error(f"Error creating indexes: {e}")
+        logger.error(f"Error checking or creating indexes: {e}")
         # Continue even if index creation fails
 
 # Create indexes when the app starts
-with app.app_context():
-    create_indexes()
+try:
+    with app.app_context():
+        create_indexes()
+        logger.info("MongoDB indexes created or verified")
+except Exception as e:
+    logger.error(f"Failed to create MongoDB indexes: {e}")
 
 @app.route("/")
 def home():
@@ -71,7 +97,7 @@ def status():
     return jsonify({"status": "API is running", "version": "1.0.0"})
 
 # Fetch all items from 'products' collection with pagination and search
-@app.route("/api/products")
+@app.route("/dataset/products")
 def get_products():
     try:
         page = int(request.args.get('page', 1))
@@ -112,7 +138,7 @@ def get_products():
         return jsonify({"error": str(e)}), 500
 
 # Get product by ID
-@app.route("/api/products/<id>")
+@app.route("/dataset/products/<id>")
 def get_product(id):
     try:
         product = mongo.db.products.find_one({"_id": ObjectId(id)})
@@ -121,10 +147,11 @@ def get_product(id):
             return jsonify(product)
         return jsonify({"error": "Product not found"}), 404
     except Exception as e:
+        logger.error(f"Error fetching product by ID {id}: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Fetch all items from 'Grocery Products' collection with pagination and search
-@app.route("/api/groceryProducts")
+@app.route("/dataset/groceryProducts")
 def get_grocery_products():
     try:
         page = int(request.args.get('page', 1))
@@ -166,7 +193,7 @@ def get_grocery_products():
         return jsonify({"error": str(e)}), 500
 
 # Get grocery product by ID
-@app.route("/api/groceryProducts/<id>")
+@app.route("/dataset/groceryProducts/<id>")
 def get_grocery_product(id):
     try:
         grocery_collection = mongo.db["Grocery Products"]
@@ -179,7 +206,7 @@ def get_grocery_product(id):
         return jsonify({"error": str(e)}), 500
 
 # For backward compatibility
-@app.route("/products")
+@app.route("/api/products")
 def get_products_old():
     try:
         products = list(mongo.db.products.find().limit(100))
@@ -189,7 +216,7 @@ def get_products_old():
         return jsonify({"error": str(e)}), 500
 
 # For backward compatibility
-@app.route("/grocery-products")
+@app.route("/api/grocery-products")
 def get_grocery_products_old():
     try:
         grocery_collection = mongo.db["Grocery Products"]  # Use quotes for space
@@ -269,8 +296,8 @@ def search_food():
         return jsonify({"error": str(e)}), 500
 
 # Food search API using MongoDB
-@app.route("/api/food/search", methods=["GET"])
-def search_food():
+@app.route("/api/dataset/search", methods=["GET"])
+def search_dataset():
     try:
         query = request.args.get("query", "")
         if not query:
@@ -298,44 +325,25 @@ def search_food():
         logger.error(f"Error searching food: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Community messages API
-@app.route("/api/messages", methods=["GET"])
-def get_messages():
+
+# Health check endpoint for MongoDB connection
+@app.route("/api/health")
+def health_check():
     try:
-        # Get messages from MongoDB
-        messages = list(mongo.db.messages.find().sort("timestamp", -1).limit(100))
-        return jsonify(messages)
-    except Exception as e:
-        logger.error(f"Error fetching messages: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# Add a new message
-@app.route("/api/messages", methods=["POST"])
-def add_message():
-    try:
-        # Get message data from request
-        message_data = request.json
-
-        # Validate message data
-        if not message_data or not message_data.get("text") or not message_data.get("user"):
-            return jsonify({"error": "Invalid message data"}), 400
-
-        # Add timestamp if not provided
-        if "timestamp" not in message_data:
-            from datetime import datetime, timezone
-            message_data["timestamp"] = datetime.now(timezone.utc)
-
-        # Insert message into MongoDB
-        result = mongo.db.messages.insert_one(message_data)
-
-        # Return the inserted message
+        # Check MongoDB connection
+        mongo.db.command('ping')
         return jsonify({
-            "_id": str(result.inserted_id),
-            **message_data
-        }), 201
+            "status": "healthy",
+            "mongodb": "connected",
+            "version": "1.0.0"
+        })
     except Exception as e:
-        logger.error(f"Error adding message: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            "status": "unhealthy",
+            "mongodb": "disconnected",
+            "error": str(e)
+        }), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

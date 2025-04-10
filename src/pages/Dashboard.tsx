@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope, Sparkles, Bot, RefreshCw, Activity } from 'lucide-react';
+import { Bell, Info, Zap, ArrowRight, Trophy, Stethoscope, Sparkles } from 'lucide-react';
+import AchievementBadge from '@/components/AchievementBadge';
 import Footer from '@/components/Footer';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatCard from '@/components/StatCard';
@@ -15,7 +16,7 @@ import ActivityRecommendation from '@/components/ActivityRecommendation';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import FoodGroupChart from '@/components/FoodGroupChart';
 import MacronutrientChart from '@/components/MacronutrientChart';
-import GuestBanner from '@/components/GuestBanner';
+import GuestDashboard from '@/components/GuestDashboard';
 import HealthInsights from '@/components/HealthInsights';
 import ProductRecommendations from '@/components/ProductRecommendations';
 import AIRecommendations from '@/components/AIRecommendations';
@@ -25,7 +26,6 @@ import LoginPrompt from '@/components/LoginPrompt';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-// Import Loader when needed
 import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { generateHealthTips } from "@/services/healthTipsService";
 import TermsPopup from "@/components/TermsPopup";
@@ -43,7 +43,7 @@ const foodRecommendations: Record<string, string[]> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { isGuest, enterEmergencyGuestMode } = useGuestMode(); // Use guest mode for permission errors
+  const { isGuest } = useGuestMode(); // Use guest mode for permission errors
   const [showWeeklyPrompt, setShowWeeklyPrompt] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginPromptFeature, setLoginPromptFeature] = useState('');
@@ -502,6 +502,35 @@ const Dashboard = () => {
     );
   }
 
+  // If user is in guest mode, show the guest dashboard
+  if (isGuest) {
+    return (
+      <>
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1.5 px-4 flex items-center justify-center z-50">
+          <div className="flex items-center space-x-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4 text-yellow-300" />
+            <span>SafeBite v2.1 - Under Active Development</span>
+            <Sparkles className="h-4 w-4 text-yellow-300" />
+          </div>
+        </div>
+
+        <div className="min-h-screen bg-safebite-dark-blue">
+          <DashboardSidebar />
+          <main className="md:ml-64 min-h-screen">
+            <GuestDashboard />
+          </main>
+        </div>
+
+        {/* Login prompt modal */}
+        <LoginPrompt
+          isOpen={showLoginPrompt}
+          onClose={() => setShowLoginPrompt(false)}
+          feature={loginPromptFeature}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <TermsPopup onAccept={handleTermsAccept} />
@@ -523,9 +552,6 @@ const Dashboard = () => {
 
         <main className="md:ml-64 min-h-screen">
           <div className="p-4 sm:p-6 md:p-8">
-            {/* Guest Banner */}
-            {/* Only show guest banner for users who explicitly chose guest mode, not for authenticated users */}
-            {isGuest && localStorage.getItem('userType') === 'guest' && <GuestBanner />}
 
           {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -880,6 +906,20 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* Achievements Section */}
+            {userProfile?.achievements && userProfile.achievements.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-safebite-text mb-4">Your Achievements</h2>
+                <Card className="sci-fi-card">
+                  <CardContent className="flex flex-wrap gap-4">
+                    {userProfile.achievements.map((achievement) => (
+                      <AchievementBadge key={achievement.id} achievement={achievement} />
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             {/* Charts Section */}
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-safebite-text mb-4">Your Health Dashboard</h2>
@@ -1001,18 +1041,18 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Activity Recommendation based on Activity Level */}
-            {!isGuest && userProfile?.activity_level && (
+            {/* Activity Recommendation based on Activity Level - REMOVED DUPLICATE */}
+            {/* {!isGuest && userProfile?.activity_level && (
               <div className="mt-8">
                 <ActivityRecommendation
                   activityLevel={userProfile.activity_level}
                   weeklyAnswers={userProfile.weeklyCheckin?.answers}
                 />
               </div>
-            )}
+            )} */}
 
-            {/* Placeholder for AI Recommendations & Food Safety Alerts */}
-            <div className="mt-8">
+            {/* Placeholder for AI Recommendations & Alerts - REMOVED REDUNDANT */}
+            {/* <div className="mt-8">
               <h2 className="text-2xl font-semibold text-safebite-text mb-4">AI Recommendations & Alerts</h2>
               <Card className="sci-fi-card">
                 <CardHeader>
@@ -1024,7 +1064,7 @@ const Dashboard = () => {
                   </p>
                 </CardContent>
               </Card>
-            </div>
+            </div> */}
 
             <div className="text-xs text-safebite-text-secondary mt-6 text-right">
               Created by Aditya Shenvi

@@ -12,6 +12,7 @@ import {
   Settings, BookOpen, Bookmark, CheckCircle, ShieldAlert, Eye, XCircle, Loader2, Sparkles
 } from 'lucide-react';
 import { trackHealthBoxInteraction } from '@/services/mlService';
+import userActivityService from '@/services/userActivityService';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth } from "firebase/auth";
@@ -80,16 +81,28 @@ const HealthBox = () => {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+
+    // Track this interaction for ML learning
     trackHealthBoxInteraction('tab', value);
+    userActivityService.trackActivity('healthbox', 'change-tab', {
+      tab: value
+    });
   };
 
   const toggleTool = (toolId: string) => {
-    if (activeTools.includes(toolId)) {
+    const isActive = activeTools.includes(toolId);
+    if (isActive) {
       setActiveTools(activeTools.filter(id => id !== toolId));
     } else {
       setActiveTools([...activeTools, toolId]);
     }
+
+    // Track this interaction for ML learning
     trackHealthBoxInteraction('tool', toolId);
+    userActivityService.trackActivity('healthbox', isActive ? 'close-tool' : 'open-tool', {
+      toolId,
+      category: activeTab
+    });
   };
 
   // Toggle a tool as favorite
@@ -130,7 +143,12 @@ const HealthBox = () => {
         favoriteHealthTools: updatedFavorites
       }, { merge: true });
 
+      // Track this interaction for ML learning
       trackHealthBoxInteraction(isFavorite ? 'unfavorite' : 'favorite', toolId);
+      userActivityService.trackActivity('healthbox', isFavorite ? 'unfavorite-tool' : 'favorite-tool', {
+        toolId,
+        category
+      });
     } catch (error) {
       console.error('Error toggling favorite tool:', error);
     }
@@ -522,7 +540,7 @@ const HealthBox = () => {
             {/* Tool Selection */}
             <div className="sci-fi-card p-4">
               <h2 className="text-xl font-semibold text-safebite-text mb-4">Available Tools</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="healthbox-grid">
                 {allTools[activeTab as keyof typeof allTools]
                   .filter(tool => {
                     // Apply search filter
@@ -606,15 +624,18 @@ const HealthBox = () => {
 
             {/* Active Tools */}
             {activeTools.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeTools.map(toolId => {
-                  const tool = allTools[activeTab as keyof typeof allTools].find(t => t.id === toolId);
-                  return tool ? (
-                    <div key={toolId}>
-                      {tool.component}
-                    </div>
-                  ) : null;
-                })}
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold text-safebite-text mb-4">Your Selected Tools</h2>
+                <div className="healthbox-grid">
+                  {activeTools.map(toolId => {
+                    const tool = allTools[activeTab as keyof typeof allTools].find(t => t.id === toolId);
+                    return tool ? (
+                      <div key={toolId} className="sci-fi-card pulse-animation">
+                        {tool.component}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
               </div>
             )}
 
@@ -636,15 +657,15 @@ const HealthBox = () => {
               Connect your health devices and apps to get personalized recommendations and insights.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center">
+              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
                 <Activity className="h-5 w-5 text-safebite-teal mr-2" />
                 <span className="text-safebite-text-secondary">Fitness Trackers</span>
               </div>
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center">
+              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
                 <Heart className="h-5 w-5 text-safebite-teal mr-2" />
                 <span className="text-safebite-text-secondary">Heart Rate Monitors</span>
               </div>
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center">
+              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
                 <Scale className="h-5 w-5 text-safebite-teal mr-2" />
                 <span className="text-safebite-text-secondary">Smart Scales</span>
               </div>
@@ -652,7 +673,7 @@ const HealthBox = () => {
           </div>
 
           <div className="text-xs text-safebite-text-secondary mt-6 text-right">
-            Created by Aditya Shenvi
+            Created by Aditya Shenvi | SafeBite v2.2
           </div>
         </div>
       </main>

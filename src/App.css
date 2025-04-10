@@ -1,42 +1,168 @@
+/* Base styles */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  min-height: 100vh;
+  text-align: left;
+}
+
+/* Sci-fi UI elements */
+.sci-fi-card {
+  background-color: rgba(23, 29, 40, 0.7);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.sci-fi-card:hover {
+  border-color: rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+}
+
+.sci-fi-input {
+  background-color: rgba(23, 29, 40, 0.8);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  color: #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.sci-fi-input:focus {
+  border-color: rgba(0, 255, 204, 0.6);
+  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
+}
+
+/* Animations */
+@keyframes pulse-border {
+  0% {
+    border-color: rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+  }
+  50% {
+    border-color: rgba(0, 255, 204, 0.6);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+  }
+  100% {
+    border-color: rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+  }
+}
+
+.pulse-animation {
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes gradient-text {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-text {
+  animation: gradient-text 3s ease infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delay {
+  animation: float 4s ease-in-out 1s infinite;
+}
+
+.animate-float-delay-2 {
+  animation: float 4s ease-in-out 2s infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+.animate-spin-very-slow {
+  animation: spin-slow 40s linear infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spin-slow 30s linear infinite reverse;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(90deg, #14b8a6, #06b6d4, #0ea5e9);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-fill-color: transparent;
+}
+
+/* Neon effects */
+.shadow-neon-teal {
+  box-shadow: 0 0 5px rgba(0, 255, 204, 0.2),
+              0 0 10px rgba(0, 255, 204, 0.1),
+              0 0 15px rgba(0, 255, 204, 0.05);
+}
+
+.shadow-neon-teal:hover {
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3),
+              0 0 15px rgba(0, 255, 204, 0.2),
+              0 0 20px rgba(0, 255, 204, 0.1);
+}
+
+.shadow-neon-purple {
+  box-shadow: 0 0 5px rgba(170, 0, 255, 0.2),
+              0 0 10px rgba(170, 0, 255, 0.1),
+              0 0 15px rgba(170, 0, 255, 0.05);
+}
+
+.shadow-neon-purple:hover {
+  box-shadow: 0 0 8px rgba(170, 0, 255, 0.3),
+              0 0 15px rgba(170, 0, 255, 0.2),
+              0 0 20px rgba(170, 0, 255, 0.1);
+}
+
+/* Layout improvements */
+.healthbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .healthbox-grid,
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Development banner */
+.dev-banner {
+  background: linear-gradient(90deg, #ff0080, #7928ca);
+  color: white;
   text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
 }

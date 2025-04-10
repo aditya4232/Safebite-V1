@@ -100,11 +100,22 @@ const Community = () => {
   const handleSendMessage = async () => {
     if (!messageInput.trim()) return;
 
+    // Prevent guests from sending messages
+    if (isGuest || !user) {
+      toast({
+        title: "Login Required",
+        description: "Please log in or sign up to send messages in the community chat.",
+        variant: "default", // Use default variant for informational messages
+      });
+      return;
+    }
+
     const newMessage = {
-      userId: user?.uid,
-      username: user?.displayName || user?.email || 'Anonymous',
+      userId: user.uid, // User is guaranteed to exist here
+      username: user.displayName || user.email || 'Anonymous', // Use guaranteed user details
       text: messageInput,
       timestamp: serverTimestamp(),
+      avatar: user.photoURL || '', // Add avatar URL if available
     };
 
     try {

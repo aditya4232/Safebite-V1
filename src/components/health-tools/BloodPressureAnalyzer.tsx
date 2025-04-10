@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Heart, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
+import { trackHealthBoxInteraction } from '@/services/mlService';
+import userActivityService from '@/services/userActivityService';
 
 const BloodPressureAnalyzer = () => {
   const [systolic, setSystolic] = useState<number | ''>('');
@@ -54,6 +56,14 @@ const BloodPressureAnalyzer = () => {
     }
 
     setResult({ category, color, icon, description });
+
+    // Track this interaction for ML learning
+    trackHealthBoxInteraction('blood-pressure', 'analyze');
+    userActivityService.trackActivity('health-tool', 'blood-pressure-analyze', {
+      systolic,
+      diastolic,
+      result: category
+    });
   };
 
   return (
@@ -83,8 +93,8 @@ const BloodPressureAnalyzer = () => {
         </div>
       </div>
 
-      <Button 
-        onClick={analyzeBP} 
+      <Button
+        onClick={analyzeBP}
         className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
         disabled={systolic === '' || diastolic === ''}
       >

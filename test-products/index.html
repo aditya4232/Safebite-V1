@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeBite Products Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      margin-right: 5px;
+      border-radius: 5px 5px 0 0;
+    }
+    .tab.active {
+      background-color: #fff;
+      border-bottom: 1px solid #fff;
+      margin-bottom: -1px;
+      font-weight: bold;
+    }
+    .search-container {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px 0 0 4px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .products-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .product-card {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 15px;
+      transition: transform 0.3s ease;
+    }
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .product-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #2c3e50;
+    }
+    .product-brand {
+      color: #7f8c8d;
+      font-size: 0.9em;
+      margin-bottom: 10px;
+    }
+    .product-category {
+      display: inline-block;
+      background-color: #e0f7fa;
+      color: #00838f;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+    }
+    .loading {
+      text-align: center;
+      padding: 50px;
+      font-size: 1.2em;
+      color: #7f8c8d;
+    }
+    .error {
+      text-align: center;
+      padding: 50px;
+      font-size: 1.2em;
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <h1>SafeBite Products</h1>
+  
+  <div class="tabs">
+    <div class="tab active" id="tab-products">Products</div>
+    <div class="tab" id="tab-grocery">Grocery Products</div>
+  </div>
+  
+  <div class="search-container">
+    <input type="text" id="search-input" placeholder="Search products...">
+    <button id="search-button">Search</button>
+  </div>
+  
+  <div id="products-container" class="products-container">
+    <div class="loading">Loading products...</div>
+  </div>
+
+  <script>
+    // API URL - Change this to your Render backend URL
+    const API_BASE_URL = 'https://safebite-backend.onrender.com';
+    
+    // State
+    let activeTab = 'products';
+    let searchQuery = '';
+    
+    // DOM Elements
+    const productsTab = document.getElementById('tab-products');
+    const groceryTab = document.getElementById('tab-grocery');
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    const productsContainer = document.getElementById('products-container');
+    
+    // Event Listeners
+    productsTab.addEventListener('click', () => {
+      setActiveTab('products');
+    });
+    
+    groceryTab.addEventListener('click', () => {
+      setActiveTab('grocery');
+    });
+    
+    searchButton.addEventListener('click', () => {
+      searchQuery = searchInput.value;
+      fetchProducts();
+    });
+    
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchQuery = searchInput.value;
+        fetchProducts();
+      }
+    });
+    
+    // Functions
+    function setActiveTab(tab) {
+      activeTab = tab;
+      
+      // Update UI
+      if (tab === 'products') {
+        productsTab.classList.add('active');
+        groceryTab.classList.remove('active');
+      } else {
+        groceryTab.classList.add('active');
+        productsTab.classList.remove('active');
+      }
+      
+      // Reset search and fetch products
+      searchInput.value = '';
+      searchQuery = '';
+      fetchProducts();
+    }
+    
+    async function fetchProducts() {
+      // Show loading
+      productsContainer.innerHTML = '<div class="loading">Loading products...</div>';
+      
+      try {
+        // Determine endpoint based on active tab and search query
+        let endpoint = '';
+        
+        if (searchQuery) {
+          endpoint = `${API_BASE_URL}/${activeTab}/search?q=${encodeURIComponent(searchQuery)}`;
+        } else {
+          endpoint = `${API_BASE_URL}/${activeTab}`;
+        }
+        
+        // Fetch data
+        const response = await fetch(endpoint);
+        
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Display products
+        displayProducts(data);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        productsContainer.innerHTML = `
+          <div class="error">
+            Failed to load products. Please try again later.<br>
+            Error: ${error.message}
+          </div>
+        `;
+      }
+    }
+    
+    function displayProducts(products) {
+      if (!products || products.length === 0) {
+        productsContainer.innerHTML = '<div class="error">No products found.</div>';
+        return;
+      }
+      
+      // Clear container
+      productsContainer.innerHTML = '';
+      
+      // Add product cards
+      products.forEach(product => {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        
+        // Get product properties based on active tab
+        const name = activeTab === 'products' ? product.name : product.ProductName;
+        const brand = activeTab === 'products' ? product.brand : product.Brand;
+        const category = activeTab === 'products' ? product.category : product.Category;
+        
+        card.innerHTML = `
+          <div class="product-name">${name || 'Unknown Product'}</div>
+          ${brand ? `<div class="product-brand">${brand}</div>` : ''}
+          ${category ? `<div class="product-category">${category}</div>` : ''}
+        `;
+        
+        productsContainer.appendChild(card);
+      });
+    }
+    
+    // Initial fetch
+    fetchProducts();
+  </script>
+</body>
+</html>

@@ -7,6 +7,98 @@ export const API_BASE_URL = 'https://safebite-backend.onrender.com';
 // Backup API URL in case the main one is down
 export const BACKUP_API_URL = 'https://safebite-api.onrender.com';
 
+// Fallback products data when API is unavailable
+export const FALLBACK_PRODUCTS = [
+  {
+    _id: 'fallback1',
+    name: 'Organic Whole Grain Bread',
+    brand: "Nature's Best",
+    category: 'Bakery',
+    description: 'Nutritious whole grain bread made with organic ingredients.',
+    ingredients: ['Whole wheat flour', 'Water', 'Yeast', 'Salt', 'Honey'],
+    nutritionalInfo: {
+      calories: 80,
+      protein: 4,
+      carbs: 15,
+      fat: 1,
+      fiber: 3,
+      sugar: 1
+    },
+    allergens: ['Wheat', 'Gluten'],
+    dietaryInfo: ['Vegetarian'],
+    healthScore: 8,
+    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+    price: 3.99,
+    tags: ['Organic', 'Whole Grain', 'Bread']
+  },
+  {
+    _id: 'fallback2',
+    name: 'Greek Yogurt',
+    brand: 'Healthy Dairy',
+    category: 'Dairy',
+    description: 'Creamy Greek yogurt high in protein and probiotics.',
+    ingredients: ['Milk', 'Live active cultures'],
+    nutritionalInfo: {
+      calories: 120,
+      protein: 15,
+      carbs: 7,
+      fat: 5,
+      fiber: 0,
+      sugar: 5
+    },
+    allergens: ['Milk'],
+    dietaryInfo: ['Vegetarian', 'Gluten-Free'],
+    healthScore: 9,
+    imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+    price: 2.49,
+    tags: ['Protein', 'Probiotic', 'Dairy']
+  },
+  {
+    _id: 'fallback3',
+    name: 'Quinoa Salad',
+    brand: 'Fresh Meals',
+    category: 'Prepared Foods',
+    description: 'Ready-to-eat quinoa salad with vegetables and herbs.',
+    ingredients: ['Quinoa', 'Bell peppers', 'Cucumber', 'Olive oil', 'Lemon juice', 'Herbs'],
+    nutritionalInfo: {
+      calories: 220,
+      protein: 8,
+      carbs: 35,
+      fat: 7,
+      fiber: 6,
+      sugar: 2
+    },
+    allergens: [],
+    dietaryInfo: ['Vegan', 'Gluten-Free'],
+    healthScore: 10,
+    imageUrl: 'https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+    price: 5.99,
+    tags: ['Vegan', 'Protein', 'Ready-to-eat']
+  },
+  {
+    _id: 'fallback4',
+    name: 'Almond Butter',
+    brand: 'Nut Heaven',
+    category: 'Spreads',
+    description: 'Creamy almond butter made from roasted almonds.',
+    ingredients: ['Roasted almonds'],
+    nutritionalInfo: {
+      calories: 190,
+      protein: 7,
+      carbs: 6,
+      fat: 17,
+      fiber: 3,
+      sugar: 1
+    },
+    allergens: ['Tree nuts'],
+    dietaryInfo: ['Vegan', 'Gluten-Free'],
+    healthScore: 7,
+    imageUrl: 'https://images.unsplash.com/photo-1501012259-39cd25f18b8d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+    price: 7.99,
+    tags: ['Nut butter', 'Protein', 'Natural']
+  }
+];
+
 /**
  * Check if the API is available
  * @returns Promise<{ isAvailable: boolean, activeUrl: string }> - API status and active URL
@@ -118,9 +210,9 @@ export const fetchProductsWithFallback = async (
     const { isAvailable, activeUrl } = await checkApiStatus();
 
     if (!isAvailable) {
-      console.warn('API is not available, returning empty data');
-      // Return empty data instead of fallback data
-      return { products: [], total: 0, page: 1, totalPages: 1 };
+      console.warn('API is not available, returning fallback data');
+      // Return the provided fallback data
+      return fallbackData;
     }
 
     // API is available, try to fetch products
@@ -206,14 +298,16 @@ export const fetchProductsWithFallback = async (
       } catch (legacyError) {
         console.error(`Error fetching from legacy endpoint: ${legacyError}`);
         clearTimeout(timeoutId);
-        // Return empty data instead of fallback data
-        return { products: [], total: 0, page: 1, totalPages: 1 };
+        // Return the provided fallback data
+        console.warn('All fetch attempts failed, returning fallback data');
+        return fallbackData;
       }
     }
   } catch (error) {
     console.error(`Error fetching ${collection}:`, error);
-    // Return empty data instead of fallback data
-    return { products: [], total: 0, page: 1, totalPages: 1 };
+    // Return the provided fallback data
+    console.warn('Error during fetch process, returning fallback data');
+    return fallbackData;
   }
 };
 
@@ -242,7 +336,7 @@ export const fetchRecipesWithFallback = async (
     };
   } catch (error) {
     console.error('Error fetching recipes:', error);
-    // Return empty data instead of fallback data
+    // Return empty fallback data for recipes if fetch fails
     return { recipes: [], total: 0, page: 1, totalPages: 1 };
   }
 };
@@ -252,6 +346,8 @@ export const fetchRecipesWithFallback = async (
 
 export default {
   API_BASE_URL,
+  BACKUP_API_URL,
+  FALLBACK_PRODUCTS,
   checkApiStatus,
   fetchProductsWithFallback,
   fetchRecipesWithFallback

@@ -3,7 +3,7 @@
 // API Keys from environment variables with fallbacks
 const EDAMAM_APP_ID = import.meta.env.VITE_EDAMAM_APP_ID || '64b66d05';
 const EDAMAM_APP_KEY = import.meta.env.VITE_EDAMAM_APP_KEY || '7598859c968254ec27441ad9ed9197d3';
-const CALORIENINJAS_API_KEY = import.meta.env.VITE_CALORIENINJAS_API_KEY || 'YOUR_API_KEY';
+const CALORIENINJAS_API_KEY = import.meta.env.VITE_CALORIENINJAS_API_KEY || 'Rl0Rl5Hs9Hn9Yx9Nt9Ht9A==Ck9Nt9Ht9A==Ck9Nt9Ht9A==';
 
 // Backup API keys in case the primary ones reach their rate limits
 const EDAMAM_BACKUP_APP_IDS = [
@@ -210,7 +210,7 @@ const searchCalorieNinjas = async (query: string): Promise<FoodItem[]> => {
   try {
     console.log(`Searching CalorieNinjas for: ${query}`);
 
-    const response = await fetch(`${CALORIENINJAS_BASE_URL}/nutrition?query=${encodeURIComponent(query)}`, {
+    const response = await fetch(`https://api.calorieninjas.com/v1/nutrition?query=${encodeURIComponent(query)}`, {
       method: 'GET',
       headers: {
         'X-Api-Key': CALORIENINJAS_API_KEY,
@@ -223,16 +223,28 @@ const searchCalorieNinjas = async (query: string): Promise<FoodItem[]> => {
     }
 
     const data = await response.json();
+    console.log('CalorieNinjas response:', data);
 
-    if (!data.items || data.items.length === 0) {
-      return [];
+    // Check if the API returned items in the expected format
+    if (data && data.items && data.items.length > 0) {
+      return transformCalorieNinjasResults(data.items);
+    }
+    // Handle the case where the API returns a different format
+    else if (data && Array.isArray(data.items)) {
+      return transformCalorieNinjasResults(data.items);
+    }
+    // Handle the case where the API returns a different format with no items property
+    else if (data) {
+      // Try to extract items from the response
+      const items = data.items || [];
+      return transformCalorieNinjasResults(items);
     }
 
-    // Transform CalorieNinjas data to our format
-    return transformCalorieNinjasResults(data.items);
+    return [];
   } catch (error) {
     console.error('CalorieNinjas API error:', error);
-    throw error;
+    // Return empty array instead of throwing to allow fallback to other APIs
+    return [];
   }
 };
 
@@ -685,6 +697,52 @@ const transformEdamamResults = (hints: any[]): FoodItem[] => {
       label: measure.label,
       weight: measure.weight
     }));
+
+// Helper function to transform CalorieNinjas results
+const transformCalorieNinjasResults = (items: any[]): FoodItem[] => {
+  return items.map((item: any) => {
+    // Calculate nutrition score based on nutrient values
+    let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
+
+    if (item.protein_g > 15 && (item.fiber_g > 3 || !item.fiber_g) && (item.sugar_g < 10 || !item.sugar_g)) {
+      nutritionScore = 'green';
+    } else if ((item.fat_total_g > 20 || !item.fat_total_g) || (item.sugar_g > 15 || !item.sugar_g)) {
+      nutritionScore = 'red';
+    }
+
+    return {
+      id: `calorieninjas-${item.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+      name: item.name || 'Unknown Food',
+      brand: '',
+      calories: Math.round(item.calories) || 0,
+      image: '', // CalorieNinjas doesn't provide images
+      nutritionScore,
+      nutrients: {
+        protein: Math.round(item.protein_g) || 0,
+        carbs: Math.round(item.carbohydrates_total_g) || 0,
+        fat: Math.round(item.fat_total_g) || 0,
+        fiber: Math.round(item.fiber_g) || 0,
+        sugar: Math.round(item.sugar_g) || 0
+      },
+      details: {
+        protein: Math.round(item.protein_g) || 0,
+        carbs: Math.round(item.carbohydrates_total_g) || 0,
+        fat: Math.round(item.fat_total_g) || 0,
+        sodium: Math.round(item.sodium_mg) || 0,
+        sugar: Math.round(item.sugar_g) || 0,
+        calories: Math.round(item.calories) || 0,
+        ingredients: [],
+        allergens: [],
+        additives: []
+      },
+      servingSizes: [{
+        label: 'Serving',
+        weight: item.serving_size_g || 100
+      }],
+      source: 'CalorieNinjas'
+    };
+  });
+};
 
     // Calculate nutrition score based on nutrient values
     let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';

@@ -1,24 +1,35 @@
 
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import Loader from '@/components/Loader';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, UserCircle, AlertCircle, Info } from 'lucide-react';
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { app } from "../../firebase";
+import guestAuthService from "@/services/guestAuthService";
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showGuestInfo, setShowGuestInfo] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const auth = getAuth(app); // Get the auth instance
+
+  // Check if user came from guest login link
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('guest') === 'true') {
+      setShowGuestInfo(true);
+    }
+  }, [location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +75,34 @@ const Login = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle guest login
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+
+    try {
+      await guestAuthService.signInAsGuest();
+      toast({
+        title: "Guest login successful",
+        description: "You're now using SafeBite in guest mode. Your data won't be saved.",
+      });
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error("Guest login error:", error);
+      toast({
+        title: "Guest login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Toggle guest info panel
+  const toggleGuestInfo = () => {
+    setShowGuestInfo(!showGuestInfo);
   };
 
   return (
@@ -157,13 +196,53 @@ const Login = () => {
             </svg>
             Google
           </Button>
+
+          <Button
+            variant="outline"
+            className="sci-fi-button"
+            onClick={handleGuestLogin}
+            disabled={isLoading}
+          >
+            <UserCircle className="mr-2 h-4 w-4" />
+            Guest
+          </Button>
         </div>
 
+        {/* Guest Mode Info Panel */}
+        {showGuestInfo && (
+          <div className="mt-4 p-3 bg-safebite-teal/10 border border-safebite-teal/30 rounded-md">
+            <div className="flex items-start">
+              <Info className="h-5 w-5 text-safebite-teal mr-2 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-medium text-safebite-text mb-1">About Guest Mode</h4>
+                <ul className="text-xs text-safebite-text-secondary space-y-1 list-disc pl-4">
+                  <li>Access all features and tools without registration</li>
+                  <li>Your data won't be saved when you leave</li>
+                  <li>No personalized recommendations over time</li>
+                  <li>Create an account anytime to save your progress</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 text-center text-sm">
-          <span className="text-safebite-text-secondary">Don't have an account? </span>
-          <Link to="/auth/signup" className="text-safebite-teal hover:text-safebite-teal/80">
-            Sign up
-          </Link>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-safebite-text-secondary">Don't have an account? </span>
+            <button
+              onClick={toggleGuestInfo}
+              className="text-xs text-safebite-teal hover:text-safebite-teal/80 flex items-center"
+              type="button"
+            >
+              <Info className="h-3 w-3 mr-1" />
+              {showGuestInfo ? 'Hide' : 'About'} guest mode
+            </button>
+          </div>
+          <div className="flex justify-center space-x-4">
+            <Link to="/auth/signup" className="text-safebite-teal hover:text-safebite-teal/80">
+              Sign up
+            </Link>
+          </div>
         </div>
       </Card>
     </div>
