@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useGuestMode } from '@/hooks/useGuestMode';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle, CheckCircle, XCircle,
   Leaf, Flame, Heart, Zap, Database,
   History, Tag, Star, Upload, Scan,
-  Bot, AlertCircle, Camera
+  Bot, AlertCircle, Camera, Search, Filter,
+  Utensils, Info, ArrowRight, Sparkles, ShoppingBag
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FoodSearchBar from '@/components/FoodSearchBar';
@@ -19,12 +22,17 @@ import FoodScannerUpload from '@/components/FoodScannerUpload';
 import ImageNutritionAnalysis from '@/components/ImageNutritionAnalysis';
 import ApiSourceSelector from '@/components/ApiSourceSelector';
 import FoodChatBot from '@/components/FoodChatBot';
+import FoodDeliveryCard from '@/components/FoodDeliveryCard';
 import {
   FoodItem, searchFoods, searchByBarcode, searchByImage,
   saveSearchHistory, getSearchHistory, toggleFavorite,
   addTagToSearch, removeTagFromSearch, removeSearchHistoryItem,
-  getApiStatus
+  getApiStatus, trackUserInteraction
 } from '@/services/foodApiService';
+import {
+  searchNutrition, analyzeImage, scanBarcode,
+  getNutritionApiStatus, FoodItem as NutritionFoodItem
+} from '@/services/nutritionApiService';
 import { useToast } from "@/hooks/use-toast";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -55,7 +63,10 @@ const FoodSearch = () => {
   const [quantity, setQuantity] = useState(1);
   // API status tracking
   const [apiStatuses, setApiStatuses] = useState(getApiStatus());
+  const [nutritionApiStatuses, setNutritionApiStatuses] = useState(getNutritionApiStatus());
   const [preferredApi, setPreferredApi] = useState<string | undefined>(undefined);
+  const [activeNutritionApi, setActiveNutritionApi] = useState<'calorieNinjas' | 'fatSecret' | 'both'>('both');
+  const [nutritionResults, setNutritionResults] = useState<NutritionFoodItem[]>([]);
   // AI analysis
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
@@ -67,6 +78,7 @@ const FoodSearch = () => {
   const [showScannerUpload, setShowScannerUpload] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showApiSelector, setShowApiSelector] = useState(false);
+  const [showChatBot, setShowChatBot] = useState(false);
   const [searchHistory, setSearchHistory] = useState<any[]>([]);
   const [activeApiSource, setActiveApiSource] = useState('Edamam');
   const [favoriteItems, setFavoriteItems] = useState<{[key: string]: boolean}>({});
@@ -78,6 +90,7 @@ const FoodSearch = () => {
   const { toast } = useToast();
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const { isGuest } = useGuestMode();
 
   // Effect to read query parameter on load
   useEffect(() => {
@@ -138,6 +151,19 @@ const FoodSearch = () => {
 
   // Fetch user profile from Firebase
   const fetchUserProfile = async () => {
+    // If in guest mode, use default profile
+    if (isGuest) {
+      const guestProfile: HealthProfile = {
+        health_goals: 'General Health',
+        dietary_preferences: 'Balanced',
+        health_conditions: '',
+        food_allergies: ''
+      };
+      setUserProfile(guestProfile);
+      await generateRecommendations(guestProfile);
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user) return;
 
@@ -305,6 +331,15 @@ const FoodSearch = () => {
   };
 
   const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      toast({
+        title: "Empty Search",
+        description: "Please enter a food item to search",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSearchQuery(query);
     setIsLoading(true);
     setSelectedFood(null);
@@ -316,38 +351,86 @@ const FoodSearch = () => {
       // Save to search history
       const historyId = saveSearchHistory(query);
       setCurrentHistoryId(historyId);
-
-      // Reload search history
       loadSearchHistory();
 
-      // Update API statuses before search
-      setApiStatuses(getApiStatus());
+      // Track this interaction
+      trackUserInteraction('search', { query });
 
-      // Call the API service with preferred API if set
-      const results = await searchFoods(query, preferredApi);
+      // Use only CalorieNinjas API for simplicity and reliability
+      const results = await searchCalorieNinjas(query);
 
-      // Update API statuses after search
-      setApiStatuses(getApiStatus());
+      if (results && results.length > 0) {
+        // Process the results to calculate nutrition scores
+        const processedResults = results.map(item => {
+          // Calculate nutrition score based on nutrient values
+          let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
 
-      setSearchResults(results);
-      setShowNoResults(results.length === 0);
+          // Determine score based on protein, fiber, sugar content
+          const protein = item.nutrients.protein || 0;
+          const fiber = item.nutrients.fiber || 0;
+          const sugar = item.nutrients.sugar || 0;
+          const fat = item.nutrients.fat || 0;
 
-      // Show toast notification
-      toast({
-        title: "Search Complete",
-        description: `Found ${results.length} results for "${query}" using ${results.length > 0 ? results[0].apiSource : 'APIs'}`,
-      });
+          if (protein > 15 && fiber > 3 && sugar < 10) {
+            nutritionScore = 'green';
+          } else if (fat > 20 || sugar > 15) {
+            nutritionScore = 'red';
+          }
+
+          return {
+            id: item.id,
+            name: item.name,
+            calories: item.calories,
+            nutritionScore,
+            nutrients: item.nutrients,
+            source: 'CalorieNinjas',
+            apiSource: 'CalorieNinjas',
+            image: '', // CalorieNinjas doesn't provide images
+            details: {
+              protein: item.nutrients.protein || 0,
+              carbs: item.nutrients.carbs || 0,
+              fat: item.nutrients.fat || 0,
+              sodium: item.nutrients.sodium || 0,
+              sugar: item.nutrients.sugar || 0,
+              calories: item.calories,
+              ingredients: [],
+              allergens: [],
+              additives: []
+            }
+          };
+        });
+
+        // Update both result sets for consistency
+        setSearchResults(processedResults);
+        setNutritionResults(results);
+        setShowNoResults(false);
+
+        toast({
+          title: "Search Complete",
+          description: `Found ${results.length} results for "${query}"`,
+        });
+      } else {
+        setSearchResults([]);
+        setNutritionResults([]);
+        setShowNoResults(true);
+
+        toast({
+          title: "No Results",
+          description: `No results found for "${query}". Try a different search term.`,
+          variant: "default"
+        });
+      }
     } catch (error) {
       console.error('Search error:', error);
+      setSearchResults([]);
+      setNutritionResults([]);
+      setShowNoResults(true);
+
       toast({
         title: "Search Error",
         description: "There was a problem with your search. Please try again.",
         variant: "destructive"
       });
-      setShowNoResults(true);
-
-      // Update API statuses after error
-      setApiStatuses(getApiStatus());
     } finally {
       setIsLoading(false);
     }
@@ -846,6 +929,31 @@ const FoodSearch = () => {
             />
           </div>
 
+          {/* API Selection Tabs */}
+          <div className="mb-6">
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="all" onClick={() => setActiveNutritionApi('both')}>
+                  <Database className="mr-2 h-4 w-4" />
+                  All Sources
+                </TabsTrigger>
+                <TabsTrigger value="calorieNinjas" onClick={() => setActiveNutritionApi('calorieNinjas')}>
+                  <Flame className="mr-2 h-4 w-4" />
+                  CalorieNinjas
+                </TabsTrigger>
+                <TabsTrigger value="fatSecret" onClick={() => setActiveNutritionApi('fatSecret')}>
+                  <Utensils className="mr-2 h-4 w-4" />
+                  FatSecret
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Food Delivery Card */}
+          <div className="mb-6">
+            <FoodDeliveryCard />
+          </div>
+
           {/* CalorieNinjas Image Analysis */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-safebite-text mb-4 flex items-center">
@@ -883,116 +991,248 @@ const FoodSearch = () => {
           ) : (
             <div className="sci-fi-card">
               <h2 className="text-xl font-semibold text-safebite-text mb-4">
-                {searchResults.length > 0 ? 'Search Results' : 'Popular Searches'}
+                {searchResults.length > 0 || nutritionResults.length > 0 ? 'Search Results' : 'Popular Searches'}
               </h2>
-              {renderSearchResults()}
 
-              {(!searchResults.length && !showNoResults && !isLoading) && (
+              {/* Tabs for different result sources */}
+              {(searchResults.length > 0 || nutritionResults.length > 0) && (
+                <Tabs defaultValue="all" className="w-full mb-6">
+                  <TabsList className="grid grid-cols-3 mb-4">
+                    <TabsTrigger value="all">
+                      <Database className="mr-2 h-4 w-4" />
+                      All Results
+                    </TabsTrigger>
+                    <TabsTrigger value="edamam">
+                      <Utensils className="mr-2 h-4 w-4" />
+                      Edamam
+                    </TabsTrigger>
+                    <TabsTrigger value="nutrition">
+                      <Flame className="mr-2 h-4 w-4" />
+                      Nutrition APIs
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="all">
+                    {/* Combined Results */}
+                    <div className="grid grid-cols-1 gap-4 mb-6">
+                      {searchResults.map((food) => (
+                        <FoodItemCard
+                          key={food.id}
+                          name={food.name || food.product || food.food_name || food.recipe_name || 'Unknown Food'}
+                          calories={food.calories || food.nutritionalInfo?.calories || 0}
+                          nutritionScore={food.nutritionScore || 0}
+                          onClick={() => handleFoodSelect(food)}
+                          source="Edamam"
+                        />
+                      ))}
+
+                      {nutritionResults.map((food) => (
+                        <FoodItemCard
+                          key={food.id}
+                          name={food.name}
+                          calories={food.calories}
+                          nutritionScore={0}
+                          onClick={() => {
+                            // Convert NutritionFoodItem to FoodItem format
+                            const convertedFood: FoodItem = {
+                              id: food.id,
+                              name: food.name,
+                              calories: food.calories,
+                              nutritionalInfo: {
+                                calories: food.calories,
+                                protein: food.nutrients.protein,
+                                carbs: food.nutrients.carbs,
+                                fat: food.nutrients.fat,
+                                fiber: food.nutrients.fiber,
+                                sugar: food.nutrients.sugar
+                              },
+                              source: food.source
+                            };
+                            handleFoodSelect(convertedFood);
+                          }}
+                          source={food.source}
+                        />
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="edamam">
+                    {/* Edamam Results */}
+                    <div className="grid grid-cols-1 gap-4 mb-6">
+                      {searchResults.length > 0 ? (
+                        searchResults.map((food) => (
+                          <FoodItemCard
+                            key={food.id}
+                            name={food.name || food.product || food.food_name || food.recipe_name || 'Unknown Food'}
+                            calories={food.calories || food.nutritionalInfo?.calories || 0}
+                            nutritionScore={food.nutritionScore || 0}
+                            onClick={() => handleFoodSelect(food)}
+                            source="Edamam"
+                          />
+                        ))
+                      ) : (
+                        <div className="text-center p-6">
+                          <AlertCircle className="mx-auto h-12 w-12 text-safebite-text-secondary mb-4" />
+                          <p className="text-safebite-text-secondary">No results found from Edamam API</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="nutrition">
+                    {/* Nutrition API Results */}
+                    <div className="grid grid-cols-1 gap-4 mb-6">
+                      {nutritionResults.length > 0 ? (
+                        nutritionResults.map((food) => (
+                          <FoodItemCard
+                            key={food.id}
+                            name={food.name}
+                            calories={food.calories}
+                            nutritionScore={0}
+                            onClick={() => {
+                              // Convert NutritionFoodItem to FoodItem format
+                              const convertedFood: FoodItem = {
+                                id: food.id,
+                                name: food.name,
+                                calories: food.calories,
+                                nutritionalInfo: {
+                                  calories: food.calories,
+                                  protein: food.nutrients.protein,
+                                  carbs: food.nutrients.carbs,
+                                  fat: food.nutrients.fat,
+                                  fiber: food.nutrients.fiber,
+                                  sugar: food.nutrients.sugar
+                                },
+                                source: food.source
+                              };
+                              handleFoodSelect(convertedFood);
+                            }}
+                            source={food.source}
+                          />
+                        ))
+                      ) : (
+                        <div className="text-center p-6">
+                          <AlertCircle className="mx-auto h-12 w-12 text-safebite-text-secondary mb-4" />
+                          <p className="text-safebite-text-secondary">No results found from Nutrition APIs</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              )}
+
+              {searchResults.length === 0 && nutritionResults.length === 0 && (
                 <>
-                  {/* Personalized Recommendations */}
-                  {recommendations.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="text-xl font-semibold text-safebite-text mb-4">
-                        Recommended for You
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        {recommendations.map((food) => (
-                          <FoodItemCard
-                            key={food.id}
-                            name={food.name}
-                            calories={food.calories}
-                            nutritionScore={food.nutritionScore}
-                            onClick={() => handleFoodSelect(food)}
-                          />
-                        ))}
+                  {renderSearchResults()}
+
+                  {(!searchResults.length && !showNoResults && !isLoading) && (
+                    <>
+                      {/* Personalized Recommendations */}
+                      {recommendations.length > 0 && (
+                        <div className="mb-8">
+                          <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                            Recommended for You
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            {recommendations.map((food) => (
+                              <FoodItemCard
+                                key={food.id}
+                                name={food.name}
+                                calories={food.calories}
+                                nutritionScore={food.nutritionScore}
+                                onClick={() => handleFoodSelect(food)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Popular Categories */}
+                      <div className="mb-8">
+                        <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                          Popular Categories
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <Card
+                            className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                            onClick={() => handleSearch("healthy breakfast")}
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3">
+                                <Leaf className="h-6 w-6 text-green-500" />
+                              </div>
+                              <h4 className="font-medium text-safebite-text">Healthy Breakfast</h4>
+                            </div>
+                          </Card>
+
+                          <Card
+                            className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                            onClick={() => handleSearch("protein rich")}
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mb-3">
+                                <Flame className="h-6 w-6 text-red-500" />
+                              </div>
+                              <h4 className="font-medium text-safebite-text">Protein Rich</h4>
+                            </div>
+                          </Card>
+
+                          <Card
+                            className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
+                            onClick={() => handleSearch("heart healthy")}
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-3">
+                                <Heart className="h-6 w-6 text-purple-500" />
+                              </div>
+                              <h4 className="font-medium text-safebite-text">Heart Healthy</h4>
+                            </div>
+                          </Card>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Recent Foods */}
+                      <div>
+                        <h3 className="text-xl font-semibold text-safebite-text mb-4">
+                          Recent Foods
+                        </h3>
+                        {recentFoods.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-4">
+                            {recentFoods.map((food) => (
+                              <FoodItemCard
+                                key={food.id}
+                                name={food.name}
+                                calories={food.calories}
+                                nutritionScore={food.nutritionScore}
+                                onClick={() => handleFoodSelect(food)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-4">
+                            <FoodItemCard
+                              name="Breakfast Cereal"
+                              calories={120}
+                              nutritionScore="yellow"
+                              onClick={() => handleSearch("cereal")}
+                            />
+                            <FoodItemCard
+                              name="Protein Bars"
+                              calories={200}
+                              nutritionScore="yellow"
+                              onClick={() => handleSearch("protein bar")}
+                            />
+                            <FoodItemCard
+                              name="Greek Yogurt"
+                              calories={100}
+                              nutritionScore="green"
+                              onClick={() => handleSearch("greek yogurt")}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
-
-                  {/* Popular Categories */}
-                  <div className="mb-8">
-                    <h3 className="text-xl font-semibold text-safebite-text mb-4">
-                      Popular Categories
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <Card
-                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
-                        onClick={() => handleSearch("healthy breakfast")}
-                      >
-                        <div className="flex flex-col items-center text-center">
-                          <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3">
-                            <Leaf className="h-6 w-6 text-green-500" />
-                          </div>
-                          <h4 className="font-medium text-safebite-text">Healthy Breakfast</h4>
-                        </div>
-                      </Card>
-
-                      <Card
-                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
-                        onClick={() => handleSearch("protein rich")}
-                      >
-                        <div className="flex flex-col items-center text-center">
-                          <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mb-3">
-                            <Flame className="h-6 w-6 text-red-500" />
-                          </div>
-                          <h4 className="font-medium text-safebite-text">Protein Rich</h4>
-                        </div>
-                      </Card>
-
-                      <Card
-                        className="p-4 cursor-pointer hover:bg-safebite-card-bg-alt transition-colors"
-                        onClick={() => handleSearch("heart healthy")}
-                      >
-                        <div className="flex flex-col items-center text-center">
-                          <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-3">
-                            <Heart className="h-6 w-6 text-purple-500" />
-                          </div>
-                          <h4 className="font-medium text-safebite-text">Heart Healthy</h4>
-                        </div>
-                      </Card>
-                    </div>
-                  </div>
-
-                  {/* Recent Foods */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-safebite-text mb-4">
-                      Recent Foods
-                    </h3>
-                    {recentFoods.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-4">
-                        {recentFoods.map((food) => (
-                          <FoodItemCard
-                            key={food.id}
-                            name={food.name}
-                            calories={food.calories}
-                            nutritionScore={food.nutritionScore}
-                            onClick={() => handleFoodSelect(food)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-4">
-                        <FoodItemCard
-                          name="Breakfast Cereal"
-                          calories={120}
-                          nutritionScore="yellow"
-                          onClick={() => handleSearch("cereal")}
-                        />
-                        <FoodItemCard
-                          name="Protein Bars"
-                          calories={200}
-                          nutritionScore="yellow"
-                          onClick={() => handleSearch("protein bar")}
-                        />
-                        <FoodItemCard
-                          name="Greek Yogurt"
-                          calories={100}
-                          nutritionScore="green"
-                          onClick={() => handleSearch("greek yogurt")}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </>
               )}
             </div>
@@ -1010,7 +1250,9 @@ const FoodSearch = () => {
       )}
 
       {/* AI Chatbot */}
-      <FoodChatBot initialMessage="Hi! I'm your SafeBite AI assistant. Ask me anything about food, nutrition, or the foods you're searching for!" />
+      {showChatBot && (
+        <FoodChatBot initialMessage="Hi! I'm your SafeBite AI assistant. Ask me anything about food, nutrition, or the foods you're searching for!" />
+      )}
 
       {/* API Source Selector Modal */}
       {showApiSelector && (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogIn, User } from 'lucide-react';
@@ -55,7 +55,7 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-safebite-card-bg border-b border-safebite-card-bg-alt">
+        <div className="md:hidden bg-safebite-card-bg border-b border-safebite-card-bg-alt transition-all duration-300 ease-in-out transform origin-top">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             <Link
               to="/"

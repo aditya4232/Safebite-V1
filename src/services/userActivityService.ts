@@ -28,15 +28,15 @@ class UserActivityService {
 
   constructor() {
     // Check if user is in guest mode
-    this.isGuest = localStorage.getItem('userType') === 'guest' || 
+    this.isGuest = localStorage.getItem('userType') === 'guest' ||
                    sessionStorage.getItem('safebite-guest-mode') === 'true';
-    
+
     // Set up sync interval for logged-in users
     this.setupSyncInterval();
-    
+
     // Listen for auth state changes
     this.auth.onAuthStateChanged((user) => {
-      this.isGuest = !user && (localStorage.getItem('userType') === 'guest' || 
+      this.isGuest = !user && (localStorage.getItem('userType') === 'guest' ||
                               sessionStorage.getItem('safebite-guest-mode') === 'true');
       this.setupSyncInterval();
     });
@@ -58,15 +58,15 @@ class UserActivityService {
 
     // Add to local activities
     this.localActivities.push(activity);
-    
+
     // Save to cookies for ML learning
     this.saveActivityToCookies(activity);
-    
+
     // If user is logged in and we've reached the threshold, sync with Firebase
     if (!this.isGuest && this.localActivities.length >= this.maxLocalActivities) {
       await this.syncActivitiesWithFirebase();
     }
-    
+
     console.log(`Activity tracked: ${type} - ${action}`);
   }
 
@@ -78,17 +78,17 @@ class UserActivityService {
     try {
       // Get existing activities from cookies
       const cookieActivities = this.getActivitiesFromCookies();
-      
+
       // Add new activity
       cookieActivities.push({
         type: activity.type,
         action: activity.action,
         timestamp: activity.timestamp.getTime()
       });
-      
+
       // Keep only the last 50 activities
       const trimmedActivities = cookieActivities.slice(-50);
-      
+
       // Save back to cookies
       document.cookie = `safebite_activities=${JSON.stringify(trimmedActivities)};path=/;max-age=2592000`; // 30 days
     } catch (error) {
@@ -104,12 +104,12 @@ class UserActivityService {
     try {
       const cookies = document.cookie.split(';');
       const activityCookie = cookies.find(cookie => cookie.trim().startsWith('safebite_activities='));
-      
+
       if (activityCookie) {
         const cookieValue = activityCookie.split('=')[1];
         return JSON.parse(decodeURIComponent(cookieValue));
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error getting activities from cookies:', error);
@@ -123,17 +123,17 @@ class UserActivityService {
   async syncActivitiesWithFirebase(): Promise<void> {
     try {
       const user = this.auth.currentUser;
-      
+
       if (!user || this.isGuest || this.localActivities.length === 0) {
         return;
       }
-      
+
       const userRef = doc(this.db, 'users', user.uid);
       const activityRef = doc(this.db, 'user_activities', user.uid);
-      
+
       // Check if user activity document exists
       const activityDoc = await getDoc(activityRef);
-      
+
       if (activityDoc.exists()) {
         // Update existing document
         await updateDoc(activityRef, {
@@ -148,16 +148,16 @@ class UserActivityService {
           userId: user.uid
         });
       }
-      
+
       // Update user document with last activity
       await updateDoc(userRef, {
         lastActivity: this.localActivities[this.localActivities.length - 1],
         lastActiveAt: Timestamp.now()
       }, { merge: true });
-      
+
       // Clear local activities after successful sync
       this.localActivities = [];
-      
+
       console.log('Activities synced with Firebase');
     } catch (error) {
       console.error('Error syncing activities with Firebase:', error);
@@ -173,7 +173,7 @@ class UserActivityService {
       window.clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
-    
+
     // Set up new interval if user is logged in
     if (!this.isGuest) {
       this.syncInterval = window.setInterval(() => {
@@ -192,22 +192,48 @@ class UserActivityService {
   async getRecentActivities(limit: number = 10): Promise<UserActivity[]> {
     try {
       const user = this.auth.currentUser;
-      
+
       if (!user || this.isGuest) {
         return this.localActivities.slice(-limit);
       }
-      
+
       const activityRef = doc(this.db, 'user_activities', user.uid);
       const activityDoc = await getDoc(activityRef);
-      
+
       if (activityDoc.exists()) {
         const data = activityDoc.data() as UserActivityLog;
         return data.activities.slice(-limit);
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error getting recent activities:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all user activities for a specific user
+   * @param userId User ID to get activities for
+   * @returns Promise with array of all user activities
+   */
+  async getUserActivity(userId: string): Promise<UserActivity[]> {
+    try {
+      if (!userId) {
+        return [];
+      }
+
+      const activityRef = doc(this.db, 'user_activities', userId);
+      const activityDoc = await getDoc(activityRef);
+
+      if (activityDoc.exists()) {
+        const data = activityDoc.data() as UserActivityLog;
+        return data.activities || [];
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Error getting user activities:', error);
       return [];
     }
   }

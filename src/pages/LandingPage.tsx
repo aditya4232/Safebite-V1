@@ -1,11 +1,13 @@
-
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../firebase'; // Corrected path
 import { Button } from "@/components/ui/button";
 import DevPopup from "@/components/DevPopup";
 import ProfileImage from "@/components/ProfileImage";
 import {
   Shield, Brain, Heart, Zap, Search, ArrowRight,
-  Users, BarChart, Clock, Star, LogIn
+  Users, BarChart, Clock, Star, LogIn, Info, Check
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -18,20 +20,24 @@ import QuickSearchDemo from '@/components/QuickSearchDemo';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [showDevPopup, setShowDevPopup] = useState(false);
+  const [user] = useAuthState(auth); // Get user auth state
 
   return (
     <div className="min-h-screen flex flex-col relative">
       <ParticleBackground />
       <Navbar />
-      <DevPopup />
-      <FloatingActionButton />
+      <DevPopup isOpen={showDevPopup} onClose={() => setShowDevPopup(false)} />
+      {/* Conditionally render FloatingActionButton only for logged-in users */}
+      {user && <FloatingActionButton />}
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 md:pt-40 md:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
         <div className="flex flex-col md:flex-row items-center">
           <div className="md:w-1/2 md:pr-8 mb-10 md:mb-0">
-            <div className="inline-block bg-safebite-teal/20 text-safebite-teal px-3 py-1 rounded-full text-sm font-medium mb-4 animate-pulse">
-              Version 2.2 - Now with AI Analysis
+            {/* Removed animate-pulse */}
+            <div className="inline-block bg-safebite-teal text-safebite-dark-blue px-4 py-2 rounded-full text-sm font-medium mb-4 shadow-md">
+              Version 2.5 - Production Ready
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               <span className="gradient-text animate-gradient-text">Safe Food Choices</span><br />
@@ -41,18 +47,20 @@ const LandingPage = () => {
               Know exactly what's in your food. Track nutrition, receive personalized recommendations, and make informed choices for your health journey.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              {/* Added hover scale effect */}
               <Button
                 onClick={() => navigate('/auth/signup')}
-                className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 text-lg px-8 py-6 shadow-neon-teal"
-              >
+                className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 text-lg px-8 py-4 rounded-md shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+                >
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
+              {/* Added hover scale effect */}
               <Button
                 variant="outline"
                 onClick={() => navigate('/auth/login?guest=true')}
-                className="sci-fi-button text-lg px-8 py-6"
-              >
+                className="sci-fi-button text-lg px-8 py-4 rounded-md hover:scale-105 transition-transform duration-200"
+                >
                 <LogIn className="mr-2 h-5 w-5" />
                 Guest Login
               </Button>
@@ -116,41 +124,47 @@ const LandingPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Simple Food Search"
               description="Search or scan barcodes to instantly access comprehensive food information and safety ratings."
               icon={<Search size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Health Goal Setting"
               description="Set personalized health goals and track your progress with interactive charts and reports."
               icon={<BarChart size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Community Support"
               description="Connect with like-minded individuals, share experiences, and get motivation from our community."
               icon={<Users size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Weekly Health Check-ins"
               description="Answer simple questions about your week to track progress and receive updated recommendations."
               icon={<Clock size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Personalized Dashboard"
               description="View your nutrition stats, track progress, and get insights tailored to your health goals."
               icon={<Zap size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
+            {/* Added hover:shadow-neon-teal */}
             <FeatureCard
               title="Food Tracker"
               description="Add foods to your daily tracker to monitor your nutrition intake and stay on target with your goals."
               icon={<Zap size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300"
+              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
             />
           </div>
         </div>
@@ -224,29 +238,7 @@ const LandingPage = () => {
               </p>
             </div>
           </div>
-
-          <div className="bg-safebite-dark-blue p-6 rounded-lg border border-safebite-teal/30 sci-fi-card shadow-neon-teal">
-            <div className="flex flex-col md:flex-row items-center md:items-start mb-4">
-              <ProfileImage size="md" className="mr-0 md:mr-3 mb-4 md:mb-0" />
-              <div>
-                <h3 className="text-xl font-semibold text-safebite-text text-center md:text-left">Developer's Note</h3>
-                <p className="text-safebite-teal text-sm text-center md:text-left">Aditya Shenvi | IFHE Hyderabad</p>
-                <p className="text-safebite-text-secondary my-4">
-                  SafeBite was developed as a special engineering project to demonstrate how technology can help people make better food choices.
-                  The application combines modern web technologies with nutritional science to create an intuitive platform for food analysis and health tracking.
-                </p>
-                <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">React</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">TypeScript</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Firebase</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Tailwind CSS</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">MongoDB</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Flask</span>
-                  <span className="px-3 py-1 bg-safebite-card-bg-alt rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Food APIs</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Removed Developer Note box from here */}
         </div>
       </section>
 
@@ -327,6 +319,85 @@ const LandingPage = () => {
             </Button>
           </div>
         </div>
+      </section>
+
+      {/* Developer Note Section (Moved from "How It Works") */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
+         <div className="bg-safebite-dark-blue p-6 rounded-lg border border-safebite-teal/30 sci-fi-card shadow-neon-teal">
+            <div className="flex flex-col md:flex-row items-center md:items-start mb-4">
+              <ProfileImage size="md" className="mr-0 md:mr-3 mb-4 md:mb-0 flex-shrink-0" />
+              <div className="flex-grow">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
+                  <div>
+                    <h3 className="text-xl font-semibold text-safebite-text text-center md:text-left">Developer's Note</h3>
+                    <p className="text-safebite-teal text-sm text-center md:text-left">Aditya Shenvi | IFHE Hyderabad</p>
+                  </div>
+                   <div className="mt-2 sm:mt-0 bg-green-500/20 text-green-500 px-3 py-1 rounded-full text-xs font-medium self-center md:self-auto">
+                     Production Ready v2.5
+                   </div>
+                </div>
+                <p className="text-safebite-text-secondary my-4 text-sm md:text-base">
+                  SafeBite was developed as a special engineering project to demonstrate how technology can help people make better food choices.
+                  The application combines modern web technologies with nutritional science to create an intuitive platform for food analysis and health tracking.
+                  This release includes fixes to the AI chatbot, improved icon positioning, and overall stability improvements.
+                </p>
+
+                {/* Tech Stack & Changelog */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 my-6">
+                  {/* Tech Stack */}
+                  <div className="lg:col-span-1 bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
+                     <h4 className="text-safebite-teal font-medium mb-3 text-center">Tech Stack</h4>
+                     <div className="flex flex-wrap gap-2 justify-center">
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">React</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">TypeScript</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Firebase</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Tailwind CSS</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">MongoDB</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Flask</span>
+                       <span className="px-3 py-1 bg-safebite-card-bg rounded-full text-xs text-safebite-teal border border-safebite-teal/20 hover:bg-safebite-teal/20 transition-colors cursor-default">Food APIs</span>
+                     </div>
+                  </div>
+
+                  {/* Changelog */}
+                  <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
+                       <h4 className="text-safebite-teal font-medium mb-2">New Features</h4>
+                       <ul className="text-safebite-text-secondary space-y-1 text-sm">
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced AI chatbot</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Weekly health check-in</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Improved dashboard</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Food delivery integration</span></li>
+                       </ul>
+                     </div>
+                     <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
+                       <h4 className="text-safebite-teal font-medium mb-2">Technical Improvements</h4>
+                       <ul className="text-safebite-text-secondary space-y-1 text-sm">
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>MongoDB integration</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>User activity tracking</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Firebase security</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced UI/UX</span></li>
+                       </ul>
+                     </div>
+                  </div>
+                </div>
+
+                <p className="text-safebite-text-secondary text-sm md:text-base">
+                  Thank you for your support and feedback! I'm committed to improving SafeBite further.
+                </p>
+
+                 <div className="mt-6 flex justify-center">
+                   <Button
+                     variant="outline"
+                     className="sci-fi-button"
+                     onClick={() => setShowDevPopup(true)}
+                   >
+                     <Info className="mr-2 h-4 w-4" />
+                     View Full Changelog
+                   </Button>
+                 </div>
+              </div>
+            </div>
+          </div>
       </section>
 
       <Footer />

@@ -37,7 +37,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  const { name, calories, nutritionScore, details, brand, apiSource, source } = food;
+  const { name, calories, nutritionScore, details, brand, apiSource, source, nutrients } = food;
 
   const scoreColors = {
     green: 'bg-green-500',
@@ -158,7 +158,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
         </TabsList>
 
         <TabsContent value="nutrition" className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Calories</div>
               <div className="text-safebite-text font-bold">{details?.calories || calories} kcal</div>
@@ -177,11 +177,15 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Sodium</div>
-              <div className="text-safebite-text font-bold">{details?.sodium || 0}mg</div>
+              <div className="text-safebite-text font-bold">{details?.sodium || food.nutrients?.sodium || 0}mg</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Sugar</div>
               <div className="text-safebite-text font-bold">{details?.sugar || food.nutrients?.sugar || 0}g</div>
+            </div>
+            <div className="p-3 bg-safebite-card-bg-alt rounded-md">
+              <div className="text-safebite-text-secondary text-sm">Fiber</div>
+              <div className="text-safebite-text font-bold">{details?.fiber || food.nutrients?.fiber || 0}g</div>
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, startTransition } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +15,14 @@ import { trackHealthBoxInteraction } from '@/services/mlService';
 import userActivityService from '@/services/userActivityService';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useGuestMode } from '@/hooks/useGuestMode';
+import SaveToDashboardModal from '@/components/SaveToDashboardModal';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { app } from "../firebase";
+import FoodChatBot from '@/components/FoodChatBot';
 
-// Import all health tool components
+// Import only the stable health tool components
 import BMICalculator from '@/components/health-tools/BMICalculator';
 import CalorieCalculator from '@/components/health-tools/CalorieCalculator';
 import WaterIntakeCalculator from '@/components/health-tools/WaterIntakeCalculator';
@@ -28,19 +31,10 @@ import NutritionScoreCalculator from '@/components/health-tools/NutritionScoreCa
 import IdealWeightCalculator from '@/components/health-tools/IdealWeightCalculator';
 import BodyFatCalculator from '@/components/health-tools/BodyFatCalculator';
 import HeartRateCalculator from '@/components/health-tools/HeartRateCalculator';
-import SymptomChecker from '@/components/health-tools/SymptomChecker';
-// Import health tool components with error handling
-const BloodPressureAnalyzer = React.lazy(() => import('@/components/health-tools/BloodPressureAnalyzer').catch(() => ({ default: PlaceholderTool })));
-const SleepCalculator = React.lazy(() => import('@/components/health-tools/SleepCalculator').catch(() => ({ default: PlaceholderTool })));
-const StressAnalyzer = React.lazy(() => import('@/components/health-tools/StressAnalyzer').catch(() => ({ default: PlaceholderTool })));
-const ExerciseCalorieCalculator = React.lazy(() => import('@/components/health-tools/ExerciseCalorieCalculator').catch(() => ({ default: PlaceholderTool })));
-const DiseaseRiskAssessment = React.lazy(() => import('@/components/health-tools/DiseaseRiskAssessment').catch(() => ({ default: PlaceholderTool })));
-const MedicationReminder = React.lazy(() => import('@/components/health-tools/MedicationReminder').catch(() => ({ default: PlaceholderTool })));
-const FoodSafetyChecker = React.lazy(() => import('@/components/health-tools/FoodSafetyChecker').catch(() => ({ default: PlaceholderTool })));
 
-// Placeholder components for tools we haven't fully implemented yet
+// Placeholder component for tools we haven't fully implemented yet
 const PlaceholderTool = ({ title, icon, description }: { title?: string; icon?: React.ReactNode; description?: string }) => (
-  <Card className="sci-fi-card">
+  <Card className="sci-fi-card border-t-2 border-t-safebite-teal/50 shadow-md">
     <CardHeader>
       <CardTitle className="flex items-center text-safebite-text">
         {icon || <Activity className="mr-2 h-5 w-5 text-safebite-teal" />}
@@ -51,8 +45,11 @@ const PlaceholderTool = ({ title, icon, description }: { title?: string; icon?: 
       <p className="text-safebite-text-secondary mb-4">
         {description || 'This health tool is currently under development and will be available soon.'}
       </p>
-      <div className="text-center p-4 bg-safebite-card-bg-alt rounded-md">
-        <p className="text-safebite-teal">Coming Soon</p>
+      <div className="text-center p-4 bg-safebite-card-bg-alt rounded-md border border-safebite-teal/20">
+        <p className="text-safebite-teal flex items-center justify-center">
+          <Clock className="mr-2 h-4 w-4" />
+          Coming Soon
+        </p>
       </div>
     </CardContent>
   </Card>
@@ -73,11 +70,48 @@ const HealthBox = () => {
   const { toast } = useToast();
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showDashboardSettings, setShowDashboardSettings] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [currentToolData, setCurrentToolData] = useState<{id: string; name: string; data: any}>({id: '', name: '', data: null});
+  const { isGuest } = useGuestMode();
+
+  // User data for personalized chat suggestions
+  const [userData, setUserData] = useState<any>(null);
+  const [userActivity, setUserActivity] = useState<any[]>([]);
 
   // Load user's favorite tools on component mount
   useEffect(() => {
     loadFavoriteTools();
   }, []);
+
+  // Load user data for personalized chat
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!isGuest && auth.currentUser) {
+        try {
+          // Get user profile data
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (userDoc.exists()) {
+            setUserData(userDoc.data());
+          }
+
+          // Get user activity data
+          const activityRef = doc(db, 'user_activities', auth.currentUser.uid);
+          const activityDoc = await getDoc(activityRef);
+
+          if (activityDoc.exists()) {
+            const data = activityDoc.data();
+            setUserActivity(data.activities || []);
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [isGuest]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -100,364 +134,248 @@ const HealthBox = () => {
     // Track this interaction for ML learning
     trackHealthBoxInteraction('tool', toolId);
     userActivityService.trackActivity('healthbox', isActive ? 'close-tool' : 'open-tool', {
-      toolId,
-      category: activeTab
+      tool: toolId
     });
   };
 
-  // Toggle a tool as favorite
-  const toggleFavorite = async (toolId: string, category: string) => {
+  const toggleFavorite = (toolId: string, category: string) => {
     try {
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-
-      if (!user) {
-        console.log('User not logged in, cannot save favorites');
-        return;
-      }
-
-      // Check if tool is already a favorite
       const isFavorite = favoriteTools.some(tool => tool.id === toolId);
-
       let updatedFavorites: FavoriteTool[];
 
       if (isFavorite) {
-        // Remove from favorites
         updatedFavorites = favoriteTools.filter(tool => tool.id !== toolId);
       } else {
-        // Add to favorites
-        updatedFavorites = [
-          ...favoriteTools,
-          { id: toolId, category, addedAt: Date.now() }
-        ];
+        updatedFavorites = [...favoriteTools, { id: toolId, category, addedAt: Date.now() }];
       }
 
-      // Update state
       setFavoriteTools(updatedFavorites);
-
-      // Save to Firebase
-      const db = getFirestore(app);
-      const userRef = doc(db, 'users', user.uid);
-
-      await setDoc(userRef, {
-        favoriteHealthTools: updatedFavorites
-      }, { merge: true });
+      saveFavoriteTools(updatedFavorites);
 
       // Track this interaction for ML learning
-      trackHealthBoxInteraction(isFavorite ? 'unfavorite' : 'favorite', toolId);
-      userActivityService.trackActivity('healthbox', isFavorite ? 'unfavorite-tool' : 'favorite-tool', {
-        toolId,
-        category
+      trackHealthBoxInteraction('favorite', toolId);
+      userActivityService.trackActivity('healthbox', isFavorite ? 'remove-favorite' : 'add-favorite', {
+        tool: toolId
+      });
+
+      toast({
+        title: isFavorite ? 'Removed from favorites' : 'Added to favorites',
+        description: `${toolId} has been ${isFavorite ? 'removed from' : 'added to'} your favorites.`,
+        variant: 'default',
       });
     } catch (error) {
-      console.error('Error toggling favorite tool:', error);
+      console.error('Error toggling favorite:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update favorites. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
-  // Load user's favorite tools from Firebase
   const loadFavoriteTools = async () => {
     try {
       const auth = getAuth(app);
       const user = auth.currentUser;
 
-      if (!user) {
-        console.log('User not logged in, cannot load favorites');
-        return;
-      }
+      if (user) {
+        const db = getFirestore(app);
+        const docRef = doc(db, 'userPreferences', user.uid);
+        const docSnap = await getDoc(docRef);
 
-      const db = getFirestore(app);
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists() && userSnap.data().favoriteHealthTools) {
-        setFavoriteTools(userSnap.data().favoriteHealthTools);
+        if (docSnap.exists() && docSnap.data().favoriteHealthTools) {
+          setFavoriteTools(docSnap.data().favoriteHealthTools);
+        }
       }
     } catch (error) {
       console.error('Error loading favorite tools:', error);
     }
   };
 
-  // Check if a tool is a favorite
-  const isFavorite = (toolId: string): boolean => {
-    return favoriteTools.some(tool => tool.id === toolId);
+  const saveFavoriteTools = async (favorites: FavoriteTool[]) => {
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+
+      if (user) {
+        const db = getFirestore(app);
+        const docRef = doc(db, 'userPreferences', user.uid);
+        await setDoc(docRef, { favoriteHealthTools: favorites }, { merge: true });
+      }
+    } catch (error) {
+      console.error('Error saving favorite tools:', error);
+    }
   };
 
-  // Find tool name by ID and category
-  const findToolName = (toolId: string, category: string): string => {
-    const categoryTools = allTools[category as keyof typeof allTools] || [];
-    const tool = categoryTools.find(tool => tool.id === toolId);
-    return tool ? tool.name : 'Unknown Tool';
+  // Handle saving health tool results to dashboard
+  const handleSaveResults = (toolId: string, toolName: string, data: any) => {
+    if (isGuest) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save results to your dashboard.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCurrentToolData({
+      id: toolId,
+      name: toolName,
+      data: data
+    });
+    setSaveModalOpen(true);
+
+    // Track this interaction for ML learning
+    trackHealthBoxInteraction('save_results', toolId);
+    userActivityService.trackActivity('healthbox', 'save-results', {
+      tool: toolId
+    });
   };
 
-  // Define all available tools (30+ health tools)
-  const allTools = {
+  // Define all health tools
+  const healthTools = {
     fitness: [
-      { id: 'bmi', name: 'BMI Calculator', component: <BMICalculator /> },
-      { id: 'ideal-weight', name: 'Ideal Weight', component: <IdealWeightCalculator /> },
-      { id: 'body-fat', name: 'Body Fat', component: <BodyFatCalculator /> },
-      { id: 'heart-rate', name: 'Heart Rate Zones', component: <HeartRateCalculator /> },
-      { id: 'exercise-calories', name: 'Exercise Calories', component: <ExerciseCalorieCalculator /> },
-      { id: 'sleep', name: 'Sleep Calculator', component: <SleepCalculator /> },
       {
-        id: 'fitness-age',
-        name: 'Fitness Age',
-        component: <PlaceholderTool
-          title="Fitness Age Calculator"
-          icon={<Activity className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate your fitness age based on your physical activity, resting heart rate, and other metrics."
-        />
+        id: 'bmi-calculator',
+        title: 'BMI Calculator',
+        icon: <Scale className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <BMICalculator onSaveResults={handleSaveResults} />
       },
       {
-        id: 'vo2-max',
-        name: 'VO2 Max Estimator',
-        component: <PlaceholderTool
-          title="VO2 Max Estimator"
-          icon={<Activity className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Estimate your VO2 max (maximal oxygen uptake) based on your fitness level and exercise performance."
-        />
+        id: 'calorie-calculator',
+        title: 'Calorie Calculator',
+        icon: <Flame className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <CalorieCalculator />
       },
       {
-        id: 'workout-planner',
-        name: 'Workout Planner',
-        component: <PlaceholderTool
-          title="Workout Planner"
-          icon={<Activity className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Create personalized workout plans based on your fitness goals, available equipment, and time constraints."
-        />
+        id: 'water-intake-calculator',
+        title: 'Water Intake Calculator',
+        icon: <Droplet className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <WaterIntakeCalculator />
       },
       {
-        id: 'recovery-calculator',
-        name: 'Recovery Calculator',
-        component: <PlaceholderTool
-          title="Recovery Calculator"
-          icon={<Clock className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate optimal recovery time between workouts based on intensity, duration, and muscle groups targeted."
-        />
+        id: 'macro-calculator',
+        title: 'Macro Calculator',
+        icon: <PieChart className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <MacroCalculator />
       },
+      {
+        id: 'ideal-weight-calculator',
+        title: 'Ideal Weight Calculator',
+        icon: <Scale className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <IdealWeightCalculator />
+      },
+      {
+        id: 'body-fat-calculator',
+        title: 'Body Fat Calculator',
+        icon: <Dumbbell className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <BodyFatCalculator />
+      }
     ],
     nutrition: [
-      { id: 'calories', name: 'Calorie Calculator', component: <CalorieCalculator /> },
-      { id: 'water', name: 'Water Intake', component: <WaterIntakeCalculator /> },
-      { id: 'macros', name: 'Macro Calculator', component: <MacroCalculator /> },
-      { id: 'nutrition-score', name: 'Nutrition Score', component: <NutritionScoreCalculator /> },
-      { id: 'food-safety', name: 'Food Safety Checker', component: <FoodSafetyChecker /> },
       {
-        id: 'meal-planner',
-        name: 'Meal Planner',
-        component: <PlaceholderTool
-          title="Meal Planner"
-          icon={<Utensils className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Plan balanced meals based on your nutritional needs, preferences, and health goals."
-        />
+        id: 'nutrition-score-calculator',
+        title: 'Nutrition Score Calculator',
+        icon: <Star className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <NutritionScoreCalculator />
       },
       {
-        id: 'nutrient-deficiency',
-        name: 'Nutrient Deficiency',
-        component: <PlaceholderTool
-          title="Nutrient Deficiency Analyzer"
-          icon={<AlertTriangle className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Identify potential nutrient deficiencies based on your diet and symptoms."
-        />
-      },
-      {
-        id: 'diet-comparison',
-        name: 'Diet Comparison',
-        component: <PlaceholderTool
-          title="Diet Comparison Tool"
-          icon={<PieChart className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Compare different diets (keto, vegan, paleo, etc.) and see which one might be best for your health goals."
-        />
-      },
-      {
-        id: 'grocery-list',
-        name: 'Healthy Grocery List',
-        component: <PlaceholderTool
-          title="Healthy Grocery List Generator"
-          icon={<CheckCircle className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Generate a healthy grocery list based on your nutritional needs and preferences."
-        />
-      },
-    ],
-    health: [
-      { id: 'blood-pressure', name: 'Blood Pressure', component: <BloodPressureAnalyzer /> },
-      { id: 'stress', name: 'Stress Analyzer', component: <StressAnalyzer /> },
-      { id: 'disease-risk', name: 'Disease Risk', component: <DiseaseRiskAssessment /> },
-      {
-        id: 'metabolic-age',
-        name: 'Metabolic Age',
-        component: <PlaceholderTool
-          title="Metabolic Age Calculator"
-          icon={<Zap className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate your metabolic age based on your BMR (Basal Metabolic Rate) compared to the average for your age group."
-        />
-      },
-      {
-        id: 'longevity',
-        name: 'Longevity Calculator',
-        component: <PlaceholderTool
-          title="Longevity Calculator"
-          icon={<Clock className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Estimate your life expectancy based on lifestyle factors, family history, and health metrics."
-        />
-      },
-      {
-        id: 'biological-age',
-        name: 'Biological Age',
-        component: <PlaceholderTool
-          title="Biological Age Calculator"
-          icon={<Dumbbell className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate your biological age based on various biomarkers and lifestyle factors."
-        />
-      },
-      {
-        id: 'health-score',
-        name: 'Health Score',
-        component: <PlaceholderTool
-          title="Health Score Calculator"
-          icon={<Heart className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Get a comprehensive health score based on various health metrics and lifestyle factors."
-        />
-      },
-      {
-        id: 'immunity-score',
-        name: 'Immunity Score',
-        component: <PlaceholderTool
-          title="Immunity Score Calculator"
-          icon={<ShieldAlert className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Assess your immune system strength based on lifestyle, nutrition, and health factors."
-        />
-      },
+        id: 'sleep-calculator',
+        title: 'Sleep Calculator',
+        icon: <Clock className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Sleep Calculator" icon={<Clock className="mr-2 h-5 w-5 text-safebite-teal" />} />
+      }
     ],
     medical: [
-      { id: 'symptom-checker', name: 'Symptom Checker', component: <SymptomChecker /> },
-      { id: 'medication-reminder', name: 'Medication Reminder', component: <MedicationReminder /> },
       {
-        id: 'covid-tracker',
-        name: 'COVID-19 Tracker',
-        component: <PlaceholderTool
-          title="COVID-19 Tracker"
-          icon={<Bug className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Track COVID-19 statistics and vaccination data worldwide using Disease.sh API."
-        />
+        id: 'heart-rate-calculator',
+        title: 'Heart Rate Calculator',
+        icon: <Heart className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <HeartRateCalculator />
       },
       {
-        id: 'drug-interaction',
-        name: 'Drug Interaction',
-        component: <PlaceholderTool
-          title="Drug Interaction Checker"
-          icon={<AlertTriangle className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Check for potential interactions between medications, supplements, and foods."
-        />
+        id: 'blood-pressure-analyzer',
+        title: 'Blood Pressure Analyzer',
+        icon: <Activity className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Blood Pressure Analyzer" icon={<Activity className="mr-2 h-5 w-5 text-safebite-teal" />} />
       },
       {
-        id: 'first-aid',
-        name: 'First Aid Guide',
-        component: <PlaceholderTool
-          title="First Aid Guide"
-          icon={<Heart className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Step-by-step guides for common first aid situations and emergencies."
-        />
-      },
-      {
-        id: 'vaccination-tracker',
-        name: 'Vaccination Tracker',
-        component: <PlaceholderTool
-          title="Vaccination Tracker"
-          icon={<Syringe className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Track your vaccinations and get reminders for boosters and recommended vaccines."
-        />
-      },
-      {
-        id: 'medical-id',
-        name: 'Medical ID Card',
-        component: <PlaceholderTool
-          title="Medical ID Card Generator"
-          icon={<Bookmark className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Create a digital medical ID card with important health information for emergencies."
-        />
-      },
+        id: 'stress-analyzer',
+        title: 'Stress Analyzer',
+        icon: <Brain className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Stress Analyzer" icon={<Brain className="mr-2 h-5 w-5 text-safebite-teal" />} />
+      }
     ],
-    lifestyle: [
+    safety: [
       {
-        id: 'habit-tracker',
-        name: 'Habit Tracker',
-        component: <PlaceholderTool
-          title="Habit Tracker"
-          icon={<CheckCircle className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Track your daily habits and build healthy routines with reminders and progress tracking."
-        />
+        id: 'food-safety-checker',
+        title: 'Food Safety Checker',
+        icon: <ShieldAlert className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Food Safety Checker" icon={<ShieldAlert className="mr-2 h-5 w-5 text-safebite-teal" />} />
       },
       {
-        id: 'screen-time',
-        name: 'Screen Time',
-        component: <PlaceholderTool
-          title="Screen Time Calculator"
-          icon={<Clock className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate and track your screen time and get recommendations for digital wellbeing."
-        />
+        id: 'medication-reminder',
+        title: 'Medication Reminder',
+        icon: <Pill className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Medication Reminder" icon={<Pill className="mr-2 h-5 w-5 text-safebite-teal" />} />
       },
       {
-        id: 'posture-reminder',
-        name: 'Posture Reminder',
-        component: <PlaceholderTool
-          title="Posture Reminder"
-          icon={<Activity className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Set reminders to check and correct your posture throughout the day."
-        />
-      },
-      {
-        id: 'blue-light',
-        name: 'Blue Light Calculator',
-        component: <PlaceholderTool
-          title="Blue Light Exposure Calculator"
-          icon={<Eye className="mr-2 h-5 w-5 text-safebite-teal" />}
-          description="Calculate your daily blue light exposure and get recommendations for eye health."
-        />
-      },
-    ],
+        id: 'disease-risk-assessment',
+        title: 'Disease Risk Assessment',
+        icon: <Stethoscope className="mr-2 h-5 w-5 text-safebite-teal" />,
+        component: <PlaceholderTool title="Disease Risk Assessment" icon={<Stethoscope className="mr-2 h-5 w-5 text-safebite-teal" />} />
+      }
+    ]
   };
 
+  // Filter tools based on search query and favorites setting
+  const filterTools = (tools: any[]) => {
+    let filteredTools = tools;
+
+    if (searchQuery) {
+      filteredTools = tools.filter(tool =>
+        tool.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (showFavoritesOnly) {
+      filteredTools = filteredTools.filter(tool =>
+        favoriteTools.some(fav => fav.id === tool.id)
+      );
+    }
+
+    return filteredTools;
+  };
+
+  // Get all tools for the current tab
+  const currentTabTools = healthTools[activeTab as keyof typeof healthTools] || [];
+  const filteredTools = filterTools(currentTabTools);
+
+  // Get favorite tools for the favorites tab
+  const allTools = Object.values(healthTools).flat();
+  const favoriteToolsList = allTools.filter(tool =>
+    favoriteTools.some(fav => fav.id === tool.id)
+  );
+
   return (
-    <div className="min-h-screen bg-safebite-dark-blue">
-      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1.5 px-4 flex items-center justify-center z-50">
-        <div className="flex items-center space-x-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-yellow-300" />
-          <span>SafeBite v2.1 - Under Active Development</span>
-          <Sparkles className="h-4 w-4 text-yellow-300" />
-        </div>
-      </div>
-
+    <div className="flex min-h-screen bg-safebite-bg">
       <DashboardSidebar />
+      <main className="flex-1 p-6 ml-[220px]">
+        <div className="container mx-auto max-w-6xl">
+          <h1 className="text-3xl font-bold text-safebite-text mb-6">
+            <Sparkles className="inline-block mr-2 h-6 w-6 text-safebite-teal" />
+            Healthbox
+          </h1>
+          <p className="text-safebite-text-secondary mb-6">
+            Explore our collection of health tools to monitor and improve your wellbeing.
+          </p>
 
-      <main className="md:ml-64 min-h-screen">
-        <div className="p-4 sm:p-6 md:p-8">
-          <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-safebite-text mb-2">HealthBox</h1>
-              <p className="text-safebite-text-secondary">
-                30+ health and wellness calculators and tools to help you achieve your health goals
-              </p>
-            </div>
-            <div className="mt-4 md:mt-0 flex items-center space-x-2">
-              <Button
-                variant="outline"
-                className="flex items-center"
-                onClick={() => setShowDashboardSettings(!showDashboardSettings)}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Dashboard Settings
-              </Button>
-            </div>
-          </div>
-
-          {/* Search and filter */}
-          <div className="mb-6 flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-safebite-text-secondary" />
+          <div className="mb-8 p-4 bg-safebite-card-bg rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-safebite-text-secondary" />
               <Input
-                type="text"
                 placeholder="Search health tools..."
-                className="pl-10 bg-safebite-card-bg border-safebite-card-bg-alt"
+                className="pl-8 bg-safebite-card-bg border-safebite-card-bg-alt"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -474,209 +392,221 @@ const HealthBox = () => {
             </div>
           </div>
 
-          {/* Dashboard settings panel */}
-          {showDashboardSettings && (
-            <Card className="mb-6 border-safebite-teal/30 bg-safebite-card-bg">
-              <CardHeader>
-                <CardTitle className="text-safebite-text flex items-center">
-                  <Settings className="mr-2 h-5 w-5 text-safebite-teal" />
-                  Dashboard Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-safebite-text-secondary mb-4">
-                  Select your favorite health tools to display on your dashboard. You can add up to 4 tools.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {favoriteTools.map((tool) => (
-                    <div key={tool.id} className="flex items-center justify-between p-3 bg-safebite-card-bg-alt rounded-md">
-                      <span className="text-safebite-text">{findToolName(tool.id, tool.category)}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleFavorite(tool.id, tool.category)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  {favoriteTools.length === 0 && (
-                    <div className="col-span-full text-center py-4 text-safebite-text-secondary">
-                      No favorite tools selected. Add tools by clicking the star icon on any tool.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Tabs defaultValue={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid grid-cols-5 mb-8 bg-safebite-card-bg rounded-lg overflow-hidden">
+              <TabsTrigger value="fitness" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <Dumbbell className="mr-2 h-4 w-4" />
+                Fitness
+              </TabsTrigger>
+              <TabsTrigger value="nutrition" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <Utensils className="mr-2 h-4 w-4" />
+                Nutrition
+              </TabsTrigger>
+              <TabsTrigger value="medical" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <Stethoscope className="mr-2 h-4 w-4" />
+                Medical
+              </TabsTrigger>
+              <TabsTrigger value="safety" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <ShieldAlert className="mr-2 h-4 w-4" />
+                Safety
+              </TabsTrigger>
+              <TabsTrigger value="favorites" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <Bookmark className="mr-2 h-4 w-4" />
+                Favorites
+              </TabsTrigger>
+            </TabsList>
 
-          <Tabs defaultValue="fitness" className="space-y-6" onValueChange={handleTabChange}>
-            <div className="sci-fi-card p-4 overflow-x-auto">
-              <TabsList className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <TabsTrigger value="fitness" className="flex items-center">
-                  <Activity className="mr-2 h-4 w-4" />
-                  Fitness
-                </TabsTrigger>
-                <TabsTrigger value="nutrition" className="flex items-center">
-                  <Utensils className="mr-2 h-4 w-4" />
-                  Nutrition
-                </TabsTrigger>
-                <TabsTrigger value="health" className="flex items-center">
-                  <Heart className="mr-2 h-4 w-4" />
-                  Health
-                </TabsTrigger>
-                <TabsTrigger value="medical" className="flex items-center">
-                  <Stethoscope className="mr-2 h-4 w-4" />
-                  Medical
-                </TabsTrigger>
-                <TabsTrigger value="lifestyle" className="flex items-center">
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  Lifestyle
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            {/* Tool Selection */}
-            <div className="sci-fi-card p-4">
-              <h2 className="text-xl font-semibold text-safebite-text mb-4">Available Tools</h2>
-              <div className="healthbox-grid">
-                {allTools[activeTab as keyof typeof allTools]
-                  .filter(tool => {
-                    // Apply search filter
-                    if (searchQuery) {
-                      return tool.name.toLowerCase().includes(searchQuery.toLowerCase());
-                    }
-                    // Apply favorites filter
-                    if (showFavoritesOnly) {
-                      return isFavorite(tool.id);
-                    }
-                    return true;
-                  })
-                  .map(tool => (
-                    <Card
-                      key={tool.id}
-                      className={`border ${activeTools.includes(tool.id) ? 'border-safebite-teal' : 'border-safebite-card-bg-alt'} hover:border-safebite-teal/70 transition-colors cursor-pointer`}
-                      onClick={() => toggleTool(tool.id)}
-                    >
-                      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                        <CardTitle className="text-md font-medium text-safebite-text">{tool.name}</CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`p-1 h-8 w-8 ${isFavorite(tool.id) ? 'text-yellow-500' : 'text-safebite-text-secondary'}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(tool.id, activeTab);
-                          }}
-                        >
-                          <Star className={`h-5 w-5 ${isFavorite(tool.id) ? 'fill-yellow-500' : ''}`} />
-                        </Button>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0">
-                        {activeTools.includes(tool.id) && (
-                          <div className="mt-4">
-                            <Suspense fallback={<div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-safebite-teal" /></div>}>
-                              {tool.component}
-                            </Suspense>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                {/* No results message */}
-                {allTools[activeTab as keyof typeof allTools].filter(tool => {
-                  if (searchQuery) {
-                    return tool.name.toLowerCase().includes(searchQuery.toLowerCase());
-                  }
-                  if (showFavoritesOnly) {
-                    return isFavorite(tool.id);
-                  }
-                  return true;
-                }).length === 0 && (
-                  <div className="col-span-full text-center py-8">
-                    <div className="text-safebite-text-secondary mb-2">
-                      {searchQuery ? (
-                        <>No tools match your search "{searchQuery}"</>
-                      ) : showFavoritesOnly ? (
-                        <>No favorite tools in this category. Add favorites by clicking the star icon.</>
-                      ) : (
-                        <>No tools available in this category</>
-                      )}
-                    </div>
-                    {(searchQuery || showFavoritesOnly) && (
-                      <Button
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setShowFavoritesOnly(false);
-                        }}
-                      >
-                        Clear Filters
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Active Tools */}
+            {/* Active tools section */}
             {activeTools.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold text-safebite-text mb-4">Your Selected Tools</h2>
-                <div className="healthbox-grid">
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-safebite-text mb-4">Active Tools</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {activeTools.map(toolId => {
-                    const tool = allTools[activeTab as keyof typeof allTools].find(t => t.id === toolId);
-                    return tool ? (
-                      <div key={toolId} className="sci-fi-card pulse-animation">
-                        {tool.component}
-                      </div>
-                    ) : null;
+                    const tool = allTools.find(t => t.id === toolId);
+                    if (!tool) return null;
+
+                    return (
+                      <Card key={tool.id} className="sci-fi-card border-t-2 border-t-safebite-teal shadow-lg">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle className="flex items-center text-safebite-text">
+                            {tool.icon}
+                            {tool.title}
+                          </CardTitle>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleFavorite(tool.id, activeTab)}
+                              className="h-8 w-8"
+                            >
+                              {favoriteTools.some(fav => fav.id === tool.id) ? (
+                                <Star className="h-4 w-4 fill-safebite-teal text-safebite-teal" />
+                              ) : (
+                                <Star className="h-4 w-4 text-safebite-text-secondary" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleTool(tool.id)}
+                              className="h-8 w-8"
+                            >
+                              <XCircle className="h-4 w-4 text-safebite-text-secondary" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {tool.component}
+                        </CardContent>
+                      </Card>
+                    );
                   })}
                 </div>
               </div>
             )}
 
-            {/* Empty State */}
-            {activeTools.length === 0 && (
-              <div className="text-center p-12 sci-fi-card">
-                <Activity className="h-12 w-12 text-safebite-teal mx-auto mb-4 opacity-50" />
-                <h3 className="text-xl font-semibold text-safebite-text mb-2">No Tools Selected</h3>
-                <p className="text-safebite-text-secondary mb-6">
-                  Select one or more tools from the options above to get started
-                </p>
+            {/* Tab content */}
+            <TabsContent value={activeTab} className="mt-0">
+              {filteredTools.length === 0 && (
+                <div className="text-center py-12">
+                  <AlertTriangle className="mx-auto h-12 w-12 text-safebite-text-secondary mb-4" />
+                  <h3 className="text-xl font-semibold text-safebite-text mb-2">No tools found</h3>
+                  <p className="text-safebite-text-secondary">
+                    {showFavoritesOnly
+                      ? "You don't have any favorite tools in this category yet."
+                      : "No tools match your search criteria."}
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                {filteredTools.map(tool => {
+                  const isActive = activeTools.includes(tool.id);
+                  if (isActive) return null;
+
+                  return (
+                    <Card key={tool.id} className="sci-fi-card border-t-2 border-t-safebite-teal shadow-lg hover:shadow-xl transition-all duration-300">
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="flex items-center text-safebite-text">
+                          {tool.icon}
+                          {tool.title}
+                        </CardTitle>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleFavorite(tool.id, activeTab)}
+                            className="h-8 w-8"
+                          >
+                            {favoriteTools.some(fav => fav.id === tool.id) ? (
+                              <Star className="h-4 w-4 fill-safebite-teal text-safebite-teal" />
+                            ) : (
+                              <Star className="h-4 w-4 text-safebite-text-secondary" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleTool(tool.id)}
+                            className="h-8 w-8"
+                          >
+                            <Plus className="h-4 w-4 text-safebite-text-secondary" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          onClick={() => toggleTool(tool.id)}
+                          className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 font-medium shadow-md"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Open Tool
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
-            )}
+            </TabsContent>
+
+            <TabsContent value="favorites" className="mt-0">
+              {favoriteToolsList.length === 0 ? (
+                <div className="text-center py-12">
+                  <Bookmark className="mx-auto h-12 w-12 text-safebite-text-secondary mb-4" />
+                  <h3 className="text-xl font-semibold text-safebite-text mb-2">No favorites yet</h3>
+                  <p className="text-safebite-text-secondary">
+                    Star your favorite tools to access them quickly from this tab.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                  {favoriteToolsList.map(tool => {
+                    const isActive = activeTools.includes(tool.id);
+                    if (isActive) return null;
+
+                    return (
+                      <Card key={tool.id} className="sci-fi-card border-t-2 border-t-safebite-teal shadow-lg hover:shadow-xl transition-all duration-300">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle className="flex items-center text-safebite-text">
+                            {tool.icon}
+                            {tool.title}
+                          </CardTitle>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleFavorite(tool.id, 'favorites')}
+                              className="h-8 w-8"
+                            >
+                              <Star className="h-4 w-4 fill-safebite-teal text-safebite-teal" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleTool(tool.id)}
+                              className="h-8 w-8"
+                            >
+                              <Plus className="h-4 w-4 text-safebite-text-secondary" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <Button
+                            onClick={() => toggleTool(tool.id)}
+                            className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 font-medium shadow-md"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Open Tool
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
-
-          <div className="mt-8 p-4 sci-fi-card">
-            <h2 className="text-xl font-semibold text-safebite-text mb-4">Health Data Integration</h2>
-            <p className="text-safebite-text-secondary mb-4">
-              Connect your health devices and apps to get personalized recommendations and insights.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
-                <Activity className="h-5 w-5 text-safebite-teal mr-2" />
-                <span className="text-safebite-text-secondary">Fitness Trackers</span>
-              </div>
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
-                <Heart className="h-5 w-5 text-safebite-teal mr-2" />
-                <span className="text-safebite-text-secondary">Heart Rate Monitors</span>
-              </div>
-              <div className="p-4 bg-safebite-card-bg-alt rounded-md flex items-center hover:bg-safebite-card-bg-alt/80 transition-colors cursor-pointer">
-                <Scale className="h-5 w-5 text-safebite-teal mr-2" />
-                <span className="text-safebite-text-secondary">Smart Scales</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-xs text-safebite-text-secondary mt-6 text-right">
-            Created by Aditya Shenvi | SafeBite v2.2
-          </div>
         </div>
       </main>
+
+      {/* Save to Dashboard Modal */}
+      <SaveToDashboardModal
+        isOpen={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        toolId={currentToolData.id}
+        toolName={currentToolData.name}
+        toolData={currentToolData.data}
+      />
+
+      {/* AI Chatbot */}
+      <FoodChatBot
+        currentPage="healthbox"
+        userData={{
+          profile: userData,
+          recentActivity: userActivity
+        }}
+        autoOpen={true}
+        initialMessage="Welcome to Healthbox! I can help you find the right health tools for your needs. What health aspect would you like to focus on today?"
+      />
     </div>
   );
 };

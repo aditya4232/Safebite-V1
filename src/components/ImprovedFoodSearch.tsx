@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useGuestMode } from '@/hooks/useGuestMode';
 import { Search, Filter, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ interface ImprovedFoodSearchProps {
 }
 
 const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, className = '' }) => {
+  const { isGuest } = useGuestMode();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,23 +63,23 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       // First try the new API endpoint
       const url = `${API_BASE_URL}/api/food/search?query=${encodeURIComponent(searchQuery)}`;
       console.log(`Searching food: ${url}`);
-      
+
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.items && Array.isArray(data.items)) {
         setSearchResults(data.items);
         console.log(`Found ${data.items.length} results`);
@@ -137,9 +139,9 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
               )}
               API {apiStatus === null ? 'Checking...' : apiStatus ? 'Online' : 'Offline'}
             </Badge>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={checkApiStatus}
               disabled={apiStatus === null}
             >
@@ -151,7 +153,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
           Search for food products, recipes, and nutritional information
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="mb-4">
           <div className="flex space-x-2">
@@ -162,8 +164,8 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
               onChange={(e) => setSearchQuery(e.target.value)}
               className="sci-fi-input flex-1"
             />
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
               disabled={isLoading || !searchQuery.trim()}
             >
@@ -172,7 +174,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
             </Button>
           </div>
         </form>
-        
+
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             <div className="flex items-center">
@@ -181,7 +183,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
             </div>
           </div>
         )}
-        
+
         {searchResults.length > 0 && (
           <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
             <TabsList className="grid grid-cols-3 mb-4">
@@ -189,7 +191,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
               <TabsTrigger value="products">Products ({searchResults.filter(f => f.product).length})</TabsTrigger>
               <TabsTrigger value="recipes">Recipes ({searchResults.filter(f => f.recipe_name).length})</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value={activeTab} className="space-y-4">
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
@@ -209,8 +211,8 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
                 ))
               ) : filteredResults.length > 0 ? (
                 filteredResults.map((food) => (
-                  <Card 
-                    key={food._id} 
+                  <Card
+                    key={food._id}
                     className="overflow-hidden hover:border-safebite-teal transition-colors cursor-pointer"
                     onClick={() => onSelectFood && onSelectFood(food)}
                   >
@@ -218,7 +220,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
                       <div className="p-4">
                         <h3 className="font-medium text-safebite-text">{getFoodName(food)}</h3>
                         <p className="text-sm text-safebite-text-secondary">{getBrand(food)}</p>
-                        
+
                         <div className="flex flex-wrap gap-2 mt-2">
                           {food.category && (
                             <Badge variant="outline">{food.category}</Badge>
@@ -235,7 +237,7 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
                             </Badge>
                           )}
                         </div>
-                        
+
                         {food.description && (
                           <p className="text-xs text-safebite-text-secondary mt-2 line-clamp-2">
                             {food.description}
@@ -253,13 +255,13 @@ const ImprovedFoodSearch: React.FC<ImprovedFoodSearchProps> = ({ onSelectFood, c
             </TabsContent>
           </Tabs>
         )}
-        
+
         {!isLoading && searchResults.length === 0 && !error && searchQuery && (
           <div className="text-center py-8 text-safebite-text-secondary">
             No results found for "{searchQuery}". Try a different search term.
           </div>
         )}
-        
+
         {!isLoading && searchResults.length === 0 && !error && !searchQuery && (
           <div className="text-center py-8 text-safebite-text-secondary">
             Enter a search term to find food products and recipes.

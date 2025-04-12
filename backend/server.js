@@ -29,9 +29,22 @@ mongoose.connect(MONGODB_URI, {
 app.use('/api/products', productsRoutes);
 app.use('/api/groceryProducts', groceryProductsRoutes);
 
-// Direct routes for compatibility
+// Direct routes for compatibility with frontend
 app.use('/products', productsRoutes);
 app.use('/grocery', groceryProductsRoutes);
+
+// Additional compatibility routes for search
+app.get('/api/products/search', (req, res) => {
+  // Forward to the products route with the search parameter
+  req.url = '/search' + req.url.substring(req.url.indexOf('?'));
+  productsRoutes(req, res);
+});
+
+app.get('/grocery/search', (req, res) => {
+  // Forward to the grocery route with the search parameter
+  req.url = '/search' + req.url.substring(req.url.indexOf('?'));
+  groceryProductsRoutes(req, res);
+});
 
 // Status endpoint
 app.get('/status', (req, res) => {

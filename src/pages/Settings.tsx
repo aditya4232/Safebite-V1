@@ -4,11 +4,15 @@ import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useGuestMode } from '@/hooks/useGuestMode';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Settings2, Activity, Bell, Shield, User } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Settings2, Activity, Bell, Shield, User, Database, Key, Lock, AlertTriangle, CheckCircle, Info, Eye, EyeOff, Download, Cloud, Zap } from 'lucide-react';
 import HealthDataIntegration from '@/components/HealthDataIntegration';
 import { trackPreferenceChange } from '@/services/mlService';
+import { getNutritionApiStatus } from '@/services/nutritionApiService';
 
 const Settings = () => {
   const [healthGoal, setHealthGoal] = useState('');
@@ -21,10 +25,19 @@ const Settings = () => {
   const [healthIntegrations, setHealthIntegrations] = useState<{[key: string]: boolean}>({});
   const [communityEnabled, setCommunityEnabled] = useState(false);
   const [shareHealthData, setShareHealthData] = useState(false);
+  const [apiSettings, setApiSettings] = useState<{[key: string]: boolean}>({
+    useCalorieNinjas: true,
+    useFatSecret: true,
+    useEdamam: true,
+    saveSearchHistory: true,
+    preferredApi: 'all'
+  });
+  const [nutritionApiStatuses, setNutritionApiStatuses] = useState(getNutritionApiStatus());
   const auth = getAuth(app);
   const db = getFirestore(app);
   const user = auth.currentUser;
   const { toast } = useToast();
+  const { isGuest } = useGuestMode();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -44,6 +57,11 @@ const Settings = () => {
             setHealthIntegrations(userData.healthIntegrations || {});
             setCommunityEnabled(userData.profile?.communityEnabled || false);
             setShareHealthData(userData.profile?.shareHealthData || false);
+
+            // Load API settings if available
+            if (userData.apiSettings) {
+              setApiSettings(userData.apiSettings);
+            }
           } else {
             console.log("No such document!");
           }
@@ -135,6 +153,84 @@ const Settings = () => {
     await updateUserProfile({ shareHealthData: newShareHealthData });
   };
 
+  const handleApiSettingChange = async (setting: string, value: boolean) => {
+    if (isGuest) {
+      toast({
+        title: "Guest Mode",
+        description: "Settings cannot be saved in guest mode.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setApiSettings(prev => {
+      const newSettings = { ...prev, [setting]: value };
+      return newSettings;
+    });
+
+    if (user) {
+      const userRef = doc(db, "users", user.uid);
+      try {
+        await setDoc(userRef, {
+          apiSettings: {
+            ...apiSettings,
+            [setting]: value
+          }
+        }, { merge: true });
+
+        toast({
+          title: "API Settings Updated",
+          description: `${setting} setting has been updated.`,
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error updating API settings",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handlePreferredApiChange = async (value: string) => {
+    if (isGuest) {
+      toast({
+        title: "Guest Mode",
+        description: "Settings cannot be saved in guest mode.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setApiSettings(prev => ({
+      ...prev,
+      preferredApi: value
+    }));
+
+    if (user) {
+      const userRef = doc(db, "users", user.uid);
+      try {
+        await setDoc(userRef, {
+          apiSettings: {
+            ...apiSettings,
+            preferredApi: value
+          }
+        }, { merge: true });
+
+        toast({
+          title: "Preferred API Updated",
+          description: `Your preferred API has been set to ${value}.`,
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error updating API settings",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const updateUserProfile = async (updates: any) => {
     if (user) {
       const userRef = doc(db, "users", user.uid);
@@ -192,7 +288,7 @@ const Settings = () => {
           </p>
 
           <Tabs defaultValue="preferences" className="w-full">
-            <TabsList className="grid grid-cols-4 mb-8">
+            <TabsList className="grid grid-cols-5 mb-8">
               <TabsTrigger value="preferences" className="flex items-center">
                 <Settings2 className="mr-2 h-4 w-4" />
                 Preferences
@@ -208,6 +304,10 @@ const Settings = () => {
               <TabsTrigger value="integrations" className="flex items-center">
                 <Activity className="mr-2 h-4 w-4" />
                 Health Data
+              </TabsTrigger>
+              <TabsTrigger value="api" className="flex items-center">
+                <Database className="mr-2 h-4 w-4" />
+                API Settings
               </TabsTrigger>
             </TabsList>
 
@@ -400,6 +500,138 @@ const Settings = () => {
                 onIntegrationToggle={handleHealthIntegrationToggle}
                 integrations={healthIntegrations}
               />
+            </TabsContent>
+
+            <TabsContent value="api" className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-safebite-text mb-4">API Settings</h2>
+                <div className="space-y-4">
+                  <Card className="sci-fi-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Database className="mr-2 h-5 w-5 text-safebite-teal" />
+                        Nutrition Data Sources
+                      </CardTitle>
+                      <CardDescription>
+                        Configure which nutrition data APIs to use for food searches
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-safebite-card-bg-alt rounded-lg">
+                        <div>
+                          <h3 className="text-safebite-text font-medium flex items-center">
+                            <Badge className="mr-2 bg-green-500/20 text-green-500 border-green-500">
+                              Active
+                            </Badge>
+                            CalorieNinjas API
+                          </h3>
+                          <p className="text-safebite-text-secondary text-sm">Provides detailed nutrition data for most food items</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="sci-fi-checkbox"
+                          checked={apiSettings.useCalorieNinjas}
+                          onChange={() => handleApiToggle('useCalorieNinjas')}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-safebite-card-bg-alt rounded-lg">
+                        <div>
+                          <h3 className="text-safebite-text font-medium flex items-center">
+                            <Badge className="mr-2 bg-green-500/20 text-green-500 border-green-500">
+                              Active
+                            </Badge>
+                            FatSecret API
+                          </h3>
+                          <p className="text-safebite-text-secondary text-sm">Provides branded food products and restaurant meals</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="sci-fi-checkbox"
+                          checked={apiSettings.useFatSecret}
+                          onChange={() => handleApiToggle('useFatSecret')}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-safebite-card-bg-alt rounded-lg">
+                        <div>
+                          <h3 className="text-safebite-text font-medium flex items-center">
+                            <Badge className="mr-2 bg-green-500/20 text-green-500 border-green-500">
+                              Active
+                            </Badge>
+                            Edamam API
+                          </h3>
+                          <p className="text-safebite-text-secondary text-sm">Provides recipe nutrition data and food database</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="sci-fi-checkbox"
+                          checked={apiSettings.useEdamam}
+                          onChange={() => handleApiToggle('useEdamam')}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-safebite-card-bg-alt rounded-lg">
+                        <div>
+                          <h3 className="text-safebite-text font-medium flex items-center">
+                            <Badge className="mr-2 bg-orange-500/20 text-orange-500 border-orange-500">
+                              Coming Soon
+                            </Badge>
+                            OpenFoodFacts API
+                          </h3>
+                          <p className="text-safebite-text-secondary text-sm">Open source food products database with barcode scanning</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="sci-fi-checkbox"
+                          checked={false}
+                          disabled
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="sci-fi-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Zap className="mr-2 h-5 w-5 text-safebite-teal" />
+                        API Performance
+                      </CardTitle>
+                      <CardDescription>
+                        Monitor API status and performance
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-safebite-text">CalorieNinjas API</span>
+                          <Badge className="bg-green-500/20 text-green-500 border-green-500">
+                            Operational
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-safebite-text">FatSecret API</span>
+                          <Badge className="bg-green-500/20 text-green-500 border-green-500">
+                            Operational
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-safebite-text">Edamam API</span>
+                          <Badge className="bg-green-500/20 text-green-500 border-green-500">
+                            Operational
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-safebite-text">MongoDB Connection</span>
+                          <Badge className="bg-green-500/20 text-green-500 border-green-500">
+                            Connected
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

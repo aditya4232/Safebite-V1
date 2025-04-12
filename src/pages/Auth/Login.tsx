@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; // Add React import back
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,8 @@ import { Eye, EyeOff, Mail, Lock, UserCircle, AlertCircle, Info } from 'lucide-r
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { app } from "../../firebase";
 import guestAuthService from "@/services/guestAuthService";
+import GuestNameDialog from "@/components/GuestNameDialog";
+import { getGuestName } from "@/services/guestUserService";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showGuestInfo, setShowGuestInfo] = useState(false);
+  const [showGuestNameDialog, setShowGuestNameDialog] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -79,13 +81,51 @@ const Login = () => {
 
   // Handle guest login
   const handleGuestLogin = async () => {
-    setIsLoading(true);
+    const existingGuestName = getGuestName(); // Check session storage
 
+    if (existingGuestName) {
+      // If name already exists in session, sign in directly
+      setIsLoading(true);
+      try {
+        await guestAuthService.signInAsGuest(existingGuestName);
+        toast({
+          title: "Welcome back, " + existingGuestName,
+          description: "You're continuing your guest session.",
+        });
+        navigate('/dashboard');
+      } catch (error: any) {
+        console.error("Guest login error:", error);
+        toast({
+          title: "Guest login failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Otherwise, show the dialog to get the name
+      setShowGuestNameDialog(true);
+    }
+  };
+
+  // Handle guest name submission from the dialog
+  const handleGuestNameSubmit = async (name?: string) => {
+    setShowGuestNameDialog(false);
+
+    if (!name) return; // User cancelled or closed dialog
+
+    setIsLoading(true);
     try {
-      await guestAuthService.signInAsGuest();
+      // Name is already set in sessionStorage by GuestNameDialog via setGuestName service function
+      // Remove incorrect localStorage usage:
+      // localStorage.setItem('guestName', name);
+      // localStorage.setItem('guestNameSet', 'true');
+
+      await guestAuthService.signInAsGuest(name);
       toast({
-        title: "Guest login successful",
-        description: "You're now using SafeBite in guest mode. Your data won't be saved.",
+        title: "Welcome, " + name,
+        description: "You're now using SafeBite in guest mode. Your data won't be saved permanently.",
       });
       navigate('/dashboard');
     } catch (error: any) {
@@ -245,6 +285,12 @@ const Login = () => {
           </div>
         </div>
       </Card>
+
+      {/* Guest Name Dialog */}
+      <GuestNameDialog
+        open={showGuestNameDialog}
+        onClose={handleGuestNameSubmit}
+      />
     </div>
   );
 };

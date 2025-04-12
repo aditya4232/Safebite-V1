@@ -22,8 +22,8 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 app.json_encoder = CustomJSONEncoder
 
-# MongoDB Atlas connection (from Render Env Variable or fallback)
-app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb+srv://safebiteuser:aditya@cluster0.it7rvya.mongodb.net/safebite")
+# MongoDB Atlas connection (from Render Env Variable)
+app.config["MONGO_URI"] = os.environ.get("MONGO_URI")
 
 # Initialize PyMongo with error handling
 try:

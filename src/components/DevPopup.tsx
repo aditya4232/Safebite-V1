@@ -6,14 +6,21 @@ import ProfileImage from './ProfileImage';
 interface DevPopupProps {
   developerName?: string;
   version?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const DevPopup: React.FC<DevPopupProps> = ({
   developerName = "Aditya Shenvi",
-  version = "v2.2"
+  version = "v2.3",
+  isOpen: externalIsOpen,
+  onClose
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Determine if the popup should be open based on props or internal state
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
 
   useEffect(() => {
     // Check if popup has been shown before
@@ -22,7 +29,7 @@ const DevPopup: React.FC<DevPopupProps> = ({
     if (!hasShownPopup) {
       // Show popup after 2 seconds
       const timer = setTimeout(() => {
-        setIsOpen(true);
+        setInternalIsOpen(true);
         // Mark popup as shown
         localStorage.setItem('safebite_popup_shown', 'true');
       }, 2000);
@@ -32,7 +39,11 @@ const DevPopup: React.FC<DevPopupProps> = ({
   }, []);
 
   const handleClose = () => {
-    setIsOpen(false);
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(false);
+    }
   };
 
   const toggleMinimize = () => {
@@ -42,11 +53,22 @@ const DevPopup: React.FC<DevPopupProps> = ({
   if (!isOpen) return null;
 
   const changelogItems = [
+    "Enhanced AI chatbot with context-aware guidance",
+    "Added weekly health check-in with 8 questions",
+    "Improved dashboard with weekly check-in data visualization",
+    "Added food delivery integration with Zomato and Swiggy",
+    "Enhanced recipe search with 3x4 grid and popup details",
+    "Improved UI with sci-fi visuals and better readability",
+    "Added user activity tracking for ML personalization",
+    "Fixed Healthbox component errors and improved UI",
+    "Added guest mode for testing without authentication",
+    "Production-ready with improved error handling"
+  ];
+
+  const previousVersionItems = [
     "Added Product Recommendations page with MongoDB integration",
     "Implemented user activity tracking for ML personalization",
     "Added fitness wearable data import functionality",
-    "Fixed Healthbox component errors and improved UI",
-    "Added guest mode for testing without authentication",
     "Improved Firebase security and error handling",
     "Enhanced dashboard with real-time data visualization",
     "Added login prompts for guest users"
@@ -102,8 +124,8 @@ const DevPopup: React.FC<DevPopupProps> = ({
               <div className="bg-safebite-teal/20 text-safebite-teal px-2 py-1 rounded text-xs mr-2">
                 {version}
               </div>
-              <div className="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs">
-                Under Development
+              <div className="bg-green-500/20 text-green-500 px-2 py-1 rounded text-xs">
+                Production Ready
               </div>
             </div>
 
@@ -116,10 +138,28 @@ const DevPopup: React.FC<DevPopupProps> = ({
                 <Star className="h-4 w-4 mr-1 text-safebite-teal" />
                 What's New in {version}
               </h4>
+              <div className="bg-safebite-teal/10 p-2 rounded-md border border-safebite-teal/20 mb-2">
+                <p className="text-xs text-safebite-teal font-medium mb-1">Production Release</p>
+              </div>
               <ul className="text-xs text-safebite-text-secondary space-y-1">
                 {changelogItems.map((item, index) => (
                   <li key={index} className="flex items-start">
                     <span className="text-safebite-teal mr-1">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mb-4">
+              <h4 className="text-safebite-text font-medium flex items-center mb-2">
+                <Star className="h-4 w-4 mr-1 text-safebite-text-secondary" />
+                Previous Updates (v2.2)
+              </h4>
+              <ul className="text-xs text-safebite-text-secondary space-y-1">
+                {previousVersionItems.map((item, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-safebite-text-secondary mr-1">•</span>
                     <span>{item}</span>
                   </li>
                 ))}

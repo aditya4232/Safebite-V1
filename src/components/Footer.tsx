@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Instagram, Twitter, Facebook, Github } from 'lucide-react';
+import { Twitter, Github, Mail, Heart, ExternalLink, Shield, FileText, HelpCircle, MessageSquare, Sparkles } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 
 const Footer = () => {
@@ -8,22 +8,24 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold gradient-text mb-4">SafeBite</h3>
+            <div className="flex items-center mb-4">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-safebite-teal to-safebite-purple flex items-center justify-center mr-2">
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple">SafeBite v2.5</h3>
+            </div>
             <p className="text-safebite-text-secondary mb-4">
-              Your personal food safety and nutrition companion. Make informed choices for a healthier you.
+              Smart food safety and nutrition platform helping you make informed decisions about the food you consume.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
-                <Instagram size={20} />
+              <a href="https://github.com/adityashenvi" target="_blank" rel="noopener noreferrer" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
+                <Github size={20} />
               </a>
-              <a href="#" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
                 <Twitter size={20} />
               </a>
-              <a href="#" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
-                <Facebook size={20} />
-              </a>
-              <a href="#" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
-                <Github size={20} />
+              <a href="mailto:contact@safebite.example.com" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">
+                <Mail size={20} />
               </a>
             </div>
           </div>
@@ -41,10 +43,30 @@ const Footer = () => {
           <div>
             <h4 className="text-md font-semibold text-safebite-text mb-4">Resources</h4>
             <ul className="space-y-2">
-              <li><Link to="/blog" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Blog</Link></li>
-              <li><Link to="/guides" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Nutrition Guides</Link></li>
-              <li><Link to="/faq" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">FAQs</Link></li>
-              <li><Link to="/community" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors">Community</Link></li>
+              <li>
+                <Link to="/help" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors flex items-center">
+                  <HelpCircle size={14} className="mr-2" />
+                  <span>Help Center</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/community" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors flex items-center">
+                  <MessageSquare size={14} className="mr-2" />
+                  <span>Community</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/healthbox" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors flex items-center">
+                  <Shield size={14} className="mr-2" />
+                  <span>Health Tools</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/recipes" className="text-safebite-text-secondary hover:text-safebite-teal transition-colors flex items-center">
+                  <FileText size={14} className="mr-2" />
+                  <span>Recipes</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -64,8 +86,14 @@ const Footer = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="text-safebite-text-secondary text-sm">
-            <p>&copy; {new Date().getFullYear()} SafeBite. All rights reserved.</p>
-            <p className="mt-1">A Special Engineering Project by <span className="text-safebite-teal font-medium">Aditya Shenvi</span> at IFHE Hyderabad</p>
+            <p>&copy; {new Date().getFullYear()} SafeBite v2.5. All rights reserved.</p>
+            <p className="mt-1 flex items-center">
+              Made with <Heart size={12} className="mx-1 text-red-500" /> by
+              <a href="https://github.com/adityashenvi" target="_blank" rel="noopener noreferrer" className="text-safebite-teal hover:underline flex items-center ml-1">
+                Aditya Shenvi
+                <ExternalLink size={10} className="ml-1" />
+              </a>
+            </p>
           </div>
           <div className="mt-4 md:mt-0">
             <ul className="flex space-x-6">

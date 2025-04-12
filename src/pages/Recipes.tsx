@@ -1,19 +1,20 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import DashboardSidebar from '@/components/DashboardSidebar';
 import Loader from '@/components/Loader';
-import { Search, Filter, ChefHat, Bookmark, Star, Clock, Users, Flame, AlertTriangle, Utensils } from 'lucide-react';
+import { Search, Filter, ChefHat, Bookmark, Star, Clock, Users, Flame, Utensils, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getRecipes, Recipe as RecipeType } from '@/services/recipeService';
 import { trackRecipeSearch } from '@/services/mlService';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { app } from "../firebase";
+import FoodChatBot from '@/components/FoodChatBot';
 
 // Using the Recipe type from recipeService
 
@@ -24,9 +25,45 @@ const Recipes = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [error, setError] = useState<string | null>(null);
   const [favoriteRecipes, setFavoriteRecipes] = useState<string[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeType | null>(null);
+  const [showRecipeDetails, setShowRecipeDetails] = useState(false);
   const { toast } = useToast();
   const auth = getAuth(app);
   const db = getFirestore(app);
+
+  // User data for personalized chat suggestions
+  const [userData, setUserData] = useState<any>(null);
+  const [userActivity, setUserActivity] = useState<any[]>([]);
+
+  // Load user data for personalized chat
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (auth.currentUser) {
+        try {
+          // Get user profile data
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (userDoc.exists()) {
+            setUserData(userDoc.data());
+          }
+
+          // Get user activity data
+          const activityRef = doc(db, 'user_activities', auth.currentUser.uid);
+          const activityDoc = await getDoc(activityRef);
+
+          if (activityDoc.exists()) {
+            const data = activityDoc.data();
+            setUserActivity(data.activities || []);
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [auth.currentUser, db]);
 
   // Load initial recipes and user favorites
   useEffect(() => {
@@ -293,6 +330,19 @@ const Recipes = () => {
     });
   };
 
+  // Handle recipe selection for viewing details
+  const handleRecipeSelect = (recipe: RecipeType) => {
+    setSelectedRecipe(recipe);
+    setShowRecipeDetails(true);
+
+    // Track this interaction if needed
+    try {
+      trackRecipeSearch('view_details', [recipe]);
+    } catch (error) {
+      console.error('Error tracking recipe view:', error);
+    }
+  };
+
 
 
   return (
@@ -322,7 +372,7 @@ const Recipes = () => {
                     className="sci-fi-input pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   />
                 </div>
               </div>
@@ -376,12 +426,12 @@ const Recipes = () => {
                   <Loader size="lg" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {recipes.map(recipe => (
-                    <Card key={recipe.id} className="sci-fi-card overflow-hidden">
+                    <Card key={recipe.id} className="sci-fi-card overflow-hidden hover:shadow-neon-teal transition-all duration-300 hover:border-safebite-teal/50">
                       <div className="relative h-48 w-full">
                         <img
-                          src={recipe.image}
+                          src={recipe.image || 'https://via.placeholder.com/300x200?text=No+Image'}
                           alt={recipe.title}
                           className="h-full w-full object-cover"
                         />
@@ -390,139 +440,28 @@ const Recipes = () => {
                         </Badge>
                       </div>
                       <div className="p-4">
-                        <div className="flex justify-between items-start">
-                          <h3 className="text-xl font-semibold text-safebite-text mb-2">{recipe.title}</h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`p-1 h-8 w-8 ${favoriteRecipes.includes(recipe.id) ? 'text-yellow-500' : 'text-safebite-text-secondary'}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(recipe.id);
-                            }}
-                          >
-                            <Star className={`h-5 w-5 ${favoriteRecipes.includes(recipe.id) ? 'fill-yellow-500' : ''}`} />
-                          </Button>
+                        <h3 className="text-xl font-semibold text-safebite-text mb-2 line-clamp-1">{recipe.title}</h3>
+                        <div className="flex items-center mb-2">
+                          <Flame className="h-4 w-4 text-safebite-teal mr-1" />
+                          <span className="text-sm text-safebite-text-secondary mr-3">{recipe.calories || 'N/A'} kcal</span>
+                          <Clock className="h-4 w-4 text-safebite-teal mr-1" />
+                          <span className="text-sm text-safebite-text-secondary">{recipe.cookTime || '30'} min</span>
                         </div>
-
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {recipe.healthLabels.map((label, idx) => (
-                            <Badge key={idx} variant="outline" className="border-safebite-teal text-safebite-teal">
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {recipe.healthLabels && recipe.healthLabels.slice(0, 2).map((label, index) => (
+                            <Badge key={index} variant="outline" className="bg-safebite-teal/10 text-safebite-teal border-safebite-teal/20">
                               {label}
                             </Badge>
                           ))}
                         </div>
-
-                        <div className="flex justify-between text-safebite-text-secondary mb-4">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1" />
-                            <span>{recipe.cookTime} min</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-1" />
-                            <span>{recipe.servings} servings</span>
-                          </div>
-                          <div className="flex items-center">
-                            <ChefHat className="h-4 w-4 mr-1" />
-                            <span>{recipe.calories} cal</span>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between">
-                          <Button variant="outline" className="sci-fi-button">
-                            View Recipe
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="sci-fi-button"
-                            onClick={() => handleSaveRecipe(recipe.id)}
-                          >
-                            <Bookmark className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="favorites" className="mt-0">
-              {isLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader size="lg" />
-                </div>
-              ) : error ? (
-                <div className="text-center py-12">
-                  <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-safebite-text mb-2">No Favorite Recipes</h3>
-                  <p className="text-safebite-text-secondary mb-4">{error}</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {recipes.map(recipe => (
-                    <Card key={recipe.id} className="sci-fi-card overflow-hidden">
-                      <div className="relative h-48 w-full">
-                        <img
-                          src={recipe.image}
-                          alt={recipe.title}
-                          className="h-full w-full object-cover"
-                        />
-                        <Badge className="absolute top-2 right-2 bg-safebite-purple text-white">
-                          {recipe.source}
-                        </Badge>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex justify-between items-start">
-                          <h3 className="text-xl font-semibold text-safebite-text mb-2">{recipe.title}</h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="p-1 h-8 w-8 text-yellow-500"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(recipe.id);
-                            }}
-                          >
-                            <Star className="h-5 w-5 fill-yellow-500" />
-                          </Button>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {recipe.healthLabels.map((label, idx) => (
-                            <Badge key={idx} variant="outline" className="border-safebite-teal text-safebite-teal">
-                              {label}
-                            </Badge>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm text-safebite-text-secondary mb-4">
-                          <div className="flex items-center">
-                            <Flame className="h-4 w-4 mr-1 text-safebite-teal" />
-                            {recipe.calories} kcal
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1 text-safebite-teal" />
-                            {recipe.cookTime} min
-                          </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-1 text-safebite-teal" />
-                            {recipe.servings} servings
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between">
-                          <Button variant="outline" className="sci-fi-button">
-                            View Recipe
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="sci-fi-button"
-                            onClick={() => toggleFavorite(recipe.id)}
-                          >
-                            <Star className="h-4 w-4 fill-yellow-500" />
-                          </Button>
-                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full sci-fi-button bg-safebite-teal/10 hover:bg-safebite-teal/20"
+                          onClick={() => handleRecipeSelect(recipe)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
                       </div>
                     </Card>
                   ))}
@@ -698,11 +637,108 @@ const Recipes = () => {
               )}
             </TabsContent>
           </Tabs>
-
-          <div className="text-xs text-safebite-text-secondary mt-6 text-right">
-            Created by Aditya Shenvi
-          </div>
         </div>
+        {/* Recipe Details Dialog */}
+        <Dialog open={showRecipeDetails} onOpenChange={setShowRecipeDetails}>
+          <DialogContent className="sci-fi-card max-w-4xl">
+            {selectedRecipe && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl flex items-center">
+                    <ChefHat className="h-6 w-6 text-safebite-teal mr-3" />
+                    {selectedRecipe.title}
+                  </DialogTitle>
+                  <DialogDescription className="flex flex-wrap gap-2 mt-2">
+                    <Badge className="bg-safebite-teal/20 text-safebite-teal border-safebite-teal">
+                      <Users className="h-3 w-3 mr-1" />
+                      {selectedRecipe.servings || '4'} servings
+                    </Badge>
+                    <Badge className="bg-purple-500/20 text-purple-500 border-purple-500">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {selectedRecipe.cookTime || '30'} min
+                    </Badge>
+                    <Badge className="bg-safebite-card-bg-alt">
+                      {selectedRecipe.source}
+                    </Badge>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                  <div className="bg-safebite-card-bg-alt p-5 rounded-lg border border-safebite-teal/20">
+                    <h3 className="text-lg font-semibold text-safebite-text mb-4 flex items-center">
+                      <span className="inline-block w-1 h-5 bg-safebite-teal mr-2"></span>
+                      Ingredients
+                    </h3>
+                    {selectedRecipe.ingredients ? (
+                      <ul className="space-y-3 text-safebite-text-secondary">
+                        {selectedRecipe.ingredients.map((ingredient, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-safebite-teal/20 text-safebite-teal text-xs font-medium mr-3">
+                              {index + 1}
+                            </span>
+                            {ingredient}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-safebite-text-secondary">Ingredient information not available</p>
+                    )}
+                  </div>
+
+                  <div className="bg-safebite-card-bg-alt p-5 rounded-lg border border-purple-500/20">
+                    <h3 className="text-lg font-semibold text-safebite-text mb-4 flex items-center">
+                      <span className="inline-block w-1 h-5 bg-purple-500 mr-2"></span>
+                      Instructions
+                    </h3>
+                    {selectedRecipe.instructions ? (
+                      <div className="text-safebite-text-secondary">
+                        {selectedRecipe.instructions.map((step, index) => (
+                          <div key={index} className="mb-4 flex items-start">
+                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-500/20 text-purple-500 text-sm font-medium mr-3">
+                              {index + 1}
+                            </span>
+                            <p>{step}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-safebite-text-secondary">Instruction information not available</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-between items-center">
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      className="sci-fi-button"
+                      onClick={() => toggleFavorite(selectedRecipe.id)}
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Add to Favorites
+                    </Button>
+                  </div>
+                  <DialogClose asChild>
+                    <Button className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80">
+                      Close
+                    </Button>
+                  </DialogClose>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* AI Chatbot */}
+        <FoodChatBot
+          currentPage="recipes"
+          userData={{
+            profile: userData,
+            recentActivity: userActivity
+          }}
+          autoOpen={true}
+          initialMessage="Looking for recipe ideas? I can suggest recipes based on dietary preferences, ingredients you have, or health goals. What kind of recipes are you interested in?"
+        />
       </main>
     </div>
   );

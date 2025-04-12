@@ -9,33 +9,48 @@ export const useGuestMode = () => {
   const auth = getAuth(app);
 
   useEffect(() => {
-    // Check if user is logged in
-    const user = auth.currentUser;
+    // Function to check guest mode status
+    const checkGuestMode = () => {
+      // Check if user is logged in
+      const user = auth.currentUser;
 
-    // Check localStorage for the guest flag
-    const userType = localStorage.getItem('userType');
-    // Check sessionStorage for permission-denied emergency guest mode
-    const emergencyGuestMode = sessionStorage.getItem('safebite-guest-mode');
+      // Check localStorage for the guest flag
+      const userType = localStorage.getItem('userType');
+      // Check sessionStorage for permission-denied emergency guest mode
+      const emergencyGuestMode = sessionStorage.getItem('safebite-guest-mode');
 
-    // If user is logged in, they are not a guest regardless of other flags
-    if (user) {
-      setIsGuest(false);
-      // Clear any guest flags if a user is logged in
-      if (userType === 'guest' || emergencyGuestMode === 'true') {
-        localStorage.removeItem('userType');
-        sessionStorage.removeItem('safebite-guest-mode');
-        console.log('User is logged in, clearing guest mode flags');
+      // If user is logged in, they are not a guest regardless of other flags
+      if (user) {
+        setIsGuest(false);
+        // Clear any guest flags if a user is logged in
+        if (userType === 'guest' || emergencyGuestMode === 'true') {
+          localStorage.removeItem('userType');
+          sessionStorage.removeItem('safebite-guest-mode');
+          console.log('User is logged in, clearing guest mode flags');
+        }
+      } else {
+        // Set guest mode if either condition is true and no user is logged in
+        const isGuestMode = userType === 'guest' || emergencyGuestMode === 'true';
+        setIsGuest(isGuestMode);
+
+        console.log('Guest mode check:', { userType, emergencyGuestMode, isGuestMode });
+
+        // If we're in emergency guest mode due to permission denied,
+        // we should log this for debugging
+        if (emergencyGuestMode === 'true') {
+          console.log('Using emergency guest mode due to permission denied');
+        }
       }
-    } else {
-      // Set guest mode if either condition is true and no user is logged in
-      setIsGuest(userType === 'guest' || emergencyGuestMode === 'true');
+    };
 
-      // If we're in emergency guest mode due to permission denied,
-      // we should log this for debugging
-      if (emergencyGuestMode === 'true') {
-        console.log('Using emergency guest mode due to permission denied');
-      }
-    }
+    // Run the check immediately
+    checkGuestMode();
+
+    // Set up an interval to check periodically (every 2 seconds)
+    const intervalId = setInterval(checkGuestMode, 2000);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
 
     // Listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged((user) => {

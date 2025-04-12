@@ -698,52 +698,6 @@ const transformEdamamResults = (hints: any[]): FoodItem[] => {
       weight: measure.weight
     }));
 
-// Helper function to transform CalorieNinjas results
-const transformCalorieNinjasResults = (items: any[]): FoodItem[] => {
-  return items.map((item: any) => {
-    // Calculate nutrition score based on nutrient values
-    let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
-
-    if (item.protein_g > 15 && (item.fiber_g > 3 || !item.fiber_g) && (item.sugar_g < 10 || !item.sugar_g)) {
-      nutritionScore = 'green';
-    } else if ((item.fat_total_g > 20 || !item.fat_total_g) || (item.sugar_g > 15 || !item.sugar_g)) {
-      nutritionScore = 'red';
-    }
-
-    return {
-      id: `calorieninjas-${item.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
-      name: item.name || 'Unknown Food',
-      brand: '',
-      calories: Math.round(item.calories) || 0,
-      image: '', // CalorieNinjas doesn't provide images
-      nutritionScore,
-      nutrients: {
-        protein: Math.round(item.protein_g) || 0,
-        carbs: Math.round(item.carbohydrates_total_g) || 0,
-        fat: Math.round(item.fat_total_g) || 0,
-        fiber: Math.round(item.fiber_g) || 0,
-        sugar: Math.round(item.sugar_g) || 0
-      },
-      details: {
-        protein: Math.round(item.protein_g) || 0,
-        carbs: Math.round(item.carbohydrates_total_g) || 0,
-        fat: Math.round(item.fat_total_g) || 0,
-        sodium: Math.round(item.sodium_mg) || 0,
-        sugar: Math.round(item.sugar_g) || 0,
-        calories: Math.round(item.calories) || 0,
-        ingredients: [],
-        allergens: [],
-        additives: []
-      },
-      servingSizes: [{
-        label: 'Serving',
-        weight: item.serving_size_g || 100
-      }],
-      source: 'CalorieNinjas'
-    };
-  });
-};
-
     // Calculate nutrition score based on nutrient values
     let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
 
@@ -949,5 +903,32 @@ export const removeSearchHistoryItem = (id: string): boolean => {
   } catch (error) {
     console.error('Error removing search history item:', error);
     return false;
+  }
+};
+
+// Function to track user interactions with food items
+export const trackUserInteraction = (interactionType: string, details: any): void => {
+  try {
+    // Get existing interactions or initialize empty array
+    const interactionsJson = localStorage.getItem('userFoodInteractions');
+    const interactions = interactionsJson ? JSON.parse(interactionsJson) : [];
+
+    // Add new interaction
+    interactions.push({
+      type: interactionType,
+      details,
+      timestamp: Date.now()
+    });
+
+    // Keep only the last 100 interactions
+    const trimmedInteractions = interactions.slice(-100);
+
+    // Save back to localStorage
+    localStorage.setItem('userFoodInteractions', JSON.stringify(trimmedInteractions));
+
+    // Log for debugging
+    console.log(`Tracked user interaction: ${interactionType}`, details);
+  } catch (error) {
+    console.error('Error tracking user interaction:', error);
   }
 };

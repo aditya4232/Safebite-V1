@@ -117,7 +117,7 @@ const HeroImage: React.FC = () => {
       
       {/* Version badge */}
       <div className="absolute -top-3 -right-3 bg-safebite-teal text-safebite-dark-blue text-xs font-bold px-2 py-1 rounded-full shadow-lg z-10">
-        v2.2
+        v2.5
       </div>
       
       {/* Floating features */}
