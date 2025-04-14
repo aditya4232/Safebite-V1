@@ -388,49 +388,20 @@ const ProductRecommendationsPage: React.FC = () => {
 
   // Initial data fetch
   useEffect(() => {
-    fetchProductsData(1, searchQuery);
-  }, [searchQuery]);
+    fetchGroceryProducts(1, grocerySearchQuery);
+  }, []);
 
   // Handle tab change
   useEffect(() => {
-    if (activeTab === 'grocery' && groceryProducts.length === 0) {
+    if (activeTab === 'grocery') {
       fetchGroceryProducts(1, grocerySearchQuery);
     }
-  }, [activeTab, grocerySearchQuery, groceryProducts]);
+  }, [activeTab, grocerySearchQuery]);
 
   // Handle API status change
   const handleApiStatusChange = (status: boolean) => {
     setApiAvailable(status);
   };
-
-  const handleProductSearch = useCallback(() => {
-    // If category is not 'all', we'll filter client-side
-    // Otherwise, we'll fetch from the API with the search query
-    if (selectedCategory === 'all') {
-      fetchProductsData(1, searchQuery);
-    } else {
-      // Filter the existing products by category and search query
-      let result = [...products];
-
-      // Apply category filter
-      result = result.filter(product =>
-        product.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
-
-      // Apply search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        result = result.filter(product =>
-          product.name.toLowerCase().includes(query) ||
-          product.brand.toLowerCase().includes(query) ||
-          product.description.toLowerCase().includes(query) ||
-          product.tags.some(tag => tag.toLowerCase().includes(query))
-        );
-      }
-
-      setFilteredProducts(result);
-    }
-  }, [selectedCategory, searchQuery, products, fetchProductsData, setFilteredProducts]);
 
   // Handle search for grocery products
   const handleGrocerySearch = () => {
@@ -535,24 +506,27 @@ const ProductRecommendationsPage: React.FC = () => {
               </div>
             </>
           )}
-          <Tabs defaultValue="products" className="mb-8">
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="products" className="flex items-center">
-                <ShoppingBag className="h-4 w-4 mr-2" /> Products
+          <Tabs defaultValue="grocery" className="mb-8">
+            <TabsList className="grid grid-cols-2 mb-4">
+              <TabsTrigger value="grocery" className="flex items-center">
+                <Apple className="h-4 w-4 mr-2" /> Grocery Products
               </TabsTrigger>
               <TabsTrigger value="recipes" className="flex items-center">
                 <Utensils className="h-4 w-4 mr-2" /> Recipes
               </TabsTrigger>
-              <TabsTrigger value="grocery" className="flex items-center">
-                <Apple className="h-4 w-4 mr-2" /> Grocery
-              </TabsTrigger>
             </TabsList>
-            <TabsContent value="products">
+
+            <TabsContent value="recipes">
+              <div className="grid grid-cols-1 gap-6 mb-6">
+                <GeminiProductRecommendations userPreferences={userPreferences}/>
+              </div>
+            </TabsContent>
+            <TabsContent value="grocery">
               <div className="mb-6">
                 <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="mb-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-safebite-blue focus:border-transparent"
+                  value={groceryCategory}
+                  onChange={(e) => setGroceryCategory(e.target.value)}
+                  className="w-full p-2 mb-4 bg-safebite-card-bg border border-safebite-card-bg-alt rounded-md text-safebite-text"
                 >
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
@@ -560,120 +534,130 @@ const ProductRecommendationsPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-                <Button
-                  onClick={() => {
-                    setSortBy('healthScore');
-                  }}
-                  className={`mb-2 ${sortBy === 'healthScore' ? 'bg-safebite-blue text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  Health Score
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSortBy('price');
-                  }}
-                  className={`mb-2 ${sortBy === 'price' ? 'bg-safebite-blue text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  Price
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSortBy('name');
-                  }}
-                  className={`mb-2 ${sortBy === 'name' ? 'bg-safebite-blue text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  Name
-                </Button>
+
+                <div className="flex flex-col md:flex-row gap-4 mb-4">
+                  <div className="flex-1">
+                    <Input
+                      type="text"
+                      placeholder="Search grocery products..."
+                      value={grocerySearchQuery}
+                      onChange={(e) => setGrocerySearchQuery(e.target.value)}
+                      className="sci-fi-input w-full"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleGrocerySearch}
+                      className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 flex-shrink-0"
+                      disabled={isLoadingGrocery}
+                    >
+                      {isLoadingGrocery ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Search className="h-4 w-4 mr-1" />}
+                      Search
+                    </Button>
+                  </div>
+                </div>
               </div>
-              {isLoading ? (
-                <Loader2 className="animate-spin h-8 w-8 text-white" />
-              ) : filteredProducts.length === 0 ? (
-                <Card className="sci-fi-card p-8 text-center">
-                  <div className="flex flex-col items-center">
-                    <AlertTriangle className="h-8 w-8 text-safebite-teal mb-4" />
-                    <p className="text-lg font-medium text-safebite-text">No products found.</p>
+
+              {isLoadingGrocery ? (
+                <div className="flex justify-center items-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin text-safebite-teal" />
+                  <span className="ml-2 text-safebite-text">Loading grocery products...</span>
+                </div>
+              ) : groceryProducts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {groceryProducts.map((product) => (
+                    <Card key={product._id} className="sci-fi-card overflow-hidden flex flex-col h-full hover:shadow-neon-teal transition-all duration-300">
+                      <div className="relative h-48 overflow-hidden bg-safebite-card-bg-alt">
+                        <img
+                          src={product.imageUrl || `https://source.unsplash.com/random/400x300/?${encodeURIComponent(product.name || 'food')},food`}
+                          alt={product.name}
+                          className="object-cover w-full h-full"
+                          onError={(e) => {
+                            // Fallback image if the main one fails to load
+                            const productName = product.name || 'Food Product';
+                            (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x300?text=${encodeURIComponent(productName)}`;
+                          }}
+                        />
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(product._id);
+                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 bg-black/30 backdrop-blur-sm hover:bg-black/50 text-white"
+                        >
+                          <Heart className={`h-4 w-4 ${favorites.includes(product._id) ? 'fill-safebite-teal text-safebite-teal' : ''}`} />
+                        </Button>
+                        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                          {product.category}
+                        </div>
+                      </div>
+                      <CardContent className="flex-grow p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-medium text-safebite-text">{product.name}</h3>
+                          <div className="flex items-center bg-safebite-teal/10 text-safebite-teal px-1.5 py-0.5 rounded text-xs">
+                            <Star className="h-3 w-3 mr-0.5 fill-safebite-teal" />
+                            <span>{product.healthScore?.toFixed(1) || '5.0'}</span>
+                          </div>
+                        </div>
+                        <p className="text-safebite-text-secondary text-sm mb-2">{product.brand}</p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {product.tags?.slice(0, 3).map((tag, index) => (
+                            <Badge key={index} variant="outline" className="text-xs bg-safebite-card-bg-alt">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="p-4 pt-0">
+                        <Button
+                          className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+                          onClick={() => {
+                            // Handle view details
+                            trackUserInteraction('view_grocery_details', { productId: product._id, productName: product.name });
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="sci-fi-card mb-4">
+                  <CardContent className="p-6 text-center">
+                    <AlertTriangle className="h-12 w-12 text-safebite-text-secondary mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-safebite-text mb-2">No Grocery Products Found</h3>
+                    <p className="text-safebite-text-secondary mb-4">
+                      No grocery products match your search criteria. Try adjusting your filters or search terms.
+                    </p>
                     <Button
                       onClick={() => {
-                        setSearchQuery('');
-                        handleProductSearch();
+                        setGrocerySearchQuery('');
+                        setGroceryCategory('all');
                       }}
                       className="mt-4 bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
                     >
                       Clear Search
                     </Button>
-                  </div>
+                  </CardContent>
                 </Card>
-              ) : (
-                <div className="products-grid">
-                  {filteredProducts.map((product) => {
-                    return (
-                      <Card key={product._id} className="sci-fi-card overflow-hidden flex flex-col h-full hover:shadow-neon-teal transition-all duration-300">
-                        <div className="relative h-48 overflow-hidden bg-safebite-card-bg-alt">
-                          <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleFavorite(product._id);
-                            }}
-                            className="absolute top-2 right-2 bg-transparent hover:bg-gray-200 text-white rounded-full p-1"
-                          >
-                            {favorites.includes(product._id) ? <CheckCircle className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                        <CardContent className="flex-grow p-4">
-                          <CardTitle>{product.name}</CardTitle>
-                          <CardDescription className="text-sm text-gray-500">{product.brand}</CardDescription>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {product.dietaryInfo.slice(0, 3).map((info, index) => (
-                              <Badge key={index} className="bg-gray-200 text-gray-700">{info}</Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="p-4 pt-0">
-                          <Button
-                            onClick={() => {
-                              navigate(`/product/${product._id}`);
-                            }}
-                            className="w-full bg-safebite-blue text-white"
-                          >
-                            View Details <ChevronRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    );
-                  })}
+              )}
+
+              {/* Pagination */}
+              {groceryTotalPages > 1 && (
+                <div className="mt-6 flex justify-center">
+                  <Pagination
+                    currentPage={groceryPage}
+                    totalPages={groceryTotalPages}
+                    onPageChange={(page) => {
+                      setGroceryPage(page);
+                      fetchGroceryProducts(page, grocerySearchQuery);
+                    }}
+                  />
                 </div>
               )}
-              {!isLoading && filteredProducts.length > 0 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={(page) => {
-                    setCurrentPage(page);
-                    fetchProductsData(page, searchQuery);
-                  }}
-                />
-              )}
-            </TabsContent>
-            <TabsContent value="recipes">
-              <div className="grid grid-cols-1 gap-6 mb-6">
-                <GeminiProductRecommendations userPreferences={userPreferences}/>
-              </div>
-            </TabsContent>
-            <TabsContent value="grocery">
-              <Card className="sci-fi-card mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Apple className="h-4 w-4 mr-2" /> Grocery Items
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Grocery items will be displayed here */}
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full bg-safebite-blue text-white">View All</Button>
-                </CardFooter>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>

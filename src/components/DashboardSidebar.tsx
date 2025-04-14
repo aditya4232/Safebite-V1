@@ -63,7 +63,7 @@ const DashboardSidebar = () => {
     { path: '/dashboard', name: 'Dashboard', icon: <Home size={20} /> },
     { path: '/nutrition', name: 'Nutrition', icon: <Utensils size={20} className="text-safebite-teal" /> },
     { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
-    { path: '/products', name: 'Products', icon: <ShoppingCart size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span> },
+    { path: '/grocery-products', name: 'Grocery Products', icon: <ShoppingCart size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span> },
     { path: '/community', name: 'Community', icon: <Users size={20} /> },
     { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" /> },
     { path: '/weekly-questions', name: 'Health Check', icon: <Heart size={20} /> },

@@ -323,11 +323,11 @@ const FoodChatBot: React.FC<FoodChatBotProps> = ({
                   context: page,
                   isPersonalized: true,
                   basedOn: {
-                    healthGoals,
-                    dietaryPreferences,
-                    healthConditions,
+                    healthGoals: healthGoals || 'General Health',
+                    dietaryPreferences: dietaryPreferences || 'None',
+                    healthConditions: healthConditions || 'None',
                     weeklyCheckin: weeklyCheckin ? true : false,
-                    recentActivity: recentActivity.slice(0, 3) // Just store a few recent activities
+                    recentActivity: recentActivity?.slice(0, 3) || [] // Just store a few recent activities
                   }
                 });
               }

@@ -1,9 +1,6 @@
 // Product service for fetching products from the API
 
-// API base URL
-// export const API_BASE_URL = 'http://localhost:10000'; // Local testing
-
-// For production, use this URL
+// API base URL - Always use the Render backend for reliable results
 export const API_BASE_URL = 'https://safebite-backend.onrender.com';
 
 // Product interface
@@ -80,7 +77,7 @@ export const checkApiStatus = async (): Promise<boolean> => {
 
     const data = await response.json();
     console.log('API status check response:', data);
-    return data && (data.status === 'running' || data.api_status === 'running');
+    return data && (data.status === 'API is running' || data.status === 'running' || data.api_status === 'running');
   } catch (error) {
     console.error('Error checking API status:', error);
     return false;
@@ -187,7 +184,7 @@ export const fetchGroceryProducts = async (
     }
 
     // Build the URL with query parameters
-    const url = `${API_BASE_URL}/dataset/groceryProducts?page=${page}&limit=${limit}${
+    const url = `${API_BASE_URL}/dataset/products?page=${page}&limit=${limit}${
       search ? `&search=${encodeURIComponent(search)}` : ''
     }`;
 

@@ -19,7 +19,7 @@ import Reports from "@/pages/Reports";
 import Recipes from "@/pages/Recipes";
 import HealthBox from "@/pages/HealthBox";
 import ProductRecommendationsPage from "@/pages/ProductRecommendations";
-import ProductPage from "@/pages/ProductPage";
+import GroceryProducts from "@/pages/GroceryProducts";
 import Nutrition from "@/pages/Nutrition";
 import NotFound from "@/pages/NotFound";
 import AdminLogin from "@/pages/Admin/Login";
@@ -166,10 +166,13 @@ const App = () => {
             {/* Protected Routes */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/nutrition" element={<ProtectedRoute><Nutrition /></ProtectedRoute>} />
-            <Route path="/food-search" element={<ProtectedRoute><FoodSearch /></ProtectedRoute>} />
+            {/* Redirect old food search to nutrition page */}
+            <Route path="/food-search" element={<Navigate to="/nutrition" replace />} />
             <Route path="/food-delivery" element={<ProtectedRoute><FoodDelivery /></ProtectedRoute>} />
             <Route path="/product-recommendations" element={<ProtectedRoute><ProductRecommendationsPage /></ProtectedRoute>} />
-            <Route path="/products" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
+            {/* Redirect from old products page to grocery products */}
+            <Route path="/products" element={<Navigate to="/grocery-products" replace />} />
+            <Route path="/grocery-products" element={<ProtectedRoute><GroceryProducts /></ProtectedRoute>} />
             <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
             <Route path="/healthbox" element={<ProtectedRoute><HealthBox /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

@@ -78,7 +78,7 @@ const GuestDashboard = () => {
         <div className="mb-4 sm:mb-0">
           <h1 className="text-3xl font-bold text-safebite-text mb-1">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple animate-gradient-text">
-              Welcome, {guestName || 'Guest'}!
+              Welcome, {guestName || 's'}!
             </span>
           </h1>
           <p className="text-safebite-text-secondary text-sm">
@@ -337,7 +337,7 @@ const GuestDashboard = () => {
 
       {/* Footer */}
       <div className="text-center text-safebite-text-secondary text-sm mt-8">
-        <p>SafeBite v2.1</p>
+        <p>SafeBite v2.5</p>
         <p className="mt-2">Guest mode provides limited functionality. <Button variant="link" className="p-0 h-auto text-safebite-teal" onClick={() => navigate('/auth/signup')}>Sign up</Button> for full access.</p>
       </div>
     </div>
