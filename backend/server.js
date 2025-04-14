@@ -46,9 +46,16 @@ app.get('/grocery/search', (req, res) => {
   groceryProductsRoutes(req, res);
 });
 
+// Simple search endpoint for direct access
+app.get('/search', (req, res) => {
+  // Forward to the grocery products search endpoint
+  req.url = '/search' + req.url.substring(req.url.indexOf('?'));
+  groceryProductsRoutes(req, res);
+});
+
 // Status endpoint
 app.get('/status', (req, res) => {
-  res.json({ status: 'API is running', version: '1.0.0' });
+  res.json({ status: 'API is running', version: '2.5.0' });
 });
 
 // Root endpoint
@@ -61,7 +68,8 @@ app.get('/', (req, res) => {
       productsSearch: '/api/products/search',
       groceryProducts: '/api/groceryProducts',
       directProducts: '/products',
-      directGrocery: '/grocery'
+      directGrocery: '/grocery',
+      search: '/search?q=your_query_here'
     }
   });
 });

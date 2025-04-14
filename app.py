@@ -303,18 +303,39 @@ def search_dataset():
         if not query:
             return jsonify({"error": "Query parameter is required"}), 400
 
-        # Search in MongoDB first
-        results = list(mongo.db.products.find(
-            {"$text": {"$search": query}},
-            {"score": {"$meta": "textScore"}}
-        ).sort([("score", {"$meta": "textScore"})]).limit(20))
-
-        # If no results from MongoDB, search in Grocery Products
-        if not results:
-            results = list(mongo.db["Grocery Products"].find(
+        # Try different search approaches
+        # 1. First try text search in products collection
+        try:
+            results = list(mongo.db.products.find(
                 {"$text": {"$search": query}},
                 {"score": {"$meta": "textScore"}}
             ).sort([("score", {"$meta": "textScore"})]).limit(20))
+        except Exception as e:
+            logger.warning(f"Text search in products failed: {e}")
+            # Fallback to regex search if text index doesn't exist
+            results = list(mongo.db.products.find(
+                {"name": {"$regex": query, "$options": "i"}}
+            ).limit(20))
+
+        # If no results from products, search in Grocery Products
+        if not results:
+            try:
+                # Try text search first
+                results = list(mongo.db["Grocery Products"].find(
+                    {"$text": {"$search": query}},
+                    {"score": {"$meta": "textScore"}}
+                ).sort([("score", {"$meta": "textScore"})]).limit(20))
+            except Exception as e:
+                logger.warning(f"Text search in Grocery Products failed: {e}")
+                # Fallback to regex search
+                results = list(mongo.db["Grocery Products"].find(
+                    {"$or": [
+                        {"name": {"$regex": query, "$options": "i"}},
+                        {"description": {"$regex": query, "$options": "i"}},
+                        {"category": {"$regex": query, "$options": "i"}},
+                        {"brand": {"$regex": query, "$options": "i"}}
+                    ]}
+                ).limit(20))
 
         return jsonify({
             "items": results,
@@ -325,6 +346,167 @@ def search_dataset():
         logger.error(f"Error searching food: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+# Simple search endpoint for MongoDB Atlas integration
+@app.route("/search")
+def simple_search():
+    try:
+        query = request.args.get("q", "")
+        if not query:
+            return jsonify({"error": "Query parameter (q) is required"}), 400
+
+        # Try Atlas Search with fuzzy matching first
+        try:
+            # Use Atlas Search aggregation pipeline with fuzzy matching
+            pipeline = [
+                {
+                    "$search": {
+                        "index": "default",
+                        "compound": {
+                            "should": [
+                                {
+                                    "text": {
+                                        "query": query,
+                                        "path": "name",
+                                        "fuzzy": {
+                                            "maxEdits": 2,
+                                            "prefixLength": 0,
+                                            "maxExpansions": 50
+                                        },
+                                        "score": { "boost": { "value": 5 } }
+                                    }
+                                },
+                                {
+                                    "text": {
+                                        "query": query,
+                                        "path": "description",
+                                        "fuzzy": {
+                                            "maxEdits": 1,
+                                            "prefixLength": 0
+                                        },
+                                        "score": { "boost": { "value": 3 } }
+                                    }
+                                },
+                                {
+                                    "text": {
+                                        "query": query,
+                                        "path": ["category", "brand"],
+                                        "fuzzy": {
+                                            "maxEdits": 1
+                                        },
+                                        "score": { "boost": { "value": 2 } }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                # Add a sort by score
+                {"$sort": {"score": {"$meta": "searchScore"}}},
+                # Limit to 10 results
+                {"$limit": 10},
+                # Add a project stage to include the search score
+                {"$project": {
+                    "_id": 1,
+                    "name": 1,
+                    "description": 1,
+                    "brand": 1,
+                    "category": 1,
+                    "nutritionalInfo": 1,
+                    "ingredients": 1,
+                    "allergens": 1,
+                    "imageUrl": 1,
+                    "score": {"$meta": "searchScore"}
+                }}
+            ]
+
+            # Execute the aggregation pipeline
+            results = list(mongo.db["Grocery Products"].aggregate(pipeline))
+
+            logger.info(f"Atlas Search found {len(results)} results for '{query}'")
+        except Exception as e:
+            # If Atlas Search fails, log the error and fall back to regex search
+            logger.warning(f"Atlas Search failed: {e}")
+            results = []
+
+        # If Atlas Search didn't work or found no results, fall back to regex search
+        if not results:
+            # 1. First try exact name match (case-insensitive)
+            results = list(mongo.db["Grocery Products"].find(
+                {"name": {"$regex": f"^{query}$", "$options": "i"}}
+            ).limit(10))
+
+            # 2. If no results, try contains search
+            if not results:
+                results = list(mongo.db["Grocery Products"].find(
+                    {"name": {"$regex": query, "$options": "i"}}
+                ).limit(10))
+
+            # 3. If still no results, try searching in other fields
+            if not results:
+                results = list(mongo.db["Grocery Products"].find(
+                    {"$or": [
+                        {"name": {"$regex": query, "$options": "i"}},
+                        {"description": {"$regex": query, "$options": "i"}},
+                        {"category": {"$regex": query, "$options": "i"}},
+                        {"brand": {"$regex": query, "$options": "i"}}
+                    ]}
+                ).limit(10))
+
+        # Convert ObjectId to string for JSON serialization
+        for result in results:
+            if "_id" in result:
+                result["_id"] = str(result["_id"])
+
+        if results:
+            return jsonify(results)
+        else:
+            return jsonify({"message": "No products found matching your query"}), 404
+    except Exception as e:
+        logger.error(f"Error in simple search: {e}")
+        return jsonify({"error": "Database error", "details": str(e)}), 500
+
+# Product endpoint for MongoDB Atlas integration
+@app.route("/product/<product_id>")
+def get_product_by_id(product_id):
+    try:
+        # Find product by ID
+        result = mongo.db["Grocery Products"].find_one({"_id": ObjectId(product_id)})
+
+        if result:
+            # Convert ObjectId to string for JSON serialization
+            result["_id"] = str(result["_id"])
+            return jsonify(result)
+        else:
+            return jsonify({"message": "Product not found"}), 404
+    except Exception as e:
+        logger.error(f"Error fetching product: {e}")
+        return jsonify({"error": "Database error", "details": str(e)}), 500
+
+# Status endpoint for MongoDB Atlas integration
+@app.route("/status")
+def check_status():
+    try:
+        # Check MongoDB connection
+        db_status = "connected" if mongo.db.command('ping')["ok"] else "disconnected"
+
+        # Count documents in collection
+        doc_count = mongo.db["Grocery Products"].count_documents({})
+
+        return jsonify({
+            "api_status": "running",
+            "version": "2.5.0",
+            "database_status": db_status,
+            "document_count": doc_count
+        })
+    except Exception as e:
+        logger.error(f"Error checking status: {e}")
+        return jsonify({
+            "api_status": "running",
+            "version": "2.5.0",
+            "database_status": "error",
+            "error": str(e)
+        }), 500
 
 # Health check endpoint for MongoDB connection
 @app.route("/api/health")

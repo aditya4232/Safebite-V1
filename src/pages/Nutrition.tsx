@@ -16,6 +16,8 @@ import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/foodApiService';
 import { searchCalorieNinjas } from '@/services/nutritionApiService';
 import { searchRecipes } from '@/utils/calorieNinjasApi';
+import groceryProductService from '@/services/groceryProductService';
+import mongoDbService from '@/services/mongoDbService';
 import FoodChatBot from '@/components/FoodChatBot';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
@@ -131,7 +133,91 @@ const Nutrition = () => {
       // Track this interaction
       trackUserInteraction('search', { query: searchQuery });
 
-      // Use CalorieNinjas API for food search
+      // First try MongoDB search using our Flask backend
+      const mongoResults = await mongoDbService.searchProducts(searchQuery);
+
+      // If MongoDB search returns results, use them
+      if (mongoResults.success && mongoResults.products && mongoResults.products.length > 0) {
+        // Process MongoDB results
+        const processedResults = mongoResults.products.map(item => {
+          // Calculate nutrition score based on nutrient values
+          let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
+
+          // Get nutritional info (adapt to your MongoDB schema)
+          const nutritionalInfo = item.nutritionalInfo || {};
+
+          // Determine score based on protein, fiber, sugar content
+          const protein = nutritionalInfo.protein || 0;
+          const fiber = nutritionalInfo.fiber || 0;
+          const sugar = nutritionalInfo.sugar || 0;
+          const fat = nutritionalInfo.fat || 0;
+
+          if (protein > 15 && fiber > 3 && sugar < 10) {
+            nutritionScore = 'green';
+          } else if (fat > 20 || sugar > 15) {
+            nutritionScore = 'red';
+          }
+
+          // Generate a placeholder image if none exists
+          const imageUrl = item.imageUrl || `https://source.unsplash.com/featured/?${encodeURIComponent(item.name)},food`;
+
+          return {
+            id: item._id || `mongo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: item.name,
+            calories: nutritionalInfo.calories || 0,
+            nutritionScore,
+            nutrients: {
+              protein: nutritionalInfo.protein || 0,
+              carbs: nutritionalInfo.carbs || 0,
+              fat: nutritionalInfo.fat || 0,
+              fiber: nutritionalInfo.fiber || 0,
+              sugar: nutritionalInfo.sugar || 0,
+              sodium: nutritionalInfo.sodium || 0
+            },
+            source: 'MongoDB',
+            image: imageUrl,
+            details: {
+              protein: nutritionalInfo.protein || 0,
+              carbs: nutritionalInfo.carbs || 0,
+              fat: nutritionalInfo.fat || 0,
+              sodium: nutritionalInfo.sodium || 0,
+              sugar: nutritionalInfo.sugar || 0,
+              calories: nutritionalInfo.calories || 0,
+              ingredients: item.ingredients || [],
+              allergens: item.allergens || [],
+              additives: item.additives || [],
+              servingSize: item.servingSize || '100g',
+              nutritionScore,
+              brand: item.brand,
+              category: item.category
+            }
+          };
+        });
+
+        setFoodResults(processedResults);
+        setShowNoResults(false);
+
+        // Save to search history
+        const newHistory = [...searchHistory];
+        if (!newHistory.includes(searchQuery)) {
+          newHistory.unshift(searchQuery);
+          if (newHistory.length > 5) newHistory.pop();
+          setSearchHistory(newHistory);
+
+          // Save to localStorage if not in guest mode
+          if (!isGuest) {
+            localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
+          }
+        }
+
+        toast({
+          title: "Search Complete",
+          description: `Found ${processedResults.length} results from MongoDB for "${searchQuery}"`,
+        });
+        return;
+      }
+
+      // Fallback to CalorieNinjas API if MongoDB search returns no results
       const results = await searchCalorieNinjas(searchQuery);
 
       if (results && results.length > 0) {
