@@ -167,12 +167,14 @@ export const fetchProducts = async (
  * @param page - Page number
  * @param limit - Number of items per page
  * @param search - Search query
+ * @param category - Optional category filter
  * @returns Promise with paginated grocery products
  */
 export const fetchGroceryProducts = async (
   page: number = 1,
   limit: number = 20,
-  search: string = ''
+  search: string = '',
+  category: string = ''
 ): Promise<PaginatedResponse<Product>> => {
   try {
     // Check if API is available
@@ -183,23 +185,95 @@ export const fetchGroceryProducts = async (
       return { products: [], total: 0, page: 1, totalPages: 1 };
     }
 
-    // Build the URL with query parameters
-    const url = `${API_BASE_URL}/dataset/products?page=${page}&limit=${limit}${
-      search ? `&search=${encodeURIComponent(search)}` : ''
-    }`;
+    // Prioritized list of endpoints to try in order
+    const endpointsToTry = [
+      `/grocery`,
+      `/grocery-products`,
+      `/api/grocery`,
+      `/api/grocery-products`,
+      `/dataset/grocery`,
+      `/dataset/groceryProducts`
+    ];
 
-    console.log('Fetching grocery products from:', url);
+    let response = null;
+    let url = '';
+    let endpointFound = false;
 
-    // Fetch data from the API
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
+    // Try each endpoint until one works
+    for (const endpoint of endpointsToTry) {
+      // Build URL with all query parameters
+      url = `${API_BASE_URL}${endpoint}?page=${page}&limit=${limit}`;
+
+      // Add search parameter if provided
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`);
+      // Add category parameter if provided
+      if (category && category.toLowerCase() !== 'all') {
+        url += `&category=${encodeURIComponent(category)}`;
+      }
+
+      console.log('Trying grocery endpoint:', url);
+
+      try {
+        // Fetch data from the API with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          endpointFound = true;
+          console.log('Found working grocery endpoint:', url);
+          break;
+        }
+      } catch (endpointError) {
+        console.warn(`Grocery endpoint ${endpoint} failed:`, endpointError);
+      }
+    }
+
+    // If all grocery-specific endpoints failed, try the search endpoint as fallback
+    if (!endpointFound || !response) {
+      console.warn('All grocery endpoints failed, trying search endpoint as fallback');
+
+      try {
+        const searchUrl = `${API_BASE_URL}/search?q=${encodeURIComponent(search || 'food')}&collection=grocery&limit=${limit}`;
+        console.log('Trying search fallback:', searchUrl);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        response = await fetch(searchUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          console.log('Search fallback successful');
+          endpointFound = true;
+        }
+      } catch (searchError) {
+        console.error('Search fallback also failed:', searchError);
+      }
+    }
+
+    if (!endpointFound || !response) {
+      console.error('All endpoints failed');
+      return { products: [], total: 0, page: 1, totalPages: 1 };
     }
 
     const data = await response.json();
@@ -207,28 +281,57 @@ export const fetchGroceryProducts = async (
 
     // Handle the response format from the MongoDB backend
     if (data.products && Array.isArray(data.products)) {
-      // MongoDB backend format
+      // MongoDB backend format (most common)
       return {
-        products: data.products,
+        products: data.products.map((product: any) => {
+          // Ensure consistent field names
+          if (!product.name && product.product) {
+            product.name = product.product;
+          }
+          if (!product._collection) {
+            product._collection = 'grocery';
+          }
+          return product;
+        }),
         total: data.total || 0,
         page: data.page || page,
         totalPages: data.totalPages || 1
       };
+    } else if (data.results && Array.isArray(data.results)) {
+      // Search endpoint format
+      const groceryResults = data.results.filter((item: any) =>
+        item._collection === 'grocery' || item.product || item.category === 'Grocery'
+      );
+
+      return {
+        products: groceryResults.map((product: any) => {
+          if (!product.name && product.product) {
+            product.name = product.product;
+          }
+          if (!product._collection) {
+            product._collection = 'grocery';
+          }
+          return product;
+        }),
+        total: groceryResults.length,
+        page: page,
+        totalPages: Math.ceil(groceryResults.length / limit)
+      };
     } else if (Array.isArray(data)) {
       // If the API returns an array directly
       return {
-        products: data,
+        products: data.map((product: any) => {
+          if (!product.name && product.product) {
+            product.name = product.product;
+          }
+          if (!product._collection) {
+            product._collection = 'grocery';
+          }
+          return product;
+        }),
         total: data.length,
         page: page,
         totalPages: Math.ceil(data.length / limit)
-      };
-    } else if (data.results && Array.isArray(data.results)) {
-      // Format with results array
-      return {
-        products: data.results,
-        total: data.count || data.results.length,
-        page: page,
-        totalPages: Math.ceil((data.count || data.results.length) / limit)
       };
     } else {
       console.warn('Unexpected API response format:', data);

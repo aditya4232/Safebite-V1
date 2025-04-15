@@ -94,14 +94,47 @@ def get_products():
 @app.route("/api/grocery-products")
 @app.route("/dataset/groceryProducts/")
 @app.route("/dataset/groceryProducts")
+@app.route("/grocery/")
+@app.route("/grocery")
+@app.route("/api/grocery/")
+@app.route("/api/grocery")
+@app.route("/dataset/grocery/")
+@app.route("/dataset/grocery")
 def get_grocery_products():
     try:
         logger.info("Grocery products endpoint called")
         limit = int(request.args.get("limit", 20))
-        logger.info(f"Getting all grocery products (limit: {limit})")
+        page = int(request.args.get("page", 1))
+        search = request.args.get("search", "")
+        category = request.args.get("category", "")
 
-        # Get products with limit
-        results = list(grocery_collection.find().limit(limit))
+        # Calculate skip value for pagination
+        skip = (page - 1) * limit
+
+        logger.info(f"Getting grocery products (page: {page}, limit: {limit}, search: {search}, category: {category})")
+
+        # Build query
+        query = {}
+
+        # Add search filter if provided
+        if search:
+            query["$or"] = [
+                {"product": {"$regex": search, "$options": "i"}},
+                {"brand": {"$regex": search, "$options": "i"}},
+                {"category": {"$regex": search, "$options": "i"}},
+                {"sub_category": {"$regex": search, "$options": "i"}},
+                {"type": {"$regex": search, "$options": "i"}}
+            ]
+
+        # Add category filter if provided
+        if category and category.lower() != "all":
+            query["category"] = {"$regex": category, "$options": "i"}
+
+        # Get total count for pagination
+        total_count = grocery_collection.count_documents(query)
+
+        # Get products with pagination and filters
+        results = list(grocery_collection.find(query).skip(skip).limit(limit))
 
         # Convert ObjectId to string for JSON serialization
         for result in results:
@@ -109,13 +142,13 @@ def get_grocery_products():
                 result["_id"] = str(result["_id"])
                 result["_collection"] = "grocery"
 
-        logger.info(f"Returning {len(results)} grocery products")
+        logger.info(f"Returning {len(results)} grocery products (total: {total_count})")
         return jsonify({
             "products": results,
             "results": results,  # For compatibility
-            "total": grocery_count,
-            "page": 1,
-            "totalPages": (grocery_count + limit - 1) // limit,
+            "total": total_count,
+            "page": page,
+            "totalPages": (total_count + limit - 1) // limit,
             "collection": "grocery"
         })
     except Exception as e:
@@ -134,95 +167,106 @@ def search():
         # Support both 'q' and 'query' parameters for compatibility
         query = request.args.get("query", "") or request.args.get("q", "")
         limit = int(request.args.get("limit", 20))
+        collection_filter = request.args.get("collection", "all").lower()  # Filter by collection
 
         if not query:
             return jsonify({"error": "Query parameter (query or q) is required"}), 400
 
-        logger.info(f"Searching for: {query}")
+        logger.info(f"Searching for: {query} in collection: {collection_filter}")
 
-        # Search in products collection with Atlas Search
-        try:
-            # Use Atlas Search with wildcard path
-            products_pipeline = [
-                {
-                    "$search": {
-                        "index": "default-products",
-                        "text": {
-                            "query": query,
-                            "path": {
-                                "wildcard": "*"
-                            },
-                            "fuzzy": {
-                                "maxEdits": 2
+        product_results = []
+        grocery_results = []
+
+        # Search in products collection if requested
+        if collection_filter in ["all", "products"]:
+            try:
+                # Use Atlas Search with wildcard path
+                products_pipeline = [
+                    {
+                        "$search": {
+                            "index": "default-products",
+                            "text": {
+                                "query": query,
+                                "path": {
+                                    "wildcard": "*"
+                                },
+                                "fuzzy": {
+                                    "maxEdits": 2
+                                }
                             }
                         }
-                    }
-                },
-                # Limit results
-                {"$limit": limit // 2}
-            ]
+                    },
+                    # Limit results
+                    {"$limit": limit if collection_filter == "products" else limit // 2}
+                ]
 
-            product_results = list(products_collection.aggregate(products_pipeline))
-            logger.info(f"Found {len(product_results)} product results with Atlas Search")
-        except Exception as e:
-            logger.error(f"Atlas Search error on products: {e}, falling back to regex")
-            # Fallback to regex search if Atlas Search fails
-            product_results = list(products_collection.find(
-                {"$or": [
-                    {"name": {"$regex": query, "$options": "i"}},
-                    {"description": {"$regex": query, "$options": "i"}},
-                    {"category": {"$regex": query, "$options": "i"}}
-                ]}
-            ).limit(limit // 2))
-            logger.info(f"Found {len(product_results)} product results with regex search")
+                product_results = list(products_collection.aggregate(products_pipeline))
+                logger.info(f"Found {len(product_results)} product results with Atlas Search")
+            except Exception as e:
+                logger.error(f"Atlas Search error on products: {e}, falling back to regex")
+                # Fallback to regex search if Atlas Search fails
+                product_results = list(products_collection.find(
+                    {"$or": [
+                        {"name": {"$regex": query, "$options": "i"}},
+                        {"description": {"$regex": query, "$options": "i"}},
+                        {"category": {"$regex": query, "$options": "i"}},
+                        {"recipe_name": {"$regex": query, "$options": "i"}},
+                        {"food_name": {"$regex": query, "$options": "i"}}
+                    ]}
+                ).limit(limit if collection_filter == "products" else limit // 2))
+                logger.info(f"Found {len(product_results)} product results with regex search")
 
-        # Add collection info to product results
-        for result in product_results:
-            if "_id" in result:
-                result["_id"] = str(result["_id"])
-                result["_collection"] = "products"
+            # Add collection info to product results
+            for result in product_results:
+                if "_id" in result:
+                    result["_id"] = str(result["_id"])
+                    result["_collection"] = "products"
 
-        # Search in grocery collection with Atlas Search
-        try:
-            # Use Atlas Search with wildcard path
-            grocery_pipeline = [
-                {
-                    "$search": {
-                        "index": "default",
-                        "text": {
-                            "query": query,
-                            "path": {
-                                "wildcard": "*"
-                            },
-                            "fuzzy": {
-                                "maxEdits": 2
+        # Search in grocery collection if requested
+        if collection_filter in ["all", "grocery"]:
+            try:
+                # Use Atlas Search with wildcard path
+                grocery_pipeline = [
+                    {
+                        "$search": {
+                            "index": "default",
+                            "text": {
+                                "query": query,
+                                "path": {
+                                    "wildcard": "*"
+                                },
+                                "fuzzy": {
+                                    "maxEdits": 2
+                                }
                             }
                         }
-                    }
-                },
-                # Limit results
-                {"$limit": limit // 2}
-            ]
+                    },
+                    # Limit results
+                    {"$limit": limit if collection_filter == "grocery" else limit // 2}
+                ]
 
-            grocery_results = list(grocery_collection.aggregate(grocery_pipeline))
-            logger.info(f"Found {len(grocery_results)} grocery results with Atlas Search")
-        except Exception as e:
-            logger.error(f"Atlas Search error on grocery: {e}, falling back to regex")
-            # Fallback to regex search if Atlas Search fails
-            grocery_results = list(grocery_collection.find(
-                {"$or": [
-                    {"product": {"$regex": query, "$options": "i"}},
-                    {"brand": {"$regex": query, "$options": "i"}},
-                    {"category": {"$regex": query, "$options": "i"}}
-                ]}
-            ).limit(limit // 2))
-            logger.info(f"Found {len(grocery_results)} grocery results with regex search")
+                grocery_results = list(grocery_collection.aggregate(grocery_pipeline))
+                logger.info(f"Found {len(grocery_results)} grocery results with Atlas Search")
+            except Exception as e:
+                logger.error(f"Atlas Search error on grocery: {e}, falling back to regex")
+                # Fallback to regex search if Atlas Search fails
+                grocery_results = list(grocery_collection.find(
+                    {"$or": [
+                        {"product": {"$regex": query, "$options": "i"}},
+                        {"brand": {"$regex": query, "$options": "i"}},
+                        {"category": {"$regex": query, "$options": "i"}},
+                        {"sub_category": {"$regex": query, "$options": "i"}},
+                        {"type": {"$regex": query, "$options": "i"}},
+                        {"description": {"$regex": query, "$options": "i"}}
+                    ]}
+                ).limit(limit if collection_filter == "grocery" else limit // 2))
+                logger.info(f"Found {len(grocery_results)} grocery results with regex search")
 
-        # Add collection info to grocery results
-        for result in grocery_results:
-            if "_id" in result:
-                result["_id"] = str(result["_id"])
-                result["_collection"] = "grocery"
+            # Add collection info to grocery results
+            for result in grocery_results:
+                if "_id" in result:
+                    result["_id"] = str(result["_id"])
+                    result["_collection"] = "grocery"
 
         # Combine results
         all_results = product_results + grocery_results
@@ -231,7 +275,9 @@ def search():
         return jsonify({
             "results": all_results,
             "items": all_results,  # For compatibility with frontend
-            "count": len(all_results)
+            "count": len(all_results),
+            "query": query,
+            "collection": collection_filter
         })
     except Exception as e:
         logger.error(f"Error searching: {e}")
@@ -244,35 +290,66 @@ def search():
 @app.route("/api/product/<product_id>")
 @app.route("/dataset/products/<product_id>/")
 @app.route("/dataset/products/<product_id>")
+@app.route("/grocery/<product_id>/")
+@app.route("/grocery/<product_id>")
+@app.route("/api/grocery/<product_id>/")
+@app.route("/api/grocery/<product_id>")
+@app.route("/dataset/grocery/<product_id>/")
+@app.route("/dataset/grocery/<product_id>")
 def get_product(product_id):
     try:
         logger.info(f"Getting product with ID: {product_id}")
-
-        # Try to find in products collection first
+        collection_hint = request.args.get("collection", "").lower()
         product = None
 
-        # Try with ObjectId
-        try:
-            product = products_collection.find_one({"_id": ObjectId(product_id)})
-        except:
-            # If not a valid ObjectId, try as string
-            product = products_collection.find_one({"_id": product_id})
-
-        # If not found, try in grocery collection
-        if not product:
+        # Try to find in the specified collection first if hint is provided
+        if collection_hint == "grocery":
+            # Try grocery collection first
             try:
                 product = grocery_collection.find_one({"_id": ObjectId(product_id)})
             except:
                 product = grocery_collection.find_one({"_id": product_id})
+
+            # If not found, try products collection as fallback
+            if not product:
+                try:
+                    product = products_collection.find_one({"_id": ObjectId(product_id)})
+                except:
+                    product = products_collection.find_one({"_id": product_id})
+        else:
+            # Default behavior: try products collection first
+            try:
+                product = products_collection.find_one({"_id": ObjectId(product_id)})
+            except:
+                # If not a valid ObjectId, try as string
+                product = products_collection.find_one({"_id": product_id})
+
+            # If not found, try in grocery collection
+            if not product:
+                try:
+                    product = grocery_collection.find_one({"_id": ObjectId(product_id)})
+                except:
+                    product = grocery_collection.find_one({"_id": product_id})
 
         if product:
             # Convert ObjectId to string
             if "_id" in product and isinstance(product["_id"], ObjectId):
                 product["_id"] = str(product["_id"])
 
-            # Add collection info
-            collection = "products" if product in products_collection.find() else "grocery"
-            product["_collection"] = collection
+            # Determine which collection the product belongs to
+            if collection_hint:
+                # Use the hint if provided
+                product["_collection"] = collection_hint
+            else:
+                # Try to determine collection based on fields
+                if "product" in product:
+                    product["_collection"] = "grocery"
+                else:
+                    product["_collection"] = "products"
+
+            # Add name field for consistency if it doesn't exist
+            if "name" not in product and "product" in product:
+                product["name"] = product["product"]
 
             return jsonify(product)
         else:

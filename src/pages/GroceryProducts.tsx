@@ -12,7 +12,7 @@ import {
   Apple, Tag, Bookmark, ExternalLink,
   Database, Server
 } from 'lucide-react';
-import { fetchGroceryProducts, Product } from '@/services/productService';
+import { fetchGroceryProducts, Product, API_BASE_URL } from '@/services/productService';
 import { trackUserInteraction } from '@/services/mlService';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { getAuth } from "firebase/auth";
@@ -39,15 +39,19 @@ const GroceryProductsPage: React.FC = () => {
   const productsPerPage = 20;
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Categories for filtering
+  // Categories for filtering - based on actual categories in the MongoDB database
   const categories = [
     { id: 'all', name: 'All Products' },
-    { id: 'snacks', name: 'Snacks' },
-    { id: 'beverages', name: 'Beverages' },
-    { id: 'dairy', name: 'Dairy' },
-    { id: 'grains', name: 'Grains & Cereals' },
-    { id: 'protein', name: 'Protein Foods' },
-    { id: 'fruits', name: 'Fruits & Vegetables' },
+    { id: 'Bakery, Cakes & Dairy', name: 'Bakery & Dairy' },
+    { id: 'Beverages', name: 'Beverages' },
+    { id: 'Snacks & Branded Foods', name: 'Snacks' },
+    { id: 'Foodgrains, Oil & Masala', name: 'Foodgrains & Oil' },
+    { id: 'Fruits & Vegetables', name: 'Fruits & Vegetables' },
+    { id: 'Beauty & Hygiene', name: 'Beauty & Hygiene' },
+    { id: 'Cleaning & Household', name: 'Household' },
+    { id: 'Kitchen, Garden & Pets', name: 'Kitchen & Pets' },
+    { id: 'Gourmet & World Food', name: 'Gourmet Food' },
+    { id: 'Baby Care', name: 'Baby Care' },
   ];
 
   // Fetch user favorites from Firebase
@@ -72,31 +76,71 @@ const GroceryProductsPage: React.FC = () => {
   }, [auth, db, isGuest]);
 
   // Function to fetch grocery products
-  const fetchGroceryProductsData = async (page: number = 1, search: string = '') => {
+  const fetchGroceryProductsData = async (page: number = 1, search: string = '', category: string = 'all') => {
     setIsLoading(true);
     try {
       // Track this interaction
-      trackUserInteraction('grocery_page_view', { isGuest, page, search });
+      trackUserInteraction('grocery_page_view', { isGuest, page, search, category });
 
-      const result = await fetchGroceryProducts(page, productsPerPage, search);
-      
-      setGroceryProducts(result.products);
+      // Fetch products with category filter if not 'all'
+      const categoryFilter = category !== 'all' ? category : '';
+      const result = await fetchGroceryProducts(page, productsPerPage, search, categoryFilter);
+
+      // Process the results
+      const processedProducts = result.products.map(product => {
+        // Ensure name field exists (use product field if name doesn't exist)
+        if (!product.name && product.product) {
+          product.name = product.product;
+        }
+
+        // Ensure collection field is set
+        if (!product._collection) {
+          product._collection = 'grocery';
+        }
+
+        return product;
+      });
+
+      setGroceryProducts(processedProducts);
       setCurrentPage(result.page);
       setTotalPages(result.totalPages);
       setTotalProducts(result.total);
-      
-      if (result.products.length === 0 && search) {
-        toast({
-          title: 'No products found',
-          description: `No grocery products match "${search}". Try a different search term.`,
-          variant: 'destructive',
-        });
+
+      if (processedProducts.length === 0) {
+        if (search) {
+          toast({
+            title: 'No products found',
+            description: `No grocery products match "${search}". Try a different search term.`,
+            variant: 'destructive',
+          });
+        } else if (category !== 'all') {
+          toast({
+            title: 'No products in category',
+            description: `No grocery products found in the "${category}" category.`,
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: 'API Connection Issue',
+            description: 'Could not retrieve grocery products from the database. The API may be experiencing issues.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        // Success message for search
+        if (search) {
+          toast({
+            title: 'Search Results',
+            description: `Found ${processedProducts.length} grocery products matching "${search}".`,
+            variant: 'default',
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching grocery products:', error);
       toast({
-        title: 'Error',
-        description: 'Could not load grocery products. Please try again later.',
+        title: 'Backend API Error',
+        description: 'Could not connect to the grocery products database. The backend API may be down or experiencing issues.',
         variant: 'destructive',
       });
     } finally {
@@ -111,30 +155,13 @@ const GroceryProductsPage: React.FC = () => {
 
   // Handle search
   const handleSearch = () => {
-    fetchGroceryProductsData(1, searchQuery);
+    fetchGroceryProductsData(1, searchQuery, selectedCategory);
   };
 
   // Handle category change
   useEffect(() => {
-    if (selectedCategory === 'all') {
-      // If 'all' is selected, just use the products from the API
-      fetchGroceryProductsData(currentPage, searchQuery);
-    } else {
-      // Otherwise, filter the products by category
-      const filtered = groceryProducts.filter(product =>
-        product.category?.toLowerCase().includes(selectedCategory.toLowerCase())
-      );
-      
-      if (filtered.length === 0) {
-        toast({
-          title: 'No products found',
-          description: `No grocery products found in the "${selectedCategory}" category.`,
-          variant: 'default',
-        });
-      }
-      
-      setGroceryProducts(filtered);
-    }
+    // Always fetch from API when category changes to get fresh data
+    fetchGroceryProductsData(1, searchQuery, selectedCategory);
   }, [selectedCategory]);
 
   // Handle toggle favorite
@@ -221,8 +248,8 @@ const GroceryProductsPage: React.FC = () => {
                   <Button
                     key={category.id}
                     variant={selectedCategory === category.id ? "default" : "outline"}
-                    className={selectedCategory === category.id 
-                      ? "bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80" 
+                    className={selectedCategory === category.id
+                      ? "bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
                       : "text-safebite-text-secondary border-safebite-card-bg-alt hover:bg-safebite-card-bg-alt/50"}
                     onClick={() => setSelectedCategory(category.id)}
                   >
@@ -259,93 +286,115 @@ const GroceryProductsPage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-                {groceryProducts.map((product) => (
-                  <Card key={product._id} className="sci-fi-card hover:border-safebite-teal/50 transition-all duration-300 flex flex-col h-full">
-                    {/* Product Image */}
-                    <div className="relative h-40 overflow-hidden rounded-t-lg">
-                      <img
-                        src={product.imageUrl || `https://source.unsplash.com/random/400x300/?${encodeURIComponent((product.name || product.product || 'food').replace('Unknown Product', 'food'))},food`}
-                        alt={product.name || product.product || 'Grocery Product'}
-                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                        onError={(e) => {
-                          // Fallback image if the main one fails to load
-                          const productName = product.name || product.product || 'Grocery Product';
-                          (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x300?text=${encodeURIComponent(productName)}`;
-                        }}
-                      />
-                      {/* Health score overlay */}
-                      <div className="absolute top-2 right-2">
-                        <div className="flex items-center bg-safebite-teal/80 text-safebite-dark-blue px-2 py-1 rounded-full backdrop-blur-sm text-xs font-medium">
-                          <Star className="h-3 w-3 mr-1 fill-safebite-dark-blue" />
-                          <span>{product.healthScore?.toFixed(1) || product.rating?.toFixed(1) || '4.0'}</span>
+                {groceryProducts.map((product) => {
+                  // Get product name (handle different field names)
+                  const productName = product.name || product.product || 'Unknown Product';
+                  const productBrand = product.brand || product.Brand || 'Generic Brand';
+                  const productCategory = product.category || product.sub_category || product.Category || 'Grocery';
+                  const productType = product.type || product.Type || '';
+                  const productRating = product.rating || product.healthScore || 4.0;
+                  const productPrice = product.price || product.sale_price || null;
+                  const productMarketPrice = product.market_price || null;
+
+                  // Generate image URL
+                  const imageQuery = encodeURIComponent(productName.replace('Unknown Product', 'food'));
+                  const imageUrl = product.imageUrl || `https://source.unsplash.com/random/400x300/?${imageQuery},food`;
+
+                  return (
+                    <Card key={product._id} className="sci-fi-card hover:border-safebite-teal/50 transition-all duration-300 flex flex-col h-full shadow-lg hover:shadow-xl">
+                      {/* Product Image */}
+                      <div className="relative h-48 overflow-hidden rounded-t-lg bg-safebite-card-bg-alt">
+                        <img
+                          src={imageUrl}
+                          alt={productName}
+                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                          onError={(e) => {
+                            // Fallback image if the main one fails to load
+                            (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x300?text=${encodeURIComponent(productName)}`;
+                          }}
+                        />
+                        {/* Health score overlay */}
+                        <div className="absolute top-2 right-2">
+                          <div className="flex items-center bg-safebite-teal/80 text-safebite-dark-blue px-2 py-1 rounded-full backdrop-blur-sm text-xs font-medium">
+                            <Star className="h-3 w-3 mr-1 fill-safebite-dark-blue" />
+                            <span>{typeof productRating === 'number' ? productRating.toFixed(1) : '4.0'}</span>
+                          </div>
+                        </div>
+                        {/* Favorite button */}
+                        <Button
+                          onClick={() => handleToggleFavorite(product._id)}
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm hover:bg-black/50 text-white rounded-full h-8 w-8 p-1"
+                        >
+                          <Heart className={`h-4 w-4 ${favorites.includes(product._id) ? 'fill-safebite-teal text-safebite-teal' : ''}`} />
+                        </Button>
+                        {/* Category badge */}
+                        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                          {productCategory}
                         </div>
                       </div>
-                      {/* Favorite button */}
-                      <Button
-                        onClick={() => handleToggleFavorite(product._id)}
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm hover:bg-black/50 text-white rounded-full h-8 w-8 p-1"
-                      >
-                        <Heart className={`h-4 w-4 ${favorites.includes(product._id) ? 'fill-safebite-teal text-safebite-teal' : ''}`} />
-                      </Button>
-                      {/* Category badge */}
-                      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
-                        {product.category || product.sub_category || 'Grocery'}
-                      </div>
-                    </div>
-                    
-                    <CardContent className="flex-grow p-4">
-                      <h3 className="font-medium text-safebite-text mb-1 line-clamp-2">{product.name || product.product || 'Unknown Product'}</h3>
-                      <p className="text-safebite-text-secondary text-sm mb-2">{product.brand || 'Generic Brand'}</p>
-                      
-                      {/* Price if available */}
-                      {(product.price || product.sale_price) && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-safebite-teal font-medium">₹{product.price || product.sale_price}</span>
-                          {product.market_price && product.market_price > (product.sale_price || 0) && (
-                            <span className="text-safebite-text-secondary line-through text-xs">₹{product.market_price}</span>
+
+                      <CardContent className="flex-grow p-4">
+                        <h3 className="font-medium text-safebite-text mb-1 line-clamp-2">{productName}</h3>
+                        <p className="text-safebite-text-secondary text-sm mb-2">{productBrand}</p>
+
+                        {/* Price if available */}
+                        {productPrice && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-safebite-teal font-medium">₹{productPrice}</span>
+                            {productMarketPrice && productMarketPrice > productPrice && (
+                              <span className="text-safebite-text-secondary line-through text-xs">₹{productMarketPrice}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Description if available */}
+                        {product.description && (
+                          <p className="text-safebite-text-secondary text-xs mt-2 line-clamp-2">{product.description}</p>
+                        )}
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {product.tags?.slice(0, 2).map((tag, index) => (
+                            <Badge key={index} variant="outline" className="text-xs bg-safebite-card-bg-alt">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {productType && (
+                            <Badge variant="outline" className="text-xs bg-safebite-card-bg-alt">
+                              {productType}
+                            </Badge>
                           )}
                         </div>
-                      )}
-                      
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {product.tags?.slice(0, 2).map((tag, index) => (
-                          <Badge key={index} variant="outline" className="text-xs bg-safebite-card-bg-alt">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {product.type && (
-                          <Badge variant="outline" className="text-xs bg-safebite-card-bg-alt">
-                            {product.type}
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                    
-                    <CardFooter className="p-4 pt-0">
-                      <Button
-                        className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
-                        onClick={() => {
-                          // Track this interaction
-                          trackUserInteraction('view_grocery_details', { 
-                            productId: product._id, 
-                            productName: product.name || product.product 
-                          });
-                          
-                          // Show product details in a modal or navigate to details page
-                          toast({
-                            title: 'Product Details',
-                            description: `Viewing details for ${product.name || product.product}`,
-                          });
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+                      </CardContent>
+
+                      <CardFooter className="p-4 pt-0">
+                        <Button
+                          className="w-full bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 flex items-center justify-center gap-1"
+                          onClick={() => {
+                            // Track this interaction
+                            trackUserInteraction('view_grocery_details', {
+                              productId: product._id,
+                              productName: productName,
+                              productCategory: productCategory
+                            });
+
+                            // Show product details in a modal or navigate to details page
+                            toast({
+                              title: 'Product Details',
+                              description: `Viewing details for ${productName}`,
+                              variant: 'default',
+                            });
+                          }}
+                        >
+                          <Info className="h-4 w-4" />
+                          View Details
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
               </div>
 
               {/* Pagination */}
@@ -370,6 +419,9 @@ const GroceryProductsPage: React.FC = () => {
                 <p className="text-safebite-text-secondary mb-4">
                   No grocery products match your search criteria. Try adjusting your filters or search terms.
                 </p>
+                <p className="text-safebite-text-secondary text-xs mb-4">
+                  Note: The backend API may be experiencing issues. Please try again later or contact support if the problem persists.
+                </p>
                 <Button
                   onClick={() => {
                     setSearchQuery('');
@@ -384,6 +436,13 @@ const GroceryProductsPage: React.FC = () => {
                   <Database className="h-3 w-3 text-safebite-teal" />
                   <span className="text-safebite-text-secondary">MongoDB Atlas Collection: Grocery Products</span>
                 </div>
+                <div className="mt-2 flex items-center justify-center gap-2 bg-black/20 px-3 py-1.5 rounded-full text-xs">
+                  <Server className="h-3 w-3 text-safebite-teal" />
+                  <span className="text-safebite-text-secondary">API Status: {isLoading ? 'Checking...' : 'Connection Failed'}</span>
+                </div>
+                <p className="mt-4 text-xs text-safebite-text-secondary">
+                  Backend URL: {API_BASE_URL}
+                </p>
               </CardContent>
             </Card>
           )}
