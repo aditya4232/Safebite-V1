@@ -77,112 +77,115 @@ const LandingPage = () => {
 
       {/* Features Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
-        <div className="text-center mb-16">
-          <div className="inline-block bg-safebite-teal/10 text-safebite-teal px-4 py-2 rounded-full text-sm font-medium mb-4 border border-safebite-teal/20">
-            Powered by AI & Machine Learning
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 gradient-text animate-gradient-text">
-            Intelligent Food Safety
-          </h2>
-          <p className="text-safebite-text-secondary text-lg max-w-3xl mx-auto">
-            Our platform combines cutting-edge technology with nutritional science to help you make the best food choices.
-          </p>
-          <div className="flex items-center justify-center mt-4">
-            <ProfileImage size="sm" className="mr-2" />
-            <p className="text-safebite-teal text-sm">
-              A Special Engineering Project by <span className="font-medium">Aditya Shenvi</span> at IFHE Hyderabad
+        <div className="sci-fi-card">
+          <div className="text-center mb-16">
+            <div className="inline-block bg-safebite-teal/10 text-safebite-teal px-4 py-2 rounded-full text-sm font-medium mb-4 border border-safebite-teal/20">
+              Powered by AI & Machine Learning
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 gradient-text animate-gradient-text">
+              Intelligent Food Safety
+            </h2>
+            <p className="text-safebite-text-secondary text-lg max-w-3xl mx-auto">
+              Our platform combines cutting-edge technology with nutritional science to help you make the best food choices.
             </p>
+            <div className="flex items-center justify-center mt-4">
+              <ProfileImage size="sm" className="mr-2" />
+              <p className="text-safebite-teal text-sm">
+                A Special Engineering Project by <span className="font-medium">Aditya Shenvi</span> at IFHE Hyderabad
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="mb-12">
-          <div className="p-6 border border-safebite-teal/30 rounded-lg bg-safebite-card-bg mb-8 sci-fi-card shadow-neon-teal">
-            <h3 className="text-xl font-semibold text-safebite-text mb-4 flex items-center">
-              <Star className="mr-2 h-5 w-5 text-safebite-teal" />
-              Featured Capabilities
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mb-12">
+            <div className="p-6 border border-safebite-teal/30 rounded-lg bg-safebite-card-bg mb-8 sci-fi-card shadow-neon-teal">
+              <h3 className="text-xl font-semibold text-safebite-text mb-4 flex items-center">
+                <Star className="mr-2 h-5 w-5 text-safebite-teal" />
+                Featured Capabilities
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FeatureCard
+                  title="Food Safety Analysis"
+                  description="Instantly analyze food products for additives, allergens, and harmful ingredients to make safe choices."
+                  icon={<Shield size={24} />}
+                  className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+                />
+                <FeatureCard
+                  title="AI-Powered Recommendations"
+                  description="Receive personalized food suggestions based on your health profile, preferences, and goals."
+                  icon={<Brain size={24} />}
+                  className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+                />
+                <FeatureCard
+                  title="Nutritional Tracking"
+                  description="Monitor your daily intake of calories, macros, vitamins, and minerals with detailed insights."
+                  icon={<Heart size={24} />}
+                  className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Added hover:shadow-neon-teal */}
               <FeatureCard
-                title="Food Safety Analysis"
-                description="Instantly analyze food products for additives, allergens, and harmful ingredients to make safe choices."
-                icon={<Shield size={24} />}
+                title="Simple Food Search"
+                description="Search or scan barcodes to instantly access comprehensive food information and safety ratings."
+                icon={<Search size={24} />}
                 className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
               />
+              {/* Added hover:shadow-neon-teal */}
               <FeatureCard
-                title="AI-Powered Recommendations"
-                description="Receive personalized food suggestions based on your health profile, preferences, and goals."
-                icon={<Brain size={24} />}
+                title="Health Goal Setting"
+                description="Set personalized health goals and track your progress with interactive charts and reports."
+                icon={<BarChart size={24} />}
                 className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
               />
+              {/* Added hover:shadow-neon-teal */}
               <FeatureCard
-                title="Nutritional Tracking"
-                description="Monitor your daily intake of calories, macros, vitamins, and minerals with detailed insights."
-                icon={<Heart size={24} />}
+                title="Community Support"
+                description="Connect with like-minded individuals, share experiences, and get motivation from our community."
+                icon={<Users size={24} />}
+                className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+              />
+              {/* Added hover:shadow-neon-teal */}
+              <FeatureCard
+                title="Weekly Health Check-ins"
+                description="Answer simple questions about your week to track progress and receive updated recommendations."
+                icon={<Clock size={24} />}
+                className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+              />
+              {/* Added hover:shadow-neon-teal */}
+              <FeatureCard
+                title="Personalized Dashboard"
+                description="View your nutrition stats, track progress, and get insights tailored to your health goals."
+                icon={<Zap size={24} />}
+                className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
+              />
+              {/* Added hover:shadow-neon-teal */}
+              <FeatureCard
+                title="Food Tracker"
+                description="Add foods to your daily tracker to monitor your nutrition intake and stay on target with your goals."
+                icon={<Zap size={24} />}
                 className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Simple Food Search"
-              description="Search or scan barcodes to instantly access comprehensive food information and safety ratings."
-              icon={<Search size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Health Goal Setting"
-              description="Set personalized health goals and track your progress with interactive charts and reports."
-              icon={<BarChart size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Community Support"
-              description="Connect with like-minded individuals, share experiences, and get motivation from our community."
-              icon={<Users size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Weekly Health Check-ins"
-              description="Answer simple questions about your week to track progress and receive updated recommendations."
-              icon={<Clock size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Personalized Dashboard"
-              description="View your nutrition stats, track progress, and get insights tailored to your health goals."
-              icon={<Zap size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
-            {/* Added hover:shadow-neon-teal */}
-            <FeatureCard
-              title="Food Tracker"
-              description="Add foods to your daily tracker to monitor your nutrition intake and stay on target with your goals."
-              icon={<Zap size={24} />}
-              className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
-            />
+          <div className="mt-12 text-center">
+            <Button
+              onClick={() => navigate('/features')}
+              variant="outline"
+              className="sci-fi-button hover:shadow-neon-teal transition-all duration-300"
+            >
+              View All Features
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
           </div>
-        </div>
-
-        <div className="mt-12 text-center">
-          <Button
-            onClick={() => navigate('/features')}
-            variant="outline"
-            className="sci-fi-button hover:shadow-neon-teal transition-all duration-300"
-          >
-            View All Features
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-safebite-card-bg relative">
+      <section className="py-20 bg-safebite-card-bg relative sci-fi-card">
+        {/* Subtle grid pattern */}
         <div className="absolute inset-0 opacity-10">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -243,7 +246,7 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 sci-fi-card">
         <div className="text-center mb-16">
           <div className="inline-block bg-safebite-teal/10 text-safebite-teal px-4 py-2 rounded-full text-sm font-medium mb-4 border border-safebite-teal/20">
             User Experiences
@@ -279,7 +282,7 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-safebite-card-bg border-y border-safebite-teal/20 relative">
+      <section className="py-20 bg-safebite-card-bg border-y border-safebite-teal/20 relative sci-fi-card">
         <div className="absolute inset-0 opacity-5">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <pattern id="circuit-pattern" width="100" height="100" patternUnits="userSpaceOnUse">

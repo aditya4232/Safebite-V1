@@ -48,9 +48,9 @@ const FoodChatBot: React.FC<FoodChatBotProps> = ({
     const isAuthPage = path.includes('/auth/');
     const isLoggedIn = auth.currentUser !== null;
 
-    // Only show chatbot for logged-in users (not guests) and not on landing/auth pages
-    // Also wait for the profile to load
-    const shouldBeDisplayed = isLoggedIn && !isGuest && !isLandingPage && !isAuthPage && userData !== null;
+    // Show chatbot for both logged-in users and guest users, but not on landing/auth pages
+    // Also wait for the profile to load for logged-in users
+    const shouldBeDisplayed = (isLoggedIn || isGuest) && !isLandingPage && !isAuthPage && (isGuest || userData !== null);
     console.log('FoodChatBot - shouldDisplay:', shouldBeDisplayed, { isLoggedIn, isGuest, isLandingPage, isAuthPage, userData });
     setShouldDisplay(shouldBeDisplayed);
   }, [auth.currentUser, isGuest, userData]);
@@ -105,6 +105,7 @@ const FoodChatBot: React.FC<FoodChatBotProps> = ({
   const generateContextAwareMessage = async (page: string, user: any) => {
     let contextMessage = '';
     let isGuest = !user;
+    const guestName = isGuest ? localStorage.getItem('guestUserName') || 'Guest' : null;
 
     // Don't send another message if we already have more than the initial message
     if (messages.length > 1) return;
@@ -112,7 +113,7 @@ const FoodChatBot: React.FC<FoodChatBotProps> = ({
     switch(page) {
       case 'dashboard':
         if (isGuest) {
-          contextMessage = `Welcome to the SafeBite dashboard! As a guest user, you can explore basic features. Would you like me to explain what's available to you, or would you like to sign up for full access?`;
+          contextMessage = `Welcome to the SafeBite dashboard, ${guestName}! As a guest user, you can explore basic features. Would you like me to explain what's available to you, or would you like to sign up for full access?`;
         } else {
           contextMessage = `Welcome to your personalized dashboard, ${user.displayName || 'there'}! I can help you understand your health metrics or suggest ways to improve your nutrition based on your data. What would you like to know about today?`;
         }

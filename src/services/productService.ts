@@ -1,7 +1,7 @@
 // Product service for fetching products from the API
 
 // API base URL - Always use the Render backend for reliable results
-export const API_BASE_URL = 'https://safebite-backend.onrender.com';
+export const API_BASE_URL = 'http://10.20.65.157:10000';
 
 // Product interface
 export interface Product {

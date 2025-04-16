@@ -77,6 +77,8 @@ const HealthBox = () => {
   // User data for personalized chat suggestions
   const [userData, setUserData] = useState<any>(null);
   const [userActivity, setUserActivity] = useState<any[]>([]);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
   // Load user's favorite tools on component mount
   useEffect(() => {

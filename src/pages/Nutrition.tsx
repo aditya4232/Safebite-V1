@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +23,7 @@ import FoodChatBot from '@/components/FoodChatBot';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { app } from '../firebase';
+import { checkApiStatus } from '@/services/mongoDbService'; // Import checkApiStatus
 import {
   Search, Upload, Camera, Utensils, Pizza,
   Clock, Users, ChefHat, ExternalLink, AlertCircle, X,
@@ -54,7 +56,11 @@ interface Recipe {
   instructions: string;
 }
 
-const Nutrition = () => {
+interface NutritionProps {
+  userProfile: any;
+}
+
+const Nutrition: React.FC<NutritionProps> = ({ userProfile }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isGuest } = useGuestMode();
@@ -66,14 +72,31 @@ const Nutrition = () => {
   const [recipeResults, setRecipeResults] = useState<Recipe[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [apiStatus, setApiStatus] = useState<any>(null); // State for API status
   const [showNoResults, setShowNoResults] = useState(false);
   const [showScannerUpload, setShowScannerUpload] = useState(false);
   const [showRecipeDetails, setShowRecipeDetails] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     // Load search history from localStorage if not in guest mode
     if (!isGuest) {
-      const savedHistory = localStorage.getItem('foodSearchHistory');
-      return savedHistory ? JSON.parse(savedHistory) : [];
+      try {
+        const savedHistory = localStorage.getItem('foodSearchHistory');
+        if (savedHistory) {
+          const parsed = JSON.parse(savedHistory);
+          // Check if it's an array of objects or strings
+          if (Array.isArray(parsed)) {
+            if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].query) {
+              // It's an array of objects with query property
+              return parsed.map(item => item.query);
+            } else {
+              // It's already an array of strings
+              return parsed;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing search history:', error);
+      }
     }
     return [];
   });
@@ -114,6 +137,21 @@ const Nutrition = () => {
     loadUserData();
   }, [isGuest, auth.currentUser, db]);
 
+  // Check API status on component mount
+  useEffect(() => {
+    const fetchApiStatus = async () => {
+      try {
+        const status = await checkApiStatus();
+        setApiStatus(status);
+      } catch (error) {
+        console.error("Error checking API status:", error);
+        setApiStatus({ error: "Failed to check API status." });
+      }
+    };
+
+    fetchApiStatus();
+  }, []);
+
   // Handle food search
   const handleFoodSearch = async () => {
     if (!searchQuery.trim()) {
@@ -144,13 +182,13 @@ const Nutrition = () => {
           let nutritionScore: 'green' | 'yellow' | 'red' = 'yellow';
 
           // Get nutritional info (adapt to your MongoDB schema)
-          const nutritionalInfo = item.nutritionalInfo || {};
+          const nutritionalInfo = item.nutritionalInfo as { protein?: number; fiber?: number; sugar?: number; fat?: number; sodium?: number; calories?: number } || {};
 
           // Determine score based on protein, fiber, sugar content
-          const protein = nutritionalInfo.protein || 0;
-          const fiber = nutritionalInfo.fiber || 0;
-          const sugar = nutritionalInfo.sugar || 0;
-          const fat = nutritionalInfo.fat || 0;
+          const protein = nutritionalInfo?.protein || 0;
+          const fiber = nutritionalInfo?.fiber || 0;
+          const sugar = nutritionalInfo?.sugar || 0;
+          const fat = nutritionalInfo?.fat || 0;
 
           if (protein > 15 && fiber > 3 && sugar < 10) {
             nutritionScore = 'green';
@@ -158,8 +196,8 @@ const Nutrition = () => {
             nutritionScore = 'red';
           }
 
-          // Generate a placeholder image if none exists
-          const imageUrl = item.imageUrl || `https://source.unsplash.com/featured/?${encodeURIComponent(item.name)},food`;
+          // Generate a placeholder image based on the food name
+          const imageUrl = item.imageUrl || `https://source.unsplash.com/featured/?encodeURIComponent(item.name)},food`;
 
           return {
             id: item._id || `mongo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -182,7 +220,7 @@ const Nutrition = () => {
               fat: nutritionalInfo.fat || 0,
               sodium: nutritionalInfo.sodium || 0,
               sugar: nutritionalInfo.sugar || 0,
-              calories: nutritionalInfo.calories || 0,
+              calories: item.calories || 0,
               ingredients: item.ingredients || [],
               allergens: item.allergens || [],
               additives: item.additives || [],
@@ -206,7 +244,11 @@ const Nutrition = () => {
 
           // Save to localStorage if not in guest mode
           if (!isGuest) {
-            localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
+            try {
+              localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
+            } catch (error) {
+              console.error('Error saving search history:', error);
+            }
           }
         }
 
@@ -230,10 +272,10 @@ const Nutrition = () => {
           const nutrients = item.nutrients || {};
 
           // Determine score based on protein, fiber, sugar content
-          const protein = nutrients.protein || 0;
-          const fiber = nutrients.fiber || 0;
-          const sugar = nutrients.sugar || 0;
-          const fat = nutrients.fat || 0;
+          const protein = nutrients?.protein || 0;
+          const fiber = nutrients?.fiber || 0;
+          const sugar = nutrients?.sugar || 0;
+          const fat = nutrients?.fat || 0;
 
           if (protein > 15 && fiber > 3 && sugar < 10) {
             nutritionScore = 'green';
@@ -242,7 +284,7 @@ const Nutrition = () => {
           }
 
           // Generate a placeholder image based on the food name
-          const imageUrl = `https://source.unsplash.com/featured/?${encodeURIComponent(item.name)},food`;
+          const imageUrl = `https://source.unsplash.com/featured/?encodeURIComponent(item.name)},food`;
 
           return {
             id: item.id || `food-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -284,7 +326,11 @@ const Nutrition = () => {
 
           // Save to localStorage if not in guest mode
           if (!isGuest) {
-            localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
+            try {
+              localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
+            } catch (error) {
+              console.error('Error saving search history:', error);
+            }
           }
         }
 
@@ -350,7 +396,7 @@ const Nutrition = () => {
           title: `Healthy ${searchQuery.charAt(0).toUpperCase() + searchQuery.slice(1)} Bowl`,
           ingredients: "1 cup quinoa|2 cups vegetable broth|1 cup chickpeas, drained and rinsed|1 avocado, sliced|1 cup cherry tomatoes, halved|1/4 cup red onion, diced|2 tbsp lemon juice|2 tbsp olive oil|Salt and pepper to taste",
           servings: "2 Servings",
-          instructions: "1. Rinse quinoa under cold water. 2. In a medium saucepan, bring vegetable broth to a boil. 3. Add quinoa, reduce heat, cover and simmer for 15 minutes. 4. Fluff with a fork and let cool slightly. 5. In a large bowl, combine quinoa, chickpeas, avocado, tomatoes, and red onion. 6. Whisk together lemon juice, olive oil, salt, and pepper. 7. Pour dressing over quinoa mixture and toss to combine."
+          instructions: "1. Rinse quinoa under cold water. 2. In a medium saucepan, bring vegetable broth to a boil. 3. Add quinoa, chickpeas, avocado, tomatoes, and red onion. 4. Fluff with a fork and let cool slightly. 5. In a large bowl, combine quinoa, chickpeas, avocado, tomatoes, and red onion. 6. Whisk together lemon juice, olive oil, salt, and pepper. 7. Pour dressing over quinoa mixture and toss to combine."
         },
         {
           title: `${searchQuery.charAt(0).toUpperCase() + searchQuery.slice(1)} Stir Fry`,
@@ -401,7 +447,7 @@ const Nutrition = () => {
     }
   };
 
-  // Handle search based on active tab
+  // Handle search based on activeTab
   const handleSearch = () => {
     if (activeTab === 'food') {
       handleFoodSearch();
@@ -630,7 +676,7 @@ const Nutrition = () => {
 
     if (recipeResults.length > 0) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           {recipeResults.map((recipe, index) => {
             // Extract first 3 ingredients for preview
             const ingredientsList = recipe.ingredients.split('|');
@@ -641,13 +687,15 @@ const Nutrition = () => {
             const instructionPreview = recipe.instructions.split('.').slice(0, 2).join('.') + '...';
 
             return (
-              <Card key={index} className="sci-fi-card overflow-hidden border-2 border-safebite-teal/30 hover:border-safebite-teal/70 hover:shadow-lg transition-all duration-300 bg-safebite-card-bg/90">
-                <CardContent className="p-6 relative z-10">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 rounded-full bg-safebite-teal/20 flex items-center justify-center mr-3 flex-shrink-0">
-                      <ChefHat className="h-5 w-5 text-safebite-teal" />
+              <Card key={index} className="sci-fi-card overflow-hidden border-2 border-safebite-teal/30 hover:border-safebite-teal/70 hover:shadow-lg transition-all duration-300 bg-safebite-card-bg/90 h-full flex flex-col">
+                <CardContent className="p-6 relative z-10 flex-grow flex flex-col">
+                  <div className="mb-4">
+                    <div className="flex items-center mb-2">
+                      <div className="w-10 h-10 rounded-full bg-safebite-teal/20 flex items-center justify-center mr-3 flex-shrink-0">
+                        <ChefHat className="h-5 w-5 text-safebite-teal" />
+                      </div>
+                      <h3 className="text-xl font-bold text-safebite-text">{recipe.title}</h3>
                     </div>
-                    <h3 className="text-xl font-bold text-safebite-text truncate">{recipe.title}</h3>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -691,7 +739,7 @@ const Nutrition = () => {
                     </p>
                   </div>
 
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-auto pt-4 flex justify-end">
                     <Button
                       className="sci-fi-button bg-safebite-teal hover:bg-safebite-teal/80 text-safebite-dark-blue font-medium"
                       onClick={() => handleRecipeSelect(recipe)}
@@ -766,7 +814,114 @@ const Nutrition = () => {
 
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
-      <DashboardSidebar />
+      <DashboardSidebar userProfile={userProfile} />
+
+      <main className="flex-1 p-6 ml-[220px]">
+        <div className="container mx-auto max-w-6xl">
+          <h1 className="text-3xl font-bold text-safebite-text mb-6">
+            Nutrition Search
+          </h1>
+
+          {/* Search Bar */}
+          <div className="mb-8 flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-safebite-text-secondary" />
+              </div>
+              <Input
+                type="text"
+                placeholder={activeTab === 'food' ? 'Search for food...' : 'Search for recipes...'}
+                className="pl-10 bg-safebite-card-bg border-safebite-card-bg-alt focus:border-safebite-teal"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleSearch}
+                className="bg-safebite-teal hover:bg-safebite-teal/80 text-safebite-dark-blue font-medium"
+              >
+                Search
+              </Button>
+              <Button
+                variant="outline"
+                className="border-safebite-teal text-safebite-teal hover:bg-safebite-teal/20"
+                onClick={handleOpenScannerUpload}
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Scan
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 mb-8 bg-safebite-card-bg rounded-lg overflow-hidden">
+              <TabsTrigger value="food" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <Utensils className="mr-2 h-4 w-4" />
+                Food Search
+              </TabsTrigger>
+              <TabsTrigger value="recipes" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
+                <ChefHat className="mr-2 h-4 w-4" />
+                Recipes
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Food Search Tab */}
+            <TabsContent value="food" className="mt-0">
+              {selectedFood ? (
+                <div className="grid grid-cols-1 gap-6">
+                  <FoodDetailView food={selectedFood} onClose={() => setSelectedFood(null)} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    {renderFoodResults()}
+                  </div>
+
+                  <div className="lg:col-span-1">
+                    <Card className="sci-fi-card h-full">
+                      <CardHeader>
+                        <CardTitle className="text-safebite-text">Food Details</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center py-12">
+                        <div className="text-safebite-text-secondary">
+                          <Coffee className="h-16 w-16 mx-auto mb-4 text-safebite-text-secondary opacity-50" />
+                          <p>Select a food item to view detailed nutrition information</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Recipes Tab */}
+            <TabsContent value="recipes" className="mt-0">
+              {renderRecipeResults()}
+            </TabsContent>
+          </Tabs>
+
+          {/* API Status Indicator */}
+          {apiStatus && (
+            <div className="mt-8 p-4 rounded-lg bg-safebite-card-bg border border-safebite-card-bg-alt">
+              <div className="flex items-center">
+                {apiStatus.success ? (
+                  <Check className="h-5 w-5 text-green-500 mr-2" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+                )}
+                <span className="text-sm text-safebite-text-secondary">
+                  {apiStatus.success
+                    ? "MongoDB API is connected and working properly"
+                    : "MongoDB API is currently unavailable. Using backup data sources."}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
 
       {/* Scanner/Upload Modal */}
       {showScannerUpload && (
@@ -803,361 +958,48 @@ const Nutrition = () => {
                 </div>
               </div>
             </DialogHeader>
-
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-safebite-teal/30 to-transparent my-4"></div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-              <div className="bg-safebite-card-bg-alt p-5 rounded-lg border border-safebite-teal/20">
-                <h3 className="text-lg font-semibold text-safebite-text mb-4 flex items-center">
+            <div className="p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-safebite-text mb-3 flex items-center">
                   <span className="inline-block w-1 h-5 bg-safebite-teal mr-2"></span>
                   Ingredients
                 </h3>
-                <ul className="space-y-3 text-safebite-text-secondary">
+                <ul className="space-y-2">
                   {selectedRecipe.ingredients.split('|').map((ingredient, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-safebite-teal/20 text-safebite-teal text-xs font-medium mr-3">
-                        {index + 1}
-                      </span>
+                    <li key={index} className="flex items-start text-safebite-text">
+                      <span className="inline-block h-2 w-2 rounded-full bg-safebite-teal mt-1.5 mr-2"></span>
                       {ingredient.trim()}
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-safebite-card-bg-alt p-5 rounded-lg border border-purple-500/20">
-                <h3 className="text-lg font-semibold text-safebite-text mb-4 flex items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-safebite-text mb-3 flex items-center">
                   <span className="inline-block w-1 h-5 bg-purple-500 mr-2"></span>
                   Instructions
                 </h3>
-                <div className="text-safebite-text-secondary">
+                <div className="text-safebite-text space-y-2">
                   {selectedRecipe.instructions.split('.').filter(step => step.trim()).map((step, index) => (
-                    <div key={index} className="mb-4 flex items-start">
-                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-500/20 text-purple-500 text-sm font-medium mr-3">
-                        {index + 1}
-                      </span>
-                      <p>{step.trim()}.</p>
-                    </div>
+                    <p key={index} className="flex items-start">
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-purple-500/20 text-purple-500 text-xs font-medium mr-2 mt-0.5">{index + 1}</span>
+                      {step.trim()}.
+                    </p>
                   ))}
                 </div>
               </div>
             </div>
-
-            <div className="mt-8 flex justify-between items-center">
-              <div className="text-safebite-text-secondary text-sm">
-                <p className="italic">Recipe generated based on your search query.</p>
-              </div>
+            <div className="p-4 flex justify-end border-t border-safebite-card-bg-alt">
               <Button
-                variant="outline"
-                className="sci-fi-button bg-safebite-teal/10 hover:bg-safebite-teal/20"
                 onClick={() => setShowRecipeDetails(false)}
+                className="bg-safebite-teal hover:bg-safebite-teal/80 text-safebite-dark-blue font-medium"
               >
-                <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
             </div>
           </DialogContent>
         )}
       </Dialog>
-
-      <main className="ml-0 md:ml-64 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-safebite-text mb-2">Nutrition Center</h1>
-              <p className="text-safebite-text-secondary">
-                Search for food nutrition information and recipes
-              </p>
-            </div>
-          </div>
-
-          <Tabs
-            defaultValue="food"
-            className="w-full"
-            onValueChange={(value) => {
-              setActiveTab(value);
-              setSearchQuery('');
-              setFoodResults([]);
-              setRecipeResults([]);
-              setSelectedFood(null);
-              setShowNoResults(false);
-            }}
-          >
-            <div className="sci-fi-card mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <TabsList className="grid w-full grid-cols-2 max-w-[70%] border border-safebite-teal/30 p-1 bg-safebite-card-bg-alt/50">
-                  <TabsTrigger value="food" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
-                    <Utensils className="h-4 w-4 mr-2" />
-                    Food Nutrition
-                  </TabsTrigger>
-                  <TabsTrigger value="recipes" className="data-[state=active]:bg-safebite-teal data-[state=active]:text-safebite-dark-blue">
-                    <Pizza className="h-4 w-4 mr-2" />
-                    Recipes
-                  </TabsTrigger>
-                </TabsList>
-                <Button
-                  onClick={() => navigate('/food-delivery')}
-                  className="bg-safebite-purple hover:bg-safebite-purple/80 text-white font-medium shadow-md border border-white/10">
-                  <span className="mr-2 text-lg">🍔</span> Food Delivery
-                </Button>
-              </div>
-
-              <div className="p-4">
-                <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-2.5 h-5 w-5 text-safebite-text-secondary" />
-                      <Input
-                        placeholder={activeTab === 'food' ? "Search for food (e.g., apple, chicken breast)" : "Search for recipes (e.g., pasta, vegetarian curry)"}
-                        className="sci-fi-input pl-10"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && (activeTab === 'food' ? handleFoodSearch() : handleRecipeSearch())}
-                      />
-                    </div>
-
-                    {/* Search History */}
-                    {activeTab === 'food' && searchHistory.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-safebite-text-secondary mb-1">Recent searches:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {searchHistory.map((term, index) => (
-                            <Badge
-                              key={index}
-                              className="cursor-pointer bg-safebite-card-bg-alt hover:bg-safebite-teal/20"
-                              onClick={() => {
-                                setSearchQuery(term);
-                                handleFoodSearch();
-                              }}
-                            >
-                              {term}
-                              <X className="ml-1 h-3 w-3" onClick={(e) => {
-                                e.stopPropagation();
-                                const newHistory = searchHistory.filter((_, i) => i !== index);
-                                setSearchHistory(newHistory);
-                                if (!isGuest) {
-                                  localStorage.setItem('foodSearchHistory', JSON.stringify(newHistory));
-                                }
-                              }} />
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    onClick={activeTab === 'food' ? handleFoodSearch : handleRecipeSearch}
-                    className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 font-medium shadow-md border border-white/10"
-                  >
-                    <Search className="mr-2 h-5 w-5" />
-                    Search
-                  </Button>
-                  {activeTab === 'food' && (
-                    <Button
-                      variant="outline"
-                      className="sci-fi-button border-safebite-teal/30 hover:bg-safebite-teal/10 shadow-md"
-                      onClick={handleOpenScannerUpload}
-                    >
-                      <Camera className="mr-2 h-5 w-5 text-safebite-teal" />
-                      Scan/Upload
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6">
-              <div className="w-full">
-                <TabsContent value="food" className="mt-0">
-                  <div className="sci-fi-card">
-                    <div className="p-4">
-                      <h2 className="text-xl font-semibold text-safebite-text mb-4">
-                        {searchQuery ? `Results for "${searchQuery}"` : "Food Nutrition"}
-                      </h2>
-                      {renderFoodResults()}
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="recipes" className="mt-0">
-                  <div className="sci-fi-card">
-                    <div className="p-4">
-                      <h2 className="text-xl font-semibold text-safebite-text mb-4">
-                        {searchQuery ? `Recipe Results for "${searchQuery}"` : "Recipe Search"}
-                      </h2>
-                      {renderRecipeResults()}
-                    </div>
-                  </div>
-                </TabsContent>
-              </div>
-
-              {selectedFood && (
-                <div className="w-full mt-6">
-                  <div className="sci-fi-card">
-                    <div className="p-4">
-                      <FoodDetailView
-                        food={selectedFood}
-                        onBack={() => setSelectedFood(null)}
-                        onAddToTracker={() => {
-                          toast({
-                            title: "Added to Tracker",
-                            description: `${selectedFood.name} has been added to your food tracker.`,
-                          });
-                        }}
-                        onAddTag={() => {}}
-                        onToggleFavorite={() => {}}
-                        isFavorite={false}
-                        tags={[]}
-                        aiAnalysis=""
-                        isAnalysisLoading={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Tabs>
-
-          {/* Recipe Details Dialog */}
-          <Dialog open={showRecipeDetails} onOpenChange={setShowRecipeDetails}>
-            <DialogContent className="sci-fi-card max-w-4xl">
-              {selectedRecipe && (
-                <>
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl flex items-center">
-                      <ChefHat className="h-6 w-6 text-safebite-teal mr-3" />
-                      {selectedRecipe.title}
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-safebite-text mb-3 flex items-center">
-                        <span className="inline-block w-1 h-5 bg-safebite-teal mr-2 flex-shrink-0"></span>
-                        Ingredients
-                      </h3>
-                      <ul className="space-y-2">
-                        {selectedRecipe.ingredients.split('|').map((ingredient, i) => (
-                          <li key={i} className="flex items-start">
-                            <span className="inline-block h-2 w-2 rounded-full bg-safebite-teal mt-1.5 mr-2 flex-shrink-0"></span>
-                            <span>{ingredient.trim()}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold text-safebite-text mb-3 flex items-center">
-                        <span className="inline-block w-1 h-5 bg-purple-500 mr-2 flex-shrink-0"></span>
-                        Instructions
-                      </h3>
-                      <div className="space-y-3">
-                        {selectedRecipe.instructions.split('.').filter(s => s.trim()).map((step, i) => (
-                          <p key={i} className="flex items-start">
-                            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-purple-500/20 text-purple-500 text-xs font-medium mr-2 flex-shrink-0">{i+1}</span>
-                            <span>{step.trim()}.</span>
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Badge className="bg-safebite-teal/20 text-safebite-teal border-safebite-teal mr-2">
-                        <Users className="h-3 w-3 mr-1" />
-                        {selectedRecipe.servings}
-                      </Badge>
-                      <Badge className="bg-purple-500/20 text-purple-500 border-purple-500">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {Math.floor(Math.random() * 30) + 15} mins
-                      </Badge>
-                    </div>
-                    <DialogClose asChild>
-                      <Button variant="outline" className="sci-fi-button">
-                        Close
-                      </Button>
-                    </DialogClose>
-                  </div>
-                </>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Food Delivery Search Dialog */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="fixed bottom-6 right-6 bg-orange-500 hover:bg-orange-600 text-white border-none shadow-lg z-50 rounded-full h-14 w-14 p-0"
-                onClick={() => trackUserInteraction('open_food_delivery', {})}
-              >
-                <Coffee className="h-6 w-6" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sci-fi-card max-w-3xl">
-              <DialogHeader>
-                <DialogTitle className="text-2xl flex items-center">
-                  <Coffee className="h-6 w-6 text-orange-500 mr-3" />
-                  Food Delivery Search
-                </DialogTitle>
-                <DialogDescription>
-                  Search for restaurant meals from Zomato and Swiggy (Coming Soon)
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="relative overflow-hidden rounded-lg border border-orange-500/30 p-8 text-center">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-red-500/10"></div>
-                <div className="relative z-10">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center mb-4">
-                    <Zap className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-orange-500 mb-2">Coming Soon!</h3>
-                  <p className="text-safebite-text-secondary mb-6">
-                    We're working on integrating with Zomato and Swiggy to provide nutritional information for restaurant meals.
-                  </p>
-                  <div className="flex justify-center">
-                    <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/30">
-                      Under Development
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <h3 className="text-lg font-semibold text-safebite-text mb-3">Features Coming Soon:</h3>
-                <ul className="space-y-2">
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
-                    <span>Search for restaurant meals from Zomato and Swiggy</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
-                    <span>View nutritional information for restaurant meals</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
-                    <span>Get health recommendations for restaurant orders</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
-                    <span>Save favorite restaurant meals</span>
-                  </li>
-                </ul>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* AI Chatbot */}
-          <FoodChatBot
-            currentPage="nutrition"
-            userData={{
-              profile: userData,
-              recentActivity: userActivity
-            }}
-            autoOpen={true}
-          />
-        </div>
-      </main>
     </div>
   );
 };

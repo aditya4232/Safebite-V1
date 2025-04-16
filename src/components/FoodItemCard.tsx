@@ -1,3 +1,4 @@
+import React from 'react';
 
 import { cn } from "@/lib/utils";
 import { Flame, Leaf, AlertTriangle } from 'lucide-react';
@@ -93,10 +94,11 @@ const FoodItemCard: React.FC<FoodItemCardProps> = ({
               )}
             </div>
           )}
+          {/* Add more details here if available */}
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default FoodItemCard;

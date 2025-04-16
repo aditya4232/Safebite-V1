@@ -19,10 +19,37 @@ const GuestDashboard = () => {
   // Get guest name from sessionStorage via service
   const [guestName, setGuestName] = useState<string>('');
 
-  // Fetch guest name on component mount
+  // Fetch guest name on component mount and whenever it might change
   useEffect(() => {
-    const name = getGuestName();
-    setGuestName(name);
+    const fetchGuestName = () => {
+      // Try to get name from multiple sources to ensure we get it
+      const sessionName = getGuestName();
+      const localName = localStorage.getItem('guestUserName');
+
+      console.log('Guest name sources:', {
+        sessionName,
+        localName,
+        localStorage: localStorage.getItem('guestUserName'),
+        sessionStorage: sessionStorage.getItem('guestUserName')
+      });
+
+      // Use the first available name source
+      const name = sessionName || localName || '';
+      if (name) {
+        setGuestName(name);
+        console.log('Setting guest name to:', name);
+      } else {
+        console.log('No guest name found in any storage location');
+      }
+    };
+
+    // Initial fetch
+    fetchGuestName();
+
+    // Set up interval to check for name changes (in case it's set in another tab/component)
+    const intervalId = setInterval(fetchGuestName, 2000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Removed showNamePrompt state and related useEffect debug log
@@ -78,7 +105,7 @@ const GuestDashboard = () => {
         <div className="mb-4 sm:mb-0">
           <h1 className="text-3xl font-bold text-safebite-text mb-1">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple animate-gradient-text">
-              Welcome, {guestName || 's'}!
+              Welcome, {guestName || 'Guest'}!
             </span>
           </h1>
           <p className="text-safebite-text-secondary text-sm">
@@ -92,12 +119,6 @@ const GuestDashboard = () => {
           >
             <UserCircle className="mr-2 h-4 w-4" />
             Create Account
-          </Button>
-          <Button
-            onClick={() => navigate('/food-delivery')}
-            className="bg-safebite-purple hover:bg-safebite-purple/80 text-white w-full sm:w-auto transition-transform hover:scale-105"
-          >
-            <span className="mr-2">🍔</span> Food Delivery (Beta)
           </Button>
         </div>
       </div>

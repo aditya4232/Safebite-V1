@@ -3,22 +3,38 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Utensils, ShoppingBag, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, Utensils, ShoppingBag, Clock, AlertTriangle, Truck, Lock, Sparkles } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import FoodChatBot from '@/components/FoodChatBot';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from "../firebase";
+import { useGuestMode } from '@/hooks/useGuestMode';
+import { useToast } from "@/hooks/use-toast";
 
 const FoodDelivery: React.FC = () => {
   const navigate = useNavigate();
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const { isGuest } = useGuestMode();
+  const { toast } = useToast();
 
   // User data for personalized chat suggestions
   const [userData, setUserData] = useState<any>(null);
   const [userActivity, setUserActivity] = useState<any[]>([]);
+
+  // Check if user is a guest, redirect if so
+  useEffect(() => {
+    if (isGuest) {
+      toast({
+        title: "Feature Restricted",
+        description: "Food Delivery is only available for registered users. Please sign up to access this feature.",
+        variant: "destructive"
+      });
+      navigate('/dashboard');
+    }
+  }, [isGuest, navigate, toast]);
 
   // Load user data for personalized chat
   useEffect(() => {
@@ -52,7 +68,13 @@ const FoodDelivery: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      {/* Coming Soon Banner */}
+      <div className="bg-gradient-to-r from-orange-600 via-red-500 to-yellow-500 text-white py-2 px-4 flex items-center justify-center">
+        <Sparkles className="h-4 w-4 text-yellow-300 mr-2" />
+        <span className="font-medium">Coming Soon: Food Delivery Integration</span>
+        <Sparkles className="h-4 w-4 text-yellow-300 ml-2" />
+      </div>
+      <Navbar hideAuthButtons={true} />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-6">

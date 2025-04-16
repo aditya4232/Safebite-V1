@@ -9,30 +9,50 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings2, Activity, Bell, Shield, User, Database, Key, Lock, AlertTriangle, CheckCircle, Info, Eye, EyeOff, Download, Cloud, Zap } from 'lucide-react';
+// Removed duplicated imports below
+import { Settings2, Activity, Bell, Shield, User, Database, Key, Lock, AlertTriangle, CheckCircle, Info, Eye, EyeOff, Download, Cloud, Zap, CheckCircle as CheckCircleIcon } from 'lucide-react';
 import HealthDataIntegration from '@/components/HealthDataIntegration';
 import { trackPreferenceChange } from '@/services/mlService';
-import { getNutritionApiStatus } from '@/services/nutritionApiService';
+import WeeklyQuestionsForm from '@/components/WeeklyQuestionsForm';
+
+// Define a type for the user profile
+interface UserProfile {
+  health_goals?: string;
+  dietary_preferences?: string;
+  activity_level?: string;
+  food_preferences?: string[];
+  allergies?: string[];
+  notificationsEnabled?: boolean;
+  foodSafetyAlertsEnabled?: boolean;
+  communityEnabled?: boolean;
+  shareHealthData?: boolean;
+  // Add other profile fields if necessary
+}
 
 const Settings = () => {
+  // State for user profile data
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [healthGoal, setHealthGoal] = useState('');
   const [dietaryPreference, setDietaryPreference] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
+  // Removed duplicated state declarations below
   const [foodPreferences, setFoodPreferences] = useState<string[]>([]);
   const [allergies, setAllergies] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [foodSafetyAlertsEnabled, setFoodSafetyAlertsEnabled] = useState(false);
-  const [healthIntegrations, setHealthIntegrations] = useState<{[key: string]: boolean}>({});
+  const [healthIntegrations, setHealthIntegrations] = useState<{ [key: string]: boolean }>({});
   const [communityEnabled, setCommunityEnabled] = useState(false);
   const [shareHealthData, setShareHealthData] = useState(false);
-  const [apiSettings, setApiSettings] = useState<{[key: string]: boolean}>({
+  // Separate state for boolean API settings
+  const [apiSettings, setApiSettings] = useState<{ [key: string]: boolean }>({
     useCalorieNinjas: true,
     useFatSecret: true,
     useEdamam: true,
     saveSearchHistory: true,
-    preferredApi: 'all'
   });
-  const [nutritionApiStatuses, setNutritionApiStatuses] = useState(getNutritionApiStatus());
+  // Separate state for preferred API (string)
+  const [preferredApi, setPreferredApi] = useState<string>('all');
+  // Removed unused nutritionApiStatuses state
   const auth = getAuth(app);
   const db = getFirestore(app);
   const user = auth.currentUser;
@@ -47,23 +67,38 @@ const Settings = () => {
           const docSnap = await getDoc(userRef);
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            setHealthGoal(userData.profile?.health_goals || '');
-            setDietaryPreference(userData.profile?.dietary_preferences || '');
-            setActivityLevel(userData.profile?.activity_level || '');
-            setFoodPreferences(userData.profile?.food_preferences || []);
-            setAllergies(userData.profile?.allergies || []);
-            setNotificationsEnabled(userData.profile?.notificationsEnabled || false);
-            setFoodSafetyAlertsEnabled(userData.profile?.foodSafetyAlertsEnabled || false);
-            setHealthIntegrations(userData.healthIntegrations || {});
-            setCommunityEnabled(userData.profile?.communityEnabled || false);
-            setShareHealthData(userData.profile?.shareHealthData || false);
+            const profileData = userData.profile || {};
+            const settingsData = userData.apiSettings || {};
 
-            // Load API settings if available
-            if (userData.apiSettings) {
-              setApiSettings(userData.apiSettings);
-            }
+            // Set User Profile State
+            setUserProfile(profileData); // Store the whole profile object
+
+            // Set individual preference states (can be derived from userProfile if needed elsewhere)
+            setHealthGoal(profileData.health_goals || '');
+            setDietaryPreference(profileData.dietary_preferences || '');
+            setActivityLevel(profileData.activity_level || '');
+            setFoodPreferences(profileData.food_preferences || []);
+            setAllergies(profileData.allergies || []);
+            setNotificationsEnabled(profileData.notificationsEnabled || false);
+            setFoodSafetyAlertsEnabled(profileData.foodSafetyAlertsEnabled || false);
+            setCommunityEnabled(profileData.communityEnabled || false);
+            setShareHealthData(profileData.shareHealthData || false);
+
+            setHealthIntegrations(userData.healthIntegrations || {});
+
+            // Load API settings, separating boolean flags and preferredApi string
+            setApiSettings({
+              useCalorieNinjas: settingsData.useCalorieNinjas !== undefined ? settingsData.useCalorieNinjas : true,
+              useFatSecret: settingsData.useFatSecret !== undefined ? settingsData.useFatSecret : true,
+              useEdamam: settingsData.useEdamam !== undefined ? settingsData.useEdamam : true,
+              saveSearchHistory: settingsData.saveSearchHistory !== undefined ? settingsData.saveSearchHistory : true,
+            });
+            setPreferredApi(settingsData.preferredApi || 'all');
+
           } else {
-            console.log("No such document!");
+            console.log("No such document! Creating default profile structure.");
+            // Optionally create a default structure if none exists
+            setUserProfile({}); // Set an empty profile
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -163,18 +198,18 @@ const Settings = () => {
       return;
     }
 
-    setApiSettings(prev => {
-      const newSettings = { ...prev, [setting]: value };
-      return newSettings;
-    });
+    // Update only the boolean apiSettings state
+    const updatedSettings = { ...apiSettings, [setting]: value };
+    setApiSettings(updatedSettings);
 
     if (user) {
       const userRef = doc(db, "users", user.uid);
       try {
+        // Save the updated boolean setting along with the existing preferredApi
         await setDoc(userRef, {
           apiSettings: {
-            ...apiSettings,
-            [setting]: value
+            ...updatedSettings, // Save the updated boolean settings
+            preferredApi: preferredApi // Ensure preferredApi is also saved
           }
         }, { merge: true });
 
@@ -202,18 +237,17 @@ const Settings = () => {
       return;
     }
 
-    setApiSettings(prev => ({
-      ...prev,
-      preferredApi: value
-    }));
+    // Update the separate preferredApi state
+    setPreferredApi(value);
 
     if (user) {
       const userRef = doc(db, "users", user.uid);
       try {
+        // Save the updated preferredApi along with existing boolean settings
         await setDoc(userRef, {
           apiSettings: {
-            ...apiSettings,
-            preferredApi: value
+            ...apiSettings, // Include current boolean settings
+            preferredApi: value // Save the new preferred API
           }
         }, { merge: true });
 
@@ -277,9 +311,15 @@ const Settings = () => {
     }
   };
 
+  // Render loading state or handle null userProfile if necessary
+  // if (!userProfile) {
+  //   return <div>Loading settings...</div>; // Or some loading indicator
+  // }
+
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
-      <DashboardSidebar />
+      {/* Pass userProfile to DashboardSidebar */}
+      <DashboardSidebar userProfile={userProfile} />
       <main className="md:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 md:p-8">
           <h1 className="text-3xl font-bold text-safebite-text mb-4">Settings</h1>
@@ -288,7 +328,8 @@ const Settings = () => {
           </p>
 
           <Tabs defaultValue="preferences" className="w-full">
-            <TabsList className="grid grid-cols-5 mb-8">
+            {/* Updated grid columns to match number of tabs */}
+            <TabsList className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-8">
               <TabsTrigger value="preferences" className="flex items-center">
                 <Settings2 className="mr-2 h-4 w-4" />
                 Preferences
@@ -308,6 +349,10 @@ const Settings = () => {
               <TabsTrigger value="api" className="flex items-center">
                 <Database className="mr-2 h-4 w-4" />
                 API Settings
+              </TabsTrigger>
+              <TabsTrigger value="weekly-checkin" className="flex items-center">
+                <CheckCircleIcon className="mr-2 h-4 w-4" /> {/* Used renamed CheckCircleIcon */}
+                Weekly Check-in
               </TabsTrigger>
             </TabsList>
 
@@ -495,11 +540,22 @@ const Settings = () => {
               </div>
             </TabsContent>
 
+            {/* Moved HealthDataIntegration to its own TabsContent */}
             <TabsContent value="integrations" className="space-y-6">
               <HealthDataIntegration
                 onIntegrationToggle={handleHealthIntegrationToggle}
                 integrations={healthIntegrations}
               />
+            </TabsContent>
+
+            <TabsContent value="weekly-checkin" className="space-y-6">
+              <div className="p-4">
+                <h2 className="text-2xl font-semibold text-safebite-text mb-4">Weekly Check-in</h2>
+                <p className="text-safebite-text-secondary mb-6">
+                  Answer a few questions to help us personalize your SafeBite experience.
+                </p>
+                <WeeklyQuestionsForm />
+              </div>
             </TabsContent>
 
             <TabsContent value="api" className="space-y-6">
@@ -531,7 +587,7 @@ const Settings = () => {
                           type="checkbox"
                           className="sci-fi-checkbox"
                           checked={apiSettings.useCalorieNinjas}
-                          onChange={() => handleApiToggle('useCalorieNinjas')}
+                          onChange={() => handleApiSettingChange('useCalorieNinjas', !apiSettings.useCalorieNinjas)} // Corrected function call and logic
                         />
                       </div>
 
@@ -549,7 +605,7 @@ const Settings = () => {
                           type="checkbox"
                           className="sci-fi-checkbox"
                           checked={apiSettings.useFatSecret}
-                          onChange={() => handleApiToggle('useFatSecret')}
+                          onChange={() => handleApiSettingChange('useFatSecret', !apiSettings.useFatSecret)} // Corrected function call and logic
                         />
                       </div>
 
@@ -567,7 +623,7 @@ const Settings = () => {
                           type="checkbox"
                           className="sci-fi-checkbox"
                           checked={apiSettings.useEdamam}
-                          onChange={() => handleApiToggle('useEdamam')}
+                          onChange={() => handleApiSettingChange('useEdamam', !apiSettings.useEdamam)} // Corrected function call and logic
                         />
                       </div>
 

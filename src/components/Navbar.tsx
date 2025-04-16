@@ -1,15 +1,39 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogIn, User } from 'lucide-react';
+import { getAuth } from "firebase/auth";
+import { app } from "../firebase";
 
-const Navbar = () => {
+interface NavbarProps {
+  hideAuthButtons?: boolean;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const auth = getAuth(app);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check if we're on the food-delivery page
+  const isFoodDeliveryPage = location.pathname.includes('/food-delivery');
+
+  // Check authentication status
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setIsLoggedIn(!!user);
+    });
+    return () => unsubscribe();
+  }, [auth]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+
+  // Determine whether to show auth buttons
+  // Hide if explicitly told to hide OR if we're on food-delivery page AND user is logged in
+  const shouldHideAuthButtons = hideAuthButtons || (isFoodDeliveryPage && isLoggedIn);
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 bg-safebite-dark-blue/90 backdrop-blur-md border-b border-safebite-card-bg-alt">
@@ -25,21 +49,25 @@ const Navbar = () => {
             <Link to="/" className="text-safebite-text hover:text-safebite-teal transition-colors">Home</Link>
             <Link to="/features" className="text-safebite-text hover:text-safebite-teal transition-colors">Features</Link>
             <Link to="/about" className="text-safebite-text hover:text-safebite-teal transition-colors">About</Link>
-            <Button
-              variant="outline"
-              className="sci-fi-button"
-              onClick={() => navigate('/auth/login')}
-            >
-              <LogIn className="mr-2 h-4 w-4" />
-              Login
-            </Button>
-            <Button
-              className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
-              onClick={() => navigate('/auth/signup')}
-            >
-              <User className="mr-2 h-4 w-4" />
-              Sign Up
-            </Button>
+            {!shouldHideAuthButtons && (
+              <>
+                <Button
+                  variant="outline"
+                  className="sci-fi-button"
+                  onClick={() => navigate('/auth/login')}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+                <Button
+                  className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+                  onClick={() => navigate('/auth/signup')}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Sign Up
+                </Button>
+              </>
+            )}
           </div>
 
           <div className="md:hidden flex items-center">
@@ -79,29 +107,31 @@ const Navbar = () => {
               About
             </Link>
 
-            <div className="flex flex-col space-y-2 pt-2">
-              <Button
-                variant="outline"
-                className="sci-fi-button w-full justify-center"
-                onClick={() => {
-                  navigate('/auth/login');
-                  setIsMenuOpen(false);
-                }}
-              >
-                <LogIn className="mr-2 h-4 w-4" />
-                Login
-              </Button>
-              <Button
-                className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 w-full justify-center"
-                onClick={() => {
-                  navigate('/auth/signup');
-                  setIsMenuOpen(false);
-                }}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Sign Up
-              </Button>
-            </div>
+            {!shouldHideAuthButtons && (
+              <div className="flex flex-col space-y-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="sci-fi-button w-full justify-center"
+                  onClick={() => {
+                    navigate('/auth/login');
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+                <Button
+                  className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 w-full justify-center"
+                  onClick={() => {
+                    navigate('/auth/signup');
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Sign Up
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

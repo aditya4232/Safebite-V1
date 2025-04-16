@@ -1,6 +1,7 @@
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
 import { app } from "../firebase";
+import { getGuestName } from "./guestUserService";
 
 // Types for user activity tracking
 export interface UserActivity {
@@ -49,25 +50,43 @@ class UserActivityService {
    * @param details Additional details about the activity
    */
   async trackActivity(type: string, action: string, details?: any): Promise<void> {
+    // Get user info
+    const user = this.auth.currentUser;
+    const guestName = this.isGuest ? getGuestName() : null;
+
+    // Enhance details with user information
+    const enhancedDetails = {
+      ...details,
+      userInfo: {
+        isGuest: this.isGuest,
+        name: this.isGuest ? guestName : (user?.displayName || user?.email),
+        timestamp: new Date().toISOString()
+      }
+    };
+
     const activity: UserActivity = {
       type,
       action,
-      details,
+      details: enhancedDetails,
       timestamp: new Date()
     };
 
     // Add to local activities
     this.localActivities.push(activity);
 
-    // Save to cookies for ML learning
+    // Save to cookies for ML learning (for both guest and logged-in users)
     this.saveActivityToCookies(activity);
 
+    // For guest users, store in localStorage to persist during the session
+    if (this.isGuest) {
+      this.saveGuestActivity(activity);
+    }
     // If user is logged in and we've reached the threshold, sync with Firebase
-    if (!this.isGuest && this.localActivities.length >= this.maxLocalActivities) {
+    else if (this.localActivities.length >= this.maxLocalActivities) {
       await this.syncActivitiesWithFirebase();
     }
 
-    console.log(`Activity tracked: ${type} - ${action}`);
+    console.log(`Activity tracked: ${type} - ${action} by ${this.isGuest ? 'Guest: ' + guestName : 'User: ' + (user?.displayName || user?.email)}`);
   }
 
   /**
@@ -185,6 +204,38 @@ class UserActivityService {
   }
 
   /**
+   * Save activity for guest users in localStorage
+   * @param activity Activity to save
+   */
+  private saveGuestActivity(activity: UserActivity): void {
+    try {
+      // Get existing activities from localStorage
+      const storedActivities = localStorage.getItem('guestUserActivities');
+      let guestActivities = [];
+
+      if (storedActivities) {
+        guestActivities = JSON.parse(storedActivities);
+      }
+
+      // Add new activity
+      guestActivities.push({
+        type: activity.type,
+        action: activity.action,
+        details: activity.details,
+        timestamp: activity.timestamp.toString()
+      });
+
+      // Keep only the last 50 activities
+      const trimmedActivities = guestActivities.slice(-50);
+
+      // Save back to localStorage
+      localStorage.setItem('guestUserActivities', JSON.stringify(trimmedActivities));
+    } catch (error) {
+      console.error('Error saving guest activity to localStorage:', error);
+    }
+  }
+
+  /**
    * Get user's recent activities
    * @param limit Number of activities to return
    * @returns Promise with array of recent activities
@@ -194,6 +245,16 @@ class UserActivityService {
       const user = this.auth.currentUser;
 
       if (!user || this.isGuest) {
+        // For guest users, try to get activities from localStorage first
+        if (this.isGuest) {
+          const storedActivities = localStorage.getItem('guestUserActivities');
+          if (storedActivities) {
+            const guestActivities = JSON.parse(storedActivities);
+            // Combine with local activities and return the most recent
+            const allActivities = [...guestActivities, ...this.localActivities];
+            return allActivities.slice(-limit);
+          }
+        }
         return this.localActivities.slice(-limit);
       }
 

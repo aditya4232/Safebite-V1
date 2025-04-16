@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useGuestMode } from '@/hooks/useGuestMode';
@@ -7,7 +8,7 @@ import {
   Home, BarChart2, Pizza, Users, Settings, Menu, X,
   Search, Heart, LogOut, Activity, Calculator, Stethoscope,
   Zap, BookOpen, Bot, ShoppingCart, Sparkles, ShoppingBag, Badge, Utensils,
-  UserCircle, HelpCircle
+  UserCircle, HelpCircle, Truck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, signOut } from "firebase/auth";
@@ -15,7 +16,11 @@ import { app } from "../firebase";
 import ProfilePopup from './ProfilePopup';
 import { getGuestName } from '@/services/guestUserService';
 
-const DashboardSidebar = () => {
+interface DashboardSidebarProps {
+  userProfile: any;
+}
+
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userProfile }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const navigate = useNavigate();
@@ -60,16 +65,17 @@ const DashboardSidebar = () => {
   };
 
   const navLinks = [
-    { path: '/dashboard', name: 'Dashboard', icon: <Home size={20} /> },
-    { path: '/nutrition', name: 'Nutrition', icon: <Utensils size={20} className="text-safebite-teal" /> },
-    { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} /> },
-    { path: '/grocery-products', name: 'Grocery Products', icon: <ShoppingCart size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span> },
-    { path: '/community', name: 'Community', icon: <Users size={20} /> },
-    { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" /> },
-    { path: '/weekly-questions', name: 'Health Check', icon: <Heart size={20} /> },
-    { path: '/reports', name: 'Reports', icon: <BarChart2 size={20} /> },
-    { path: '/settings', name: 'Settings', icon: <Settings size={20} /> },
-    { path: '/help', name: 'Help', icon: <HelpCircle size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span> },
+    { path: '/dashboard', name: 'Dashboard', icon: <Home size={20} />, guestAccess: true },
+    { path: '/nutrition', name: 'Nutrition', icon: <Utensils size={20} className="text-safebite-teal" />, guestAccess: false },
+    { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} />, guestAccess: false },
+    { path: '/grocery-products', name: 'Grocery Products', icon: <ShoppingCart size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span>, guestAccess: false },
+    { path: '/food-delivery', name: 'Food Delivery', icon: <Truck size={20} className="text-orange-400" />, badge: <span className="ml-2 text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-full">Coming Soon</span>, guestAccess: false },
+    { path: '/community', name: 'Community', icon: <Users size={20} />, guestAccess: false },
+    { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" />, guestAccess: false },
+    { path: '/health-check', name: 'Health Check', icon: <Heart size={20} />, guestAccess: false }, // Corrected path
+    { path: '/reports', name: 'Reports', icon: <BarChart2 size={20} />, guestAccess: false },
+    { path: '/settings', name: 'Settings', icon: <Settings size={20} />, guestAccess: false },
+    { path: '/help', name: 'Help', icon: <HelpCircle size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span>, guestAccess: true },
   ];
 
   return (
@@ -110,22 +116,24 @@ const DashboardSidebar = () => {
           <nav className="flex-1 py-4 overflow-y-auto">
             <ul className="space-y-2 px-4">
               {navLinks.map((link) => (
-                <li key={link.path}>
-                  <NavLink
-                    to={link.path}
-                    className={({ isActive }) =>
-                      `flex items-center py-2 px-4 rounded-md transition-all duration-300 ${
-                        isActive
-                          ? 'bg-gradient-to-r from-safebite-teal to-safebite-teal/80 text-safebite-dark-blue font-medium shadow-sm shadow-safebite-teal/20'
-                          : 'text-safebite-text hover:bg-safebite-card-bg-alt hover:border-safebite-teal/20 hover:pl-5'
-                      }`
-                    }
-                  >
-                    <span className="mr-3">{link.icon}</span>
-                    {link.name}
-                    {link.badge && link.badge}
-                  </NavLink>
-                </li>
+                (!isGuest || link.guestAccess) && (
+                  <li key={link.path}>
+                    <NavLink
+                      to={link.path}
+                      className={({ isActive }) =>
+                        `flex items-center py-2 px-4 rounded-md transition-all duration-300 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-safebite-teal to-safebite-teal/80 text-safebite-dark-blue font-medium shadow-sm shadow-safebite-teal/20'
+                            : 'text-safebite-text hover:bg-safebite-card-bg-alt hover:border-safebite-teal/20 hover:pl-5'
+                        }`
+                      }
+                    >
+                      <span className="mr-3">{link.icon}</span>
+                      {link.name}
+                      {link.badge && link.badge}
+                    </NavLink>
+                  </li>
+                )
               ))}
             </ul>
           </nav>
@@ -174,8 +182,9 @@ const DashboardSidebar = () => {
 
       {/* Profile Popup */}
       <ProfilePopup
-        open={showProfilePopup}
+        isOpen={showProfilePopup}
         onClose={() => setShowProfilePopup(false)}
+        userProfile={userProfile}
       />
     </>
   );

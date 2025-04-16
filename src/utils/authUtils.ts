@@ -1,4 +1,5 @@
 // Authentication utility functions
+import guestAuthService from "@/services/guestAuthService";
 
 /**
  * Check if the current page is an authentication page (login, signup, forgot password)
@@ -63,9 +64,8 @@ export const isAuthenticated = (): boolean => {
   // Check for Firebase auth
   const hasFirebaseAuth = localStorage.getItem('firebase:authUser:AIzaSyDCl5yM0z-eQCyQMCvZ4U-iFLyAn4iGi-0:[DEFAULT]') !== null;
 
-  // Check for guest mode
-  const isGuest = localStorage.getItem('userType') === 'guest' ||
-                  sessionStorage.getItem('safebite-guest-mode') === 'true';
+  // Check for guest mode with valid session
+  const isGuest = guestAuthService.isGuestUser();
 
   return hasFirebaseAuth || isGuest;
 };

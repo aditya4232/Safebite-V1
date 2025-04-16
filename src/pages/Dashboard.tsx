@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Sparkles, Clock, RefreshCw, UserCircle, 
-  AlertTriangle, User, Activity 
+import {
+  Sparkles, Clock, RefreshCw, UserCircle,
+  AlertTriangle, User, Activity, Truck, History, // Added History icon
+  Search, Pizza, ShoppingCart, Stethoscope // Added icons for activity types
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import GuestDashboard from '@/components/GuestDashboard';
@@ -16,6 +17,8 @@ import { app } from "../firebase";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import userActivityService, { UserActivity } from '@/services/userActivityService';
 import FoodDeliveryPopup from '@/components/FoodDeliveryPopup';
+import MacronutrientChart from '@/components/MacronutrientChart';
+import HighchartsComponent from '@/components/HighchartsComponent';
 import FoodChatBot from '@/components/FoodChatBot';
 import ProfilePopup from '@/components/ProfilePopup';
 
@@ -29,7 +32,13 @@ interface UserProfile {
     health_conditions?: string;
     dietary_preferences?: string;
   };
-  weeklyCheckin?: {
+ healthCheckData?: {
+   foodQuery?: string;
+   nutritionData?: any;
+   processedFoodFrequency?: string;
+   dietQuality?: string;
+ };
+ weeklyCheckin?: {
     answers?: {
       exercise_minutes?: number;
       home_cooked_meals?: number;
@@ -75,11 +84,42 @@ const Dashboard = () => {
 
   // Show food delivery popup and load user activity
   useEffect(() => {
-    // Show food delivery popup after a delay
+    // Check if popup should be shown based on last shown timestamp
+    const shouldShowPopup = () => {
+      // Don't show for guest users
+      if (isGuest || !user) return false;
+
+      // Check if user has permanently dismissed the popup
+      if (localStorage.getItem('hideDeliveryPopup') === 'permanent') return false;
+
+      // Get the last time the popup was shown
+      const lastShown = localStorage.getItem('lastDeliveryPopupShown');
+
+      // If never shown before, show it
+      if (!lastShown) return true;
+
+      // Check if it was shown in the current session
+      const currentSession = sessionStorage.getItem('currentSession');
+      if (!currentSession) {
+        // New session, set session marker
+        sessionStorage.setItem('currentSession', Date.now().toString());
+        return true;
+      }
+
+      // Check if it was shown in the last 24 hours
+      const lastShownTime = parseInt(lastShown, 10);
+      const currentTime = Date.now();
+      const oneDayInMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+      return (currentTime - lastShownTime) > oneDayInMs;
+    };
+
+    // Show food delivery popup after a delay if conditions are met
     const popupTimer = setTimeout(() => {
-      // Only show popup for logged-in users who haven't dismissed it before
-      if (!isGuest && user && !localStorage.getItem('hideDeliveryPopup')) {
+      if (shouldShowPopup()) {
         setShowFoodDeliveryPopup(true);
+        // Record the current time as the last shown time
+        localStorage.setItem('lastDeliveryPopupShown', Date.now().toString());
       }
     }, 5000); // 5 seconds delay
 
@@ -213,7 +253,7 @@ const Dashboard = () => {
       if (recentFoods.length > 0) {
         // Generate issues based on recent food searches
         const issues = [];
-        
+
         if (recentFoods.some(food => food.toLowerCase().includes('chicken') || food.toLowerCase().includes('poultry'))) {
           issues.push({
             title: 'Poultry Safety Alert',
@@ -221,7 +261,7 @@ const Dashboard = () => {
             severity: 'medium'
           });
         }
-        
+
         if (recentFoods.some(food => food.toLowerCase().includes('fish') || food.toLowerCase().includes('seafood'))) {
           issues.push({
             title: 'Seafood Storage',
@@ -229,7 +269,7 @@ const Dashboard = () => {
             severity: 'medium'
           });
         }
-        
+
         if (recentFoods.some(food => food.toLowerCase().includes('rice'))) {
           issues.push({
             title: 'Rice Storage Warning',
@@ -237,7 +277,7 @@ const Dashboard = () => {
             severity: 'high'
           });
         }
-        
+
         if (recentFoods.some(food => food.toLowerCase().includes('egg'))) {
           issues.push({
             title: 'Egg Safety',
@@ -245,7 +285,7 @@ const Dashboard = () => {
             severity: 'medium'
           });
         }
-        
+
         // Add some general issues if we don't have enough specific ones
         if (issues.length < 2) {
           issues.push({
@@ -253,18 +293,18 @@ const Dashboard = () => {
             description: 'Use separate cutting boards for raw meat and vegetables to prevent bacterial spread.',
             severity: 'medium'
           });
-          
+
           issues.push({
             title: 'Refrigeration Reminder',
             description: 'Keep your refrigerator below 40°F (4°C) to slow bacterial growth in foods.',
             severity: 'low'
           });
         }
-        
+
         return issues;
       }
     }
-    
+
     // Default issues if no relevant user activity is available
     return [
       {
@@ -299,7 +339,19 @@ const Dashboard = () => {
   };
 
   // If user is in guest mode, show the guest dashboard
+  // Add more detailed logging to help debug guest mode issues
+  useEffect(() => {
+    console.log('Dashboard - Detailed guest mode check:', {
+      isGuest,
+      userType: localStorage.getItem('userType'),
+      guestMode: sessionStorage.getItem('safebite-guest-mode'),
+      guestName: sessionStorage.getItem('guestUserName') || localStorage.getItem('guestUserName'),
+      guestSessionExpires: localStorage.getItem('guestSessionExpires')
+    });
+  }, [isGuest]);
+
   if (isGuest) {
+    console.log('Rendering GuestDashboard component');
     return <GuestDashboard />;
   }
 
@@ -318,6 +370,7 @@ const Dashboard = () => {
   // Generate dashboard data
   const healthMetrics = generateHealthMetrics();
   const foodSafetyIssues = generateFoodSafetyIssues();
+  const healthCheckData = userProfile?.healthCheckData;
 
   return (
     <div className="relative" style={{ zIndex: 10 }}>
@@ -331,29 +384,29 @@ const Dashboard = () => {
       {/* Food Delivery Popup */}
       <div style={{ marginRight: '6rem' }}>
         <FoodDeliveryPopup
-          isOpen={showFoodDeliveryPopup} 
+          isOpen={showFoodDeliveryPopup}
           onClose={() => setShowFoodDeliveryPopup(false)}
-          currentPage="dashboard" 
-          userData={userProfile} 
+          currentPage="dashboard"
+          userData={userProfile}
         />
       </div>
 
       {/* AI Chatbot */}
       <div ref={chatbotRef} style={{ zIndex: 50 }}>
-        <FoodChatBot 
-          currentPage="dashboard" 
-          userData={{ profile: userProfile, recentActivity: userActivity }} 
-          autoOpen={false} 
-          initialMessage="Welcome back! How can I help with your health goals today?" 
+        <FoodChatBot
+          currentPage="dashboard"
+          userData={{ profile: userProfile, recentActivity: userActivity }}
+          autoOpen={false}
+          initialMessage="Welcome back! How can I help with your health goals today?"
         />
       </div>
 
       {/* Sidebar */}
-      <DashboardSidebar />
+      <DashboardSidebar userProfile={userProfile} />
 
       {/* Profile Popup */}
-      <ProfilePopup 
-        isOpen={showProfilePopup} 
+      <ProfilePopup
+        isOpen={showProfilePopup}
         onClose={() => setShowProfilePopup(false)}
         userProfile={userProfile}
       />
@@ -379,7 +432,9 @@ const Dashboard = () => {
             <div className="mb-3 sm:mb-0">
               <h1 className="text-3xl font-bold text-safebite-text mb-2">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple">
-                  Welcome back, {userProfile?.displayName || user?.displayName || userProfile?.name || user?.email?.split('@')[0] || 'Friend'}
+                  Welcome back, {isGuest
+                    ? (localStorage.getItem('guestUserName') || sessionStorage.getItem('guestUserName') || 'Guest')
+                    : (userProfile?.displayName || user?.displayName || userProfile?.name || user?.email?.split('@')[0] || 'Friend')}
                 </span>
               </h1>
               <p className="text-safebite-text-secondary flex items-center">
@@ -397,10 +452,11 @@ const Dashboard = () => {
                 Profile
               </Button>
               <Button
-                className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
+                className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 transition-all duration-300"
                 onClick={() => navigate('/food-delivery')}
               >
-                <span className="mr-2">🍔</span> Food Delivery
+                <Truck className="mr-2 h-4 w-4" /> Food Delivery
+                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Coming Soon</span>
               </Button>
             </div>
           </div>
@@ -441,8 +497,8 @@ const Dashboard = () => {
                     <div key={index} className="p-3 bg-safebite-card-bg-alt rounded-lg border border-safebite-card-bg-alt">
                       <div className="flex items-start">
                         <div className={`rounded-full p-1.5 mr-2 ${
-                          issue.severity === 'high' ? 'bg-red-500/20 text-red-500' : 
-                          issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-500' : 
+                          issue.severity === 'high' ? 'bg-red-500/20 text-red-500' :
+                          issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-500' :
                           'bg-blue-500/20 text-blue-500'
                         }`}>
                           <AlertTriangle className="h-4 w-4" />
@@ -460,10 +516,140 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Display Health Check Data if available */}
+          {healthCheckData && (
+            <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-safebite-text">Recent Health Check</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-safebite-text-secondary text-sm">Food Query: <span className="text-safebite-text">{healthCheckData.foodQuery || 'N/A'}</span></p>
+                <p className="text-safebite-text-secondary text-sm">Processed Food Frequency: <span className="text-safebite-text">{healthCheckData.processedFoodFrequency || 'N/A'}</span></p>
+                <p className="text-safebite-text-secondary text-sm">Diet Quality: <span className="text-safebite-text">{healthCheckData.dietQuality || 'N/A'}</span></p>
+                {/* Optionally display nutrition data if needed */}
+                {/* <pre className="text-xs text-safebite-text-secondary mt-2">{JSON.stringify(healthCheckData.nutritionData, null, 2)}</pre> */}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Display Charts if weekly check-in data is available */}
+          {userProfile?.weeklyCheckin?.answers && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-safebite-text">Weekly Activity Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Example: Using MacronutrientChart structure for weekly data */}
+                  <MacronutrientChart
+                    data={[
+                      { name: 'Exercise (min)', value: userProfile.weeklyCheckin.answers.exercise_minutes || 0 },
+                      { name: 'Home Meals', value: userProfile.weeklyCheckin.answers.home_cooked_meals || 0 },
+                      { name: 'Water (glasses)', value: userProfile.weeklyCheckin.answers.water_intake || 0 },
+                      { name: 'Sleep (hrs)', value: userProfile.weeklyCheckin.answers.sleep_hours || 0 },
+                    ]}
+                    colors={['#FFBB28', '#FF8042', '#00C49F', '#0088FE']}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300">
+                 <CardHeader>
+                   <CardTitle className="text-lg font-semibold text-safebite-text">Weekly Trends (Example)</CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                  <HighchartsComponent
+                    options={{
+                      chart: { type: 'line', backgroundColor: 'transparent' },
+                      title: { text: 'Example Trend', style: { color: '#e0e0e0' } },
+                      xAxis: { categories: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'], labels: { style: { color: '#a0a0a0' } } },
+                      yAxis: { title: { text: 'Value', style: { color: '#a0a0a0' } }, labels: { style: { color: '#a0a0a0' } }, gridLineColor: 'rgba(255, 255, 255, 0.1)' },
+                      legend: { itemStyle: { color: '#e0e0e0' } },
+                      series: [{
+                        name: 'Metric',
+                        type: 'line', // Ensure type is specified
+                        data: [
+                          userProfile.weeklyCheckin.answers.junk_food_consumption || 0,
+                          (userProfile.weeklyCheckin.answers.stress_level || 0) * 10, // Scale stress level for visibility
+                          userProfile.weeklyCheckin.answers.fruit_vegetable_servings || 0,
+                          (userProfile.weeklyCheckin.answers.exercise_minutes || 0) / 10 // Scale exercise minutes
+                        ],
+                        color: '#00C49F'
+                      }],
+                      credits: { enabled: false }
+                    }}
+                  />
+                 </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Recent Activity Section */}
+          {!isGuest && recentActivities.length > 0 && (
+            <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-safebite-text flex items-center">
+                  <History className="mr-2 h-5 w-5 text-safebite-teal" /> Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {recentActivities.map((activity) => (
+                    <li key={activity.timestamp.toString()} className="flex items-center justify-between p-2 bg-safebite-card-bg-alt rounded-md border border-safebite-card-bg-alt hover:border-safebite-teal/30 transition-colors">
+                      <div className="flex items-center">
+                        {getActivityIcon(activity.type)}
+                        <span className="text-sm text-safebite-text ml-3">{formatActivityDescription(activity)}</span>
+                      </div>
+                      <span className="text-xs text-safebite-text-secondary">
+                        {/* Handle both Date and Timestamp objects */}
+                        {activity.timestamp instanceof Date
+                          ? new Date(activity.timestamp.getTime()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+           {!isGuest && recentActivities.length === 0 && !isLoadingProfile && (
+             <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 mb-6">
+               <CardContent className="p-4 text-center text-safebite-text-secondary text-sm">
+                 No recent activity recorded yet. Start exploring SafeBite!
+               </CardContent>
+             </Card>
+           )}
+
         </div>
       </main>
     </div>
   );
 };
+
+// Helper function to get icon based on activity type
+const getActivityIcon = (type: string) => {
+  switch (type) {
+    case 'food_search': return <Search size={18} className="text-blue-400 flex-shrink-0" />;
+    case 'recipe_view': return <Pizza size={18} className="text-orange-400 flex-shrink-0" />;
+    case 'product_view': return <ShoppingCart size={18} className="text-green-400 flex-shrink-0" />;
+    case 'health_check': return <Stethoscope size={18} className="text-red-400 flex-shrink-0" />;
+    case 'login': return <UserCircle size={18} className="text-purple-400 flex-shrink-0" />;
+    default: return <Activity size={18} className="text-gray-400 flex-shrink-0" />;
+  }
+};
+
+// Helper function to format activity description
+const formatActivityDescription = (activity: UserActivity): string => {
+  switch (activity.type) {
+    case 'food_search': return `Searched for: ${activity.details?.query || 'food'}`;
+    case 'recipe_view': return `Viewed recipe: ${activity.details?.recipeName || 'a recipe'}`;
+    case 'product_view': return `Viewed product: ${activity.details?.productName || 'a product'}`;
+    case 'health_check': return `Completed Health Check`;
+    case 'login': return `Logged in`;
+    default: return `Performed action: ${activity.type}`;
+  }
+};
+
 
 export default Dashboard;

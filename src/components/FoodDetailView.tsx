@@ -9,14 +9,49 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FoodItem } from '@/services/foodApiService';
+// Import the FoodItem interface or define it locally
+interface FoodItem {
+  id: string;
+  name: string;
+  calories: number;
+  nutritionScore: 'green' | 'yellow' | 'red';
+  brand?: string;
+  image?: string;
+  nutrients?: {
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    fiber?: number;
+    sugar?: number;
+    sodium?: number;
+  };
+  source?: string;
+  apiSource?: string;
+  details?: {
+    protein: number;
+    carbs: number;
+    fat: number;
+    sodium: number;
+    sugar: number;
+    calories?: number;
+    fiber?: number;
+    ingredients: string[];
+    allergens: string[];
+    additives: string[];
+    servingSize?: string;
+    nutritionScore?: 'green' | 'yellow' | 'red';
+    brand?: string;
+    category?: string;
+  };
+}
 
 interface FoodDetailViewProps {
   food: FoodItem;
-  onBack: () => void;
-  onAddToTracker: (food: FoodItem) => void;
-  onAddTag: (foodId: string, tag: string) => void;
-  onToggleFavorite: (foodId: string) => void;
+  onBack?: () => void;
+  onClose?: () => void;
+  onAddToTracker?: (food: FoodItem) => void;
+  onAddTag?: (foodId: string, tag: string) => void;
+  onToggleFavorite?: (foodId: string) => void;
   isFavorite?: boolean;
   tags?: string[];
   aiAnalysis?: string;
@@ -26,18 +61,22 @@ interface FoodDetailViewProps {
 const FoodDetailView: React.FC<FoodDetailViewProps> = ({
   food,
   onBack,
-  onAddToTracker,
-  onAddTag,
-  onToggleFavorite,
+  onClose,
+  onAddToTracker = () => {},
+  onAddTag = () => {},
+  onToggleFavorite = () => {},
   isFavorite = false,
   tags = [],
   aiAnalysis = '',
   isAnalysisLoading = false
 }) => {
+  // Use onClose if onBack is not provided
+  const handleBack = onBack || onClose || (() => {});
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  const { name, calories, nutritionScore, details, brand, apiSource, source, nutrients } = food;
+  const { name, calories, nutritionScore, details, brand, apiSource, source } = food;
+  const nutrients = food.nutrients || {};
 
   const scoreColors = {
     green: 'bg-green-500',
@@ -60,13 +99,13 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
   };
 
   return (
-    <div className="sci-fi-card">
+    <div className="sci-fi-card p-6 max-w-5xl mx-auto bg-safebite-card-bg border-2 border-safebite-teal/30 rounded-xl shadow-lg">
       <div className="flex justify-between items-start mb-4">
         <Button
           variant="ghost"
           size="sm"
           className="text-safebite-text-secondary -ml-2"
-          onClick={onBack}
+          onClick={handleBack}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
@@ -139,14 +178,21 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
 
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h3 className="text-2xl font-semibold text-safebite-text">{name}</h3>
-          {brand && (
-            <p className="text-safebite-text-secondary text-sm">{brand}</p>
-          )}
+          <h3 className="text-3xl font-bold text-safebite-text mb-2">{food.name}</h3>
+          <div className="flex items-center gap-3">
+            <Badge className={`px-3 py-1 ${nutritionScore === 'green' ? 'bg-green-500/20 text-green-500 border-green-500' : nutritionScore === 'yellow' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500' : 'bg-red-500/20 text-red-500 border-red-500'}`}>
+              {nutritionScore === 'green' ? 'Healthy Choice' : nutritionScore === 'yellow' ? 'Moderate' : 'Use Caution'}
+            </Badge>
+            {details?.servingSize && (
+              <span className="text-sm text-safebite-text-secondary">Serving size: {details.servingSize}</span>
+            )}
+          </div>
         </div>
-        <Badge className={`${scoreColors[nutritionScore]} text-white`}>
-          {scoreLabels[nutritionScore]}
-        </Badge>
+        {food.image && (
+          <div className="w-24 h-24 rounded-lg overflow-hidden bg-safebite-card-bg-alt flex-shrink-0">
+            <img src={food.image} alt={food.name} className="w-full h-full object-cover" />
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="nutrition" className="w-full mb-6">
@@ -165,27 +211,27 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Protein</div>
-              <div className="text-safebite-text font-bold">{details?.protein || food.nutrients?.protein || 0}g</div>
+              <div className="text-safebite-text font-bold">{details?.protein || (food.nutrients && typeof food.nutrients.protein === 'number' ? food.nutrients.protein : 0)}g</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Carbs</div>
-              <div className="text-safebite-text font-bold">{details?.carbs || food.nutrients?.carbs || 0}g</div>
+              <div className="text-safebite-text font-bold">{details?.carbs || (food.nutrients && typeof food.nutrients.carbs === 'number' ? food.nutrients.carbs : 0)}g</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Fat</div>
-              <div className="text-safebite-text font-bold">{details?.fat || food.nutrients?.fat || 0}g</div>
+              <div className="text-safebite-text font-bold">{details?.fat || (food.nutrients && typeof food.nutrients.fat === 'number' ? food.nutrients.fat : 0)}g</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Sodium</div>
-              <div className="text-safebite-text font-bold">{details?.sodium || food.nutrients?.sodium || 0}mg</div>
+              <div className="text-safebite-text font-bold">{details?.sodium || (food.nutrients && typeof food.nutrients.sodium === 'number' ? food.nutrients.sodium : 0)}mg</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Sugar</div>
-              <div className="text-safebite-text font-bold">{details?.sugar || food.nutrients?.sugar || 0}g</div>
+              <div className="text-safebite-text font-bold">{details?.sugar || (food.nutrients && typeof food.nutrients.sugar === 'number' ? food.nutrients.sugar : 0)}g</div>
             </div>
             <div className="p-3 bg-safebite-card-bg-alt rounded-md">
               <div className="text-safebite-text-secondary text-sm">Fiber</div>
-              <div className="text-safebite-text font-bold">{details?.fiber || food.nutrients?.fiber || 0}g</div>
+              <div className="text-safebite-text font-bold">{details?.fiber || (food.nutrients && typeof food.nutrients.fiber === 'number' ? food.nutrients.fiber : 0)}g</div>
             </div>
           </div>
 
@@ -402,7 +448,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
         <Button
           variant="outline"
           className="sci-fi-button"
-          onClick={onBack}
+          onClick={handleBack}
         >
           Back to Results
         </Button>

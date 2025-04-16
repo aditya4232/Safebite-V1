@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle } from 'lucide-react';
 import { getGuestName, setGuestName } from '@/services/guestUserService';
+import guestAuthService from '@/services/guestAuthService';
+import userActivityService from '@/services/userActivityService'; // Import the service
 
 interface GuestNameDialogProps {
   open: boolean;
@@ -21,9 +23,29 @@ const GuestNameDialog: React.FC<GuestNameDialogProps> = ({ open, onClose }) => {
     e.preventDefault();
     const finalName = name.trim() || 'Guest User';
 
-    // Save the guest name to sessionStorage via the service
+    // Save the guest name to both sessionStorage and localStorage via the service
+    // Save the guest name via the service function (handles both storages)
     setGuestName(finalName);
-    // No longer need the localStorage flag
+
+    // Removed redundant direct localStorage/sessionStorage calls
+
+    console.log('Guest name set in dialog via service:', finalName, {
+      localStorage: localStorage.getItem('guestUserName'), // Verify service saved it
+      sessionStorage: sessionStorage.getItem('guestUserName')
+    });
+
+    // Extend the guest session to ensure it's valid for 10 minutes
+    guestAuthService.extendGuestSession();
+
+    // Track this activity using the imported service
+    try {
+      // Removed window prefix
+      if (userActivityService) {
+        userActivityService.trackActivity('auth', 'guest-login', { guestName: finalName });
+      }
+    } catch (error) {
+      console.error('Error tracking guest login activity:', error);
+    }
 
     onClose(finalName);
   };

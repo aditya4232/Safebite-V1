@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import React, { useState } from 'react'; // Added React import
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { UserPlus, Mail, Lock, User, AlertCircle, UserCircle, Info } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getAuth, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+// Import updateProfile
+import { getAuth, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from "firebase/auth";
 import { app } from "../../firebase";
 import guestAuthService from "@/services/guestAuthService";
 
@@ -51,10 +51,18 @@ const Signup = () => {
     setError('');
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Create user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Update profile with the provided name
+      await updateProfile(user, {
+        displayName: name
+      });
+
       toast({
         title: "Account created",
-        description: "Welcome to SafeBite! Please answer a few questions to personalize your experience.",
+        description: `Welcome, ${name}! Please answer a few questions to personalize your experience.`,
       });
       // Redirect to questionnaire after signup
       navigate('/questionnaire');
@@ -72,7 +80,22 @@ const Signup = () => {
     const provider = new GoogleAuthProvider();
 
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if the user has a display name
+      if (!user.displayName) {
+        // Ask the user for their name
+        const name = prompt("Welcome to SafeBite! Please enter your name:");
+
+        // Update the user's profile with the provided name
+        if (name) {
+          await updateProfile(user, {
+            displayName: name,
+          });
+        }
+      }
+
       toast({
         title: "Account created",
         description: "Welcome to SafeBite! Let's get started with some questions.",

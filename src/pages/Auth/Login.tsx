@@ -127,6 +127,13 @@ const Login = () => {
         title: "Welcome, " + name,
         description: "You're now using SafeBite in guest mode. Your data won't be saved permanently.",
       });
+      // Add more detailed logging for guest login
+      console.log('Guest login successful, navigating to dashboard', {
+        guestName: name,
+        guestMode: sessionStorage.getItem('safebite-guest-mode'),
+        userType: localStorage.getItem('userType'),
+        guestSessionExpires: localStorage.getItem('guestSessionExpires')
+      });
       navigate('/dashboard');
     } catch (error: any) {
       console.error("Guest login error:", error);
