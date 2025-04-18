@@ -17,10 +17,10 @@ interface HealthyAlternativesProps {
 const getHealthyAlternativesFromGemini = async (product: any): Promise<any[]> => {
   // Simulate API call delay
   await new Promise(resolve => setTimeout(resolve, 1500));
-  
+
   const productName = product.name || product.product || 'Unknown Product';
   const productCategory = product.category || product.Category || 'Grocery';
-  
+
   // Generate mock alternatives based on product type
   if (productName.toLowerCase().includes('chips') || productName.toLowerCase().includes('crisps')) {
     return [
@@ -149,7 +149,7 @@ const getHealthyAlternativesFromGemini = async (product: any): Promise<any[]> =>
   }
 };
 
-const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({ 
+const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
   product,
   onAlternativeSelect
 }) => {
@@ -162,7 +162,7 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
     const fetchAlternatives = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         // In a real implementation, this would call the Gemini API
         const results = await getHealthyAlternativesFromGemini(product);
@@ -187,7 +187,7 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
     if (onAlternativeSelect) {
       onAlternativeSelect(alternative);
     }
-    
+
     toast({
       title: 'Healthy Alternative Selected',
       description: `You've selected ${alternative.name} as a healthier option.`,
@@ -197,7 +197,7 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
 
   if (isLoading) {
     return (
-      <Card className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+      <Card className="bg-green-50 border-2 border-green-400 dark:bg-green-900/30 dark:border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
         <CardContent className="p-6 flex flex-col items-center justify-center">
           <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
           <p className="text-green-700 dark:text-green-300 text-center">
@@ -242,7 +242,7 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
   }
 
   return (
-    <Card className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+    <Card className="bg-green-50 border-2 border-green-400 dark:bg-green-900/30 dark:border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg text-green-800 dark:text-green-200 flex items-center">
           <Leaf className="h-5 w-5 mr-2 text-green-500" />
@@ -255,9 +255,9 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
       <CardContent className="pt-2">
         <div className="space-y-4">
           {alternatives.map((alternative, index) => (
-            <div 
-              key={index} 
-              className="bg-white dark:bg-green-800/30 rounded-lg p-4 border border-green-100 dark:border-green-800"
+            <div
+              key={index}
+              className="bg-white dark:bg-green-800/30 rounded-lg p-4 border-2 border-green-400 dark:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(34,197,94,0.5)]"
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-medium text-green-800 dark:text-green-200">
@@ -267,19 +267,19 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
                   {alternative.healthScore.toFixed(1)}/10
                 </Badge>
               </div>
-              
+
               <p className="text-sm text-green-700 dark:text-green-300 mb-3">
                 {alternative.description}
               </p>
-              
+
               {alternative.benefits && (
                 <div className="mb-3">
                   <p className="text-xs text-green-600 dark:text-green-400 mb-1 font-medium">Benefits:</p>
                   <div className="flex flex-wrap gap-1">
                     {alternative.benefits.map((benefit: string, i: number) => (
-                      <Badge 
-                        key={i} 
-                        variant="outline" 
+                      <Badge
+                        key={i}
+                        variant="outline"
                         className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
                       >
                         <ThumbsUp className="h-3 w-3 mr-1 text-green-500" />
@@ -289,15 +289,14 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
                   </div>
                 </div>
               )}
-              
+
               <div className="flex justify-between items-center mt-2">
                 <span className="text-xs text-green-600 dark:text-green-400">
                   Source: {alternative.source}
                 </span>
-                <Button 
-                  variant="outline" 
+                <Button
                   size="sm"
-                  className="text-green-700 border-green-300 hover:bg-green-100 hover:text-green-800 dark:text-green-300 dark:border-green-700 dark:hover:bg-green-800/50"
+                  className="bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors duration-200"
                   onClick={() => handleSelectAlternative(alternative)}
                 >
                   <ExternalLink className="h-3.5 w-3.5 mr-1" />

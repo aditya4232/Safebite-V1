@@ -16,9 +16,9 @@ import GuestDashboard from '@/components/GuestDashboard';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, setDoc } from "firebase/firestore";
 import userActivityService, { UserActivity } from '@/services/userActivityService';
-import FoodDeliveryPopup from '@/components/FoodDeliveryPopup';
+// Food delivery popup removed as it's now live
 import MacronutrientChart from '@/components/MacronutrientChart';
 import HighchartsComponent from '@/components/HighchartsComponent';
 import FoodChatBot from '@/components/FoodChatBot';
@@ -70,7 +70,7 @@ const Dashboard = () => {
   const user = auth.currentUser;
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [showFoodDeliveryPopup, setShowFoodDeliveryPopup] = useState(false);
+  // Food delivery popup state removed as it's now live
   const chatbotRef = useRef<HTMLDivElement>(null);
   const [userActivity, setUserActivity] = useState<UserActivity[]>([]);
   const [profileError, setProfileError] = useState('');
@@ -88,48 +88,8 @@ const Dashboard = () => {
     });
   }, [isGuest, user]);
 
-  // Show food delivery popup and load user activity
+  // Load user activity for personalized suggestions
   useEffect(() => {
-    // Check if popup should be shown based on last shown timestamp
-    const shouldShowPopup = () => {
-      // Don't show for guest users
-      if (isGuest || !user) return false;
-
-      // Check if user has permanently dismissed the popup
-      if (localStorage.getItem('hideDeliveryPopup') === 'permanent') return false;
-
-      // Get the last time the popup was shown
-      const lastShown = localStorage.getItem('lastDeliveryPopupShown');
-
-      // If never shown before, show it
-      if (!lastShown) return true;
-
-      // Check if it was shown in the current session
-      const currentSession = sessionStorage.getItem('currentSession');
-      if (!currentSession) {
-        // New session, set session marker
-        sessionStorage.setItem('currentSession', Date.now().toString());
-        return true;
-      }
-
-      // Check if it was shown in the last 24 hours
-      const lastShownTime = parseInt(lastShown, 10);
-      const currentTime = Date.now();
-      const oneDayInMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-      return (currentTime - lastShownTime) > oneDayInMs;
-    };
-
-    // Show food delivery popup after a delay if conditions are met
-    const popupTimer = setTimeout(() => {
-      if (shouldShowPopup()) {
-        setShowFoodDeliveryPopup(true);
-        // Record the current time as the last shown time
-        localStorage.setItem('lastDeliveryPopupShown', Date.now().toString());
-      }
-    }, 5000); // 5 seconds delay
-
-    // Load user activity for personalized suggestions
     const loadUserActivity = async () => {
       if (!isGuest && user) {
         try {
@@ -142,18 +102,57 @@ const Dashboard = () => {
     };
 
     loadUserActivity();
-
-    return () => clearTimeout(popupTimer);
   }, [isGuest, user]);
 
-  // Check if this is the user's first visit
+  // Check if this is the user's first visit and show notifications
   useEffect(() => {
     const isFirstVisit = localStorage.getItem('safebite-first-visit') !== 'false';
     if (isFirstVisit && !isGuest) {
       setShowWelcomeAnimation(true);
       localStorage.setItem('safebite-first-visit', 'false');
     }
-  }, [isGuest]);
+
+    // Add notification about food delivery being live
+    const addFoodDeliveryNotification = async () => {
+      if (isGuest || !user) return;
+
+      try {
+        const notificationsRef = collection(db, 'notifications');
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.exists() ? userDoc.data() : {};
+
+        // Check if we've already sent this notification
+        if (!userData.foodDeliveryNotificationSent) {
+          // Add notification
+          await setDoc(doc(notificationsRef), {
+            userId: user.uid,
+            title: 'Food Delivery Now Live!',
+            message: 'Our food delivery integration is now live! Search and order from multiple platforms directly from SafeBite.',
+            type: 'success',
+            category: 'food',
+            timestamp: new Date(),
+            read: false,
+            icon: 'food',
+            link: '/food-delivery'
+          });
+
+          // Mark notification as sent
+          await setDoc(userRef, { foodDeliveryNotificationSent: true }, { merge: true });
+
+          // Show toast
+          toast({
+            title: "Food Delivery Now Live!",
+            description: "Check out our new food delivery integration!",
+          });
+        }
+      } catch (error) {
+        console.error('Error adding food delivery notification:', error);
+      }
+    };
+
+    addFoodDeliveryNotification();
+  }, [isGuest, user, db, toast]);
 
   // Load user profile on component mount
   useEffect(() => {
@@ -422,16 +421,7 @@ const Dashboard = () => {
         />
       )}
 
-      {/* Food Delivery Popup */}
-      <div style={{ marginRight: '6rem' }}>
-        <FoodDeliveryPopup
-          isOpen={showFoodDeliveryPopup}
-          onClose={() => setShowFoodDeliveryPopup(false)}
-          currentPage="dashboard"
-          userData={userProfile}
-          searchResults={[]}
-        />
-      </div>
+      {/* Food Delivery Popup removed as it's now live */}
 
       {/* AI Chatbot */}
       <div ref={chatbotRef} style={{ zIndex: 50 }}>
@@ -495,11 +485,11 @@ const Dashboard = () => {
                 Profile
               </Button>
               <Button
-                className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 transition-all duration-300"
+                className="bg-gradient-to-r from-green-500 to-teal-500 text-white hover:from-green-600 hover:to-teal-600 transition-all duration-300"
                 onClick={() => navigate('/food-delivery')}
               >
                 <Truck className="mr-2 h-4 w-4" /> Food Delivery
-                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Now Live</span>
+                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Live</span>
               </Button>
             </div>
           </div>

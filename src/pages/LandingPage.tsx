@@ -7,7 +7,7 @@ import DevPopup from "@/components/DevPopup";
 import ProfileImage from "@/components/ProfileImage";
 import {
   Shield, Brain, Heart, Zap, Search, ArrowRight,
-  Users, BarChart, Clock, Star, LogIn, Info, Check
+  Users, BarChart, Clock, Star, LogIn, Info, Check, Sparkles
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -162,9 +162,9 @@ const LandingPage = () => {
               />
               {/* Added hover:shadow-neon-teal */}
               <FeatureCard
-                title="Food Tracker"
-                description="Add foods to your daily tracker to monitor your nutrition intake and stay on target with your goals."
-                icon={<Zap size={24} />}
+                title="Health Insights"
+                description="Get personalized health insights based on your weekly check-ins and nutrition data."
+                icon={<Sparkles size={24} />}
                 className="hover:border-safebite-teal/50 transition-all duration-300 hover:shadow-neon-teal"
               />
             </div>

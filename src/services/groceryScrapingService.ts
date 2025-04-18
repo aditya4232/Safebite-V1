@@ -84,12 +84,46 @@ class GroceryScrapingService {
   // Scrape grocery products from various sources
   private async scrapeGroceryProducts(query: string): Promise<GroceryProduct[]> {
     try {
-      // In a real implementation, this would make API calls to a backend scraper
-      // For now, we'll return mock data
+      // Make API call to backend scraper
+      const response = await fetch(`https://safebite-backend.onrender.com/api/grocery/search?q=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data && Array.isArray(data.results) && data.results.length > 0) {
+        // Transform the API response to match our GroceryProduct interface
+        return data.results.map((item: any) => ({
+          _id: item._id || `${item.name}-${Date.now()}`,
+          name: item.name || item.product || 'Unknown Product',
+          brand: item.brand || '',
+          category: item.category || '',
+          description: item.description || '',
+          price: item.price || 0,
+          sale_price: item.sale_price || item.price,
+          market_price: item.market_price || item.price,
+          image_url: item.image_url || `https://source.unsplash.com/random/300x300/?${encodeURIComponent(query)},grocery`,
+          source: item.source || 'Other',
+          redirect: item.redirect || '',
+          nutritional_info: item.nutritional_info || {},
+          offers: item.offers || [],
+          rating: item.rating || 0,
+          reviews_count: item.reviews_count || 0,
+          in_stock: item.in_stock !== undefined ? item.in_stock : true,
+          delivery_time: item.delivery_time || '',
+          _collection: 'grocery'
+        }));
+      }
+
+      // If API returns no results, fall back to mock data
+      console.log('API returned no results, using mock data');
       return this.getMockGroceryProducts(query);
     } catch (error) {
       console.error('Error scraping grocery products:', error);
-      return [];
+      // Fall back to mock data if API fails
+      return this.getMockGroceryProducts(query);
     }
   }
 
@@ -194,7 +228,7 @@ class GroceryScrapingService {
   private getMockGroceryProducts(query: string): GroceryProduct[] {
     // Format the query for better display
     const formattedQuery = query.charAt(0).toUpperCase() + query.slice(1).toLowerCase();
-    
+
     return [
       // Blinkit products
       {
@@ -249,7 +283,7 @@ class GroceryScrapingService {
         delivery_time: '10-15 min',
         _collection: 'grocery'
       },
-      
+
       // Zepto products
       {
         name: `Fresh ${formattedQuery}`,
@@ -303,7 +337,7 @@ class GroceryScrapingService {
         delivery_time: '10 min',
         _collection: 'grocery'
       },
-      
+
       // Instamart products
       {
         name: `Premium ${formattedQuery}`,
@@ -357,7 +391,7 @@ class GroceryScrapingService {
         delivery_time: '15-20 min',
         _collection: 'grocery'
       },
-      
+
       // BigBasket products
       {
         name: `Organic ${formattedQuery} Premium`,
