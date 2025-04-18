@@ -344,11 +344,175 @@ export const fetchRecipesWithFallback = async (
 // Remove the JSX component from this file as it's a pure TypeScript utility file
 // We'll create a separate React component for the API status indicator
 
+/**
+ * Fetch restaurant data from the scraping API
+ * @param foodItem - Food item to search for
+ * @param city - City to search in
+ * @returns Promise with restaurant data
+ */
+export const fetchRestaurantData = async (
+  foodItem: string,
+  city: string
+): Promise<any[]> => {
+  try {
+    // Check if API is available first
+    const { isAvailable, activeUrl } = await checkApiStatus();
+
+    if (!isAvailable) {
+      console.warn('API is not available, returning mock restaurant data');
+      // Return mock data
+      return getMockRestaurantData(foodItem);
+    }
+
+    // API is available, try to fetch restaurant data
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+    const url = `${activeUrl}/api/scrape/restaurants`;
+
+    console.log(`Fetching restaurant data from: ${url}`);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ foodItem, city })
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`API returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (Array.isArray(data)) {
+      console.log(`Successfully fetched ${data.length} restaurants from API`);
+      return data;
+    }
+
+    // If we got here, the response format is unexpected
+    console.warn('Unexpected API response format for restaurants:', data);
+    throw new Error('Unexpected API response format');
+  } catch (error) {
+    console.error('Error fetching restaurant data:', error);
+    // Return mock data as fallback
+    return getMockRestaurantData(foodItem);
+  }
+};
+
+/**
+ * Get mock restaurant data for testing
+ * @param foodItem - Food item to search for
+ * @returns Array of mock restaurant data
+ */
+const getMockRestaurantData = (foodItem: string): any[] => {
+  return [
+    {
+      name: `Hyderabad ${foodItem} House`,
+      restaurant: `Hyderabad ${foodItem} House`,
+      rating: '4.2',
+      delivery_time: '30-35 min',
+      price_range: '₹₹',
+      cuisine: 'Various',
+      address: 'Road No. 12, Hyderabad Central',
+      popular_dishes: [`${foodItem} Special`, `Spicy ${foodItem}`],
+      source: 'Swiggy',
+      redirect: 'https://www.swiggy.com',
+      image_url: 'https://source.unsplash.com/random/300x200/?restaurant,indian',
+      dish_details: [
+        {
+          name: `${foodItem} Special`,
+          price: '₹250',
+          description: `Delicious ${foodItem.toLowerCase()} prepared in a special way`,
+          is_veg: true,
+          rating: '4.5',
+          image_url: `https://source.unsplash.com/random/300x200/?${foodItem.toLowerCase()},food`
+        }
+      ]
+    },
+    {
+      name: `Royal ${foodItem}`,
+      restaurant: `Royal ${foodItem}`,
+      rating: '4.3',
+      delivery_time: '35-40 min',
+      price_range: '₹₹₹',
+      cuisine: 'Various',
+      address: 'Banjara Hills, Hyderabad',
+      popular_dishes: [`Spicy ${foodItem}`, `Classic ${foodItem}`],
+      source: 'Zomato',
+      redirect: 'https://www.zomato.com',
+      image_url: 'https://source.unsplash.com/random/300x200/?restaurant,fancy',
+      dish_details: [
+        {
+          name: `Classic ${foodItem}`,
+          price: '₹280',
+          description: `Traditional ${foodItem.toLowerCase()} with authentic flavors`,
+          is_veg: true,
+          rating: '4.4',
+          image_url: `https://source.unsplash.com/random/300x200/?${foodItem.toLowerCase()},dish`
+        }
+      ]
+    },
+    {
+      name: `The ${foodItem} Factory`,
+      restaurant: `The ${foodItem} Factory`,
+      rating: '4',
+      delivery_time: '25-30 min',
+      price_range: '₹₹₹',
+      cuisine: 'Various',
+      address: 'Jubilee Hills, Hyderabad',
+      popular_dishes: [`${foodItem} Special`, `Kadai ${foodItem}`],
+      source: 'Swiggy',
+      redirect: 'https://www.swiggy.com',
+      image_url: 'https://source.unsplash.com/random/300x200/?restaurant,modern',
+      dish_details: [
+        {
+          name: `Kadai ${foodItem}`,
+          price: '₹270',
+          description: `Spicy ${foodItem.toLowerCase()} with bell peppers and kadai masala`,
+          is_veg: true,
+          rating: '4.2',
+          image_url: `https://source.unsplash.com/random/300x200/?${foodItem.toLowerCase()},spicy`
+        }
+      ]
+    },
+    {
+      name: `Hyderabad ${foodItem} Center`,
+      restaurant: `Hyderabad ${foodItem} Center`,
+      rating: '4.1',
+      delivery_time: '30-35 min',
+      price_range: '₹₹',
+      cuisine: 'Various',
+      address: 'Madhapur, Hyderabad',
+      popular_dishes: [`${foodItem} Special`, 'Butter Naan'],
+      source: 'Zomato',
+      redirect: 'https://www.zomato.com',
+      image_url: 'https://source.unsplash.com/random/300x200/?restaurant,traditional',
+      dish_details: [
+        {
+          name: 'Butter Naan',
+          price: '₹50',
+          description: 'Soft buttery naan bread',
+          is_veg: true,
+          rating: '4.3',
+          image_url: 'https://source.unsplash.com/random/300x200/?naan,bread'
+        }
+      ]
+    }
+  ];
+};
+
 export default {
   API_BASE_URL,
   BACKUP_API_URL,
   FALLBACK_PRODUCTS,
   checkApiStatus,
   fetchProductsWithFallback,
-  fetchRecipesWithFallback
+  fetchRecipesWithFallback,
+  fetchRestaurantData
 };

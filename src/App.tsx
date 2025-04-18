@@ -34,86 +34,21 @@ import { app } from "./firebase";
 import DevPopup from "@/components/DevPopup";
 import FoodChatBot from "@/components/FoodChatBot";
 // import { useGuestMode } from "@/hooks/useGuestMode";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { isAuthPage, redirectToLogin } from "@/utils/authUtils";
 import guestAuthService from "@/services/guestAuthService";
 import UserActivityService from "@/services/userActivityService";
+import simpleSessionService from "@/services/simpleSessionService";
+import SimpleAuthGuard from "@/components/SimpleAuthGuard";
 import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import WeeklyQuestionsForm from "@/components/WeeklyQuestionsForm";
+import SimpleDashboard from "@/components/SimpleDashboard";
 
 const queryClient = new QueryClient();
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const auth = getAuth(app);
-  const [authState, setAuthState] = useState<'authenticated' | 'unauthenticated' | 'loading'>('loading');
-
-  useEffect(() => {
-    // Check if user is logged in or in guest mode with valid session
-    const checkAuth = () => {
-      const user = auth.currentUser;
-      const isGuestMode = guestAuthService.isGuestUser(); // This checks for valid session
-
-      // Add detailed logging for authentication state
-      console.log('ProtectedRoute - Auth check:', {
-        user: user ? 'Logged in' : 'Not logged in',
-        isGuestMode,
-        userType: localStorage.getItem('userType'),
-        guestMode: sessionStorage.getItem('safebite-guest-mode'),
-        guestSessionExpires: localStorage.getItem('guestSessionExpires'),
-        path: window.location.pathname
-      });
-
-      if (user || isGuestMode) {
-        setAuthState('authenticated');
-
-        // If in guest mode, extend the session to keep it active while using the app
-        if (isGuestMode && !user) {
-          guestAuthService.extendGuestSession();
-          console.log('Guest session extended in ProtectedRoute');
-        }
-      } else {
-        setAuthState('unauthenticated');
-
-        // If not on an auth page, redirect to login
-        if (!isAuthPage()) {
-          console.log('Not authenticated and not on auth page, redirecting to login');
-          redirectToLogin();
-        }
-      }
-    };
-
-    // Check immediately
-    checkAuth();
-
-    // Also listen for auth state changes
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      checkAuth();
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
-
-  // Show loading state while checking authentication
-  if (authState === 'loading') {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-safebite-teal"></div>
-    </div>;
-  }
-
-  // If authenticated, render children, otherwise redirect to login
-  if (authState === 'authenticated') {
-    return <>{children}</>;
-  }
-
-  // Redirect to login page
-  return <Navigate to="/auth/login" replace />;
-};
+// We're now using the AuthGuard component instead of ProtectedRoute
 
 const App = () => {
   const auth = getAuth(app);
@@ -260,23 +195,29 @@ const App = () => {
               <Route path="/auth/signup" element={<Signup />} />
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
-              <Route path="/health-check" element={<ProtectedRoute><HealthCheck /></ProtectedRoute>} />
+              <Route path="/health-check" element={<SimpleAuthGuard><HealthCheck /></SimpleAuthGuard>} />
 
               {/* Protected Routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/nutrition" element={<ProtectedRoute><Nutrition userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/dashboard" element={
+                <SimpleAuthGuard>
+                  <ErrorBoundary fallback={<SimpleDashboard />}>
+                    <Dashboard />
+                  </ErrorBoundary>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/nutrition" element={<SimpleAuthGuard><Nutrition userProfile={userProfile} /></SimpleAuthGuard>} />
               {/* Redirect old food search to nutrition page */}
               <Route path="/food-search" element={<Navigate to="/nutrition" replace />} />
-              <Route path="/food-delivery" element={<ProtectedRoute><FoodDelivery /></ProtectedRoute>} />
-              <Route path="/product-recommendations" element={<ProtectedRoute><ProductRecommendationsPage /></ProtectedRoute>} />
+              <Route path="/food-delivery" element={<SimpleAuthGuard><FoodDelivery /></SimpleAuthGuard>} />
+              <Route path="/product-recommendations" element={<SimpleAuthGuard><ProductRecommendationsPage /></SimpleAuthGuard>} />
               {/* Redirect from old products page to grocery products */}
               <Route path="/products" element={<Navigate to="/grocery-products" replace />} />
-              <Route path="/grocery-products" element={<ProtectedRoute><GroceryProducts /></ProtectedRoute>} />
-              <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
-              <Route path="/healthbox" element={<ProtectedRoute><HealthBox /></ProtectedRoute>} />
-              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-              <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/grocery-products" element={<SimpleAuthGuard><GroceryProducts /></SimpleAuthGuard>} />
+              <Route path="/community" element={<SimpleAuthGuard><Community /></SimpleAuthGuard>} />
+              <Route path="/healthbox" element={<SimpleAuthGuard><HealthBox /></SimpleAuthGuard>} />
+              <Route path="/reports" element={<SimpleAuthGuard><Reports /></SimpleAuthGuard>} />
+              <Route path="/recipes" element={<SimpleAuthGuard><Recipes /></SimpleAuthGuard>} />
+              <Route path="/settings" element={<SimpleAuthGuard><Settings /></SimpleAuthGuard>} />
 
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />

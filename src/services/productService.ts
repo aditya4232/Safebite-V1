@@ -1,4 +1,5 @@
 // Product service for fetching products from the API
+import groceryScrapingService, { GroceryProduct } from './groceryScrapingService';
 
 // API base URL - Always use the Render backend for reliable results
 export const API_BASE_URL = 'http://10.20.65.157:10000';
@@ -272,7 +273,51 @@ export const fetchGroceryProducts = async (
     }
 
     if (!endpointFound || !response) {
-      console.error('All endpoints failed');
+      console.warn('All MongoDB endpoints failed, trying web scraping service');
+
+      // Use web scraping service as a last resort
+      try {
+        if (search) {
+          const scrapedProducts = await groceryScrapingService.searchGroceryProducts(search);
+
+          if (scrapedProducts && scrapedProducts.length > 0) {
+            console.log('Using scraped grocery products:', scrapedProducts.length);
+
+            // Convert GroceryProduct to Product format
+            const products = scrapedProducts.map(product => ({
+              _id: product._id || `scraped_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              name: product.name,
+              brand: product.brand,
+              category: product.category,
+              description: product.description,
+              sale_price: product.sale_price,
+              market_price: product.market_price,
+              price: product.price,
+              imageUrl: product.image_url,
+              rating: product.rating,
+              _collection: 'grocery' as const,
+              nutritionalInfo: product.nutritional_info,
+              tags: product.offers
+            }));
+
+            // Apply pagination
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const paginatedProducts = products.slice(startIndex, endIndex);
+
+            return {
+              products: paginatedProducts,
+              total: products.length,
+              page,
+              totalPages: Math.ceil(products.length / limit)
+            };
+          }
+        }
+      } catch (scrapingError) {
+        console.error('Error using web scraping service:', scrapingError);
+      }
+
+      console.error('All data retrieval methods failed');
       return { products: [], total: 0, page: 1, totalPages: 1 };
     }
 

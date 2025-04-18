@@ -23,21 +23,57 @@ dist-ssr
 *.sln
 *.sw?
 
-# Ignore Firebase & API Keys
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+.env.local
+.env.development
+.env.production
+
+# Firebase configuration and keys
 firebase.json
 firestore.rules
 serviceAccountKey.json
+firebase-adminsdk-*.json
 Securitycode
-# API Keys
+
+# API Keys and credentials
 *.key
 *.keys
 *.secret
 *.secrets
 *.credentials
+*.pem
+*.p8
+*.p12
+*.pfx
+*.cert
+
+# Specific API keys (for documentation purposes only, actual keys should be in .env)
 OPENFOODFACT_API_KEY
 EDAMAM_APP_ID
 EDAMAM_APP_KEY
 CALORIENINJAS_API_KEY
 FATSECRET_CONSUMER_KEY
 FATSECRET_CONSUMER_SECRET
+GEMINI_API_KEY
+
+# Local development files
+.cache/
+.temp/
+.tmp/
+
+# Build artifacts
+build/
+out/
+.next/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Misc
+.vercel
+.netlify
+.history/

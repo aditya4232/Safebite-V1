@@ -13,14 +13,15 @@ import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { app } from "../firebase";
 import { useGuestMode } from '@/hooks/useGuestMode';
-import { RestaurantResult, DishDetails, toggleFavoriteRestaurant } from '@/services/foodDeliveryService';
+import { RestaurantData, DishDetail } from '@/services/webScrapingService';
+import webScrapingService from '@/services/webScrapingService';
 
 interface FoodDeliveryPopupProps {
   isOpen: boolean;
   onClose: () => void;
   currentPage?: string;
   userData?: any;
-  searchResults: RestaurantResult[];
+  searchResults?: RestaurantData[];
 }
 
 const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
@@ -28,7 +29,7 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
   onClose,
   currentPage = '',
   userData = null,
-  searchResults
+  searchResults = []
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -39,9 +40,13 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"restaurants" | "dishes">("restaurants");
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [localResults, setLocalResults] = useState<RestaurantResult[]>([]);
+  const [localResults, setLocalResults] = useState<RestaurantData[]>([]);
   const [iframeUrl, setIframeUrl] = useState<string>("");
   const [showIframe, setShowIframe] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchLocation, setSearchLocation] = useState<string>('Hyderabad');
+  const [showNoResults, setShowNoResults] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Load favorites when component mounts
   useEffect(() => {
@@ -63,7 +68,7 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
 
   // Update local results with favorites
   useEffect(() => {
-    if (searchResults.length > 0) {
+    if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
       const updatedResults = searchResults.map(result => ({
         ...result,
         is_favorite: favorites.includes(result.restaurant)
@@ -73,6 +78,62 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
       setLocalResults([]);
     }
   }, [searchResults, favorites]);
+
+  // Search for restaurants
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      toast({
+        title: "Search query required",
+        description: "Please enter a food item to search for.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setShowNoResults(false);
+
+    try {
+      // Call our web scraping service
+      const results = await webScrapingService.searchRestaurants(searchQuery, searchLocation);
+
+      // Update results with favorite status
+      const updatedResults = results.map(result => ({
+        ...result,
+        is_favorite: favorites.includes(result.restaurant)
+      }));
+
+      setLocalResults(updatedResults);
+      setShowNoResults(updatedResults.length === 0);
+
+      // Track search in Firebase if user is logged in
+      if (auth.currentUser && !isGuest) {
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.exists() ? userDoc.data() : {};
+
+        // Update search history
+        await setDoc(userRef, {
+          searchHistory: [
+            ...(userData.searchHistory || []),
+            {
+              type: 'food_delivery',
+              query: searchQuery,
+              location: searchLocation,
+              timestamp: new Date(),
+              results: updatedResults.length
+            }
+          ].slice(-20) // Keep only last 20 searches
+        }, { merge: true });
+      }
+    } catch (error) {
+      console.error('Error searching restaurants:', error);
+      setError('Failed to search restaurants. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle toggling favorites
   const handleToggleFavorite = async (restaurant: string) => {
@@ -102,8 +163,13 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
         favoriteRestaurants: updatedFavorites
       });
 
-      // Also update the toggleFavoriteRestaurant service for tracking
-      await toggleFavoriteRestaurant(user.uid, restaurant, !isFavorite);
+      // Track this action for analytics
+      await setDoc(doc(db, 'user_actions', `${user.uid}_${Date.now()}`), {
+        userId: user.uid,
+        action: isFavorite ? 'remove_favorite_restaurant' : 'add_favorite_restaurant',
+        restaurant: restaurant,
+        timestamp: new Date()
+      });
 
       toast({
         title: isFavorite ? "Removed from favorites" : "Added to favorites",
@@ -133,25 +199,25 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
       case 'dashboard':
         return {
           title: "Food Delivery Integration",
-          subtitle: userData ? `Personalized for ${userData.displayName || 'you'}` : 'Coming Soon',
+          subtitle: userData ? `Personalized for ${userData.displayName || 'you'}` : 'Now Live',
           description: "Get nutritional insights for your food delivery orders and make healthier choices based on your health profile."
         };
       case 'nutrition':
         return {
           title: "Nutrition-Aware Food Delivery",
-          subtitle: 'Coming Soon',
+          subtitle: 'Now Live',
           description: "Track nutrition from your food delivery orders and stay on top of your health goals."
         };
       case 'recipes':
         return {
           title: "Order Instead of Cooking",
-          subtitle: 'Coming Soon',
+          subtitle: 'Now Live',
           description: "Don't have time to cook? Order similar healthy options from your favorite restaurants."
         };
       default:
         return {
           title: "Food Delivery Integration",
-          subtitle: 'Coming Soon',
+          subtitle: 'Now Live',
           description: "Get nutritional insights for your food delivery orders and make healthier choices."
         };
     }
@@ -191,7 +257,7 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
         setIsNotifyMeEnabled(true);
         toast({
           title: "Notification enabled",
-          description: "You'll be notified when food delivery integration is available.",
+          description: "You'll receive updates about new food delivery features.",
         });
       }
     } catch (error) {
@@ -225,6 +291,58 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
+          {/* Search bar */}
+          <div className="mb-6 bg-safebite-card-bg border border-safebite-card-bg-alt rounded-lg p-4">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="flex-1">
+                <label htmlFor="food-search" className="text-xs text-safebite-text-secondary mb-1 block">Food Item</label>
+                <div className="relative">
+                  <input
+                    id="food-search"
+                    type="text"
+                    placeholder="Search for paneer butter masala, pizza, etc."
+                    className="w-full bg-safebite-dark-blue border border-safebite-card-bg-alt rounded-md px-3 py-2 text-safebite-text placeholder:text-safebite-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-safebite-teal"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                </div>
+              </div>
+              <div className="md:w-1/3">
+                <label htmlFor="location-search" className="text-xs text-safebite-text-secondary mb-1 block">Location</label>
+                <div className="relative">
+                  <input
+                    id="location-search"
+                    type="text"
+                    placeholder="City name"
+                    className="w-full bg-safebite-dark-blue border border-safebite-card-bg-alt rounded-md px-3 py-2 text-safebite-text placeholder:text-safebite-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-safebite-teal"
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                </div>
+              </div>
+              <div className="md:w-auto flex items-end">
+                <Button
+                  className="w-full md:w-auto bg-safebite-teal hover:bg-safebite-teal/80 text-safebite-dark-blue"
+                  onClick={handleSearch}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Search
+                </Button>
+              </div>
+            </div>
+            {error && (
+              <div className="mt-3 text-red-500 text-sm">
+                <AlertTriangle className="h-4 w-4 inline-block mr-1" />
+                {error}
+              </div>
+            )}
+          </div>
+
           {/* Tabs for switching between restaurants and dishes */}
           <Tabs defaultValue="restaurants" className="mb-6" onValueChange={(value) => setActiveTab(value as "restaurants" | "dishes")}>
             <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -258,6 +376,21 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                           </Button>
                         </div>
                       </div>
+
+                      {/* Restaurant Image */}
+                      {r.image_url && (
+                        <div className="mb-3 rounded-md overflow-hidden h-40 bg-safebite-card-bg-alt">
+                          <img
+                            src={r.image_url}
+                            alt={r.restaurant}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback image if the original fails to load
+                              e.currentTarget.src = `https://source.unsplash.com/random/300x200/?restaurant,${encodeURIComponent(r.restaurant)}`;
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-2 mb-3">
                         {r.rating && (
@@ -460,11 +593,11 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
               </li>
               <li className="flex items-start">
                 <span className="text-safebite-teal mr-2">•</span>
-                <span>Get nutritional information for restaurant meals (coming soon)</span>
+                <span>Get nutritional information for restaurant meals</span>
               </li>
               <li className="flex items-start">
                 <span className="text-safebite-teal mr-2">•</span>
-                <span>Personalized recommendations based on your health profile (coming soon)</span>
+                <span>Personalized recommendations based on your health profile</span>
               </li>
             </ul>
           </div>
@@ -497,7 +630,7 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                 ) : (
                   <Bell className="mr-2 h-4 w-4" />
                 )}
-                {isNotifyMeEnabled ? "Notifications On" : "Notify Me"}
+                {isNotifyMeEnabled ? "Notifications On" : "Get Offers"}
               </Button>
             </div>
           </div>

@@ -263,7 +263,10 @@ class UserActivityService {
 
       if (activityDoc.exists()) {
         const data = activityDoc.data() as UserActivityLog;
-        return data.activities.slice(-limit);
+        if (data && data.activities && Array.isArray(data.activities)) {
+          return data.activities.slice(-limit);
+        }
+        return [];
       }
 
       return [];
@@ -289,7 +292,10 @@ class UserActivityService {
 
       if (activityDoc.exists()) {
         const data = activityDoc.data() as UserActivityLog;
-        return data.activities || [];
+        if (data && data.activities && Array.isArray(data.activities)) {
+          return data.activities;
+        }
+        return [];
       }
 
       return [];

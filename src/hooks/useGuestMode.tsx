@@ -58,9 +58,6 @@ export const useGuestMode = () => {
     // Set up an interval to check periodically (every 2 seconds)
     const intervalId = setInterval(checkGuestMode, 2000);
 
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(intervalId);
-
     // Listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
@@ -75,8 +72,11 @@ export const useGuestMode = () => {
       }
     });
 
-    // Cleanup subscription
-    return () => unsubscribe();
+    // Cleanup subscription and interval
+    return () => {
+      unsubscribe();
+      clearInterval(intervalId);
+    };
   }, [auth]);
 
   // Function to exit guest mode (for logout)

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle, CheckCircle, XCircle,
   Leaf, Flame, Heart, Tag, Star, Share2,
   Bookmark, Clock, ArrowLeft, Plus, Zap,
-  Bot, Loader2
+  Bot, Loader2, Brain
 } from 'lucide-react';
+import SimpleGeminiAnalysis from './SimpleGeminiAnalysis';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -352,50 +353,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
         </TabsContent>
 
         <TabsContent value="ai-analysis" className="space-y-4">
-          {isAnalysisLoading ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-safebite-teal mb-4" />
-              <p className="text-safebite-text-secondary">Analyzing food item...</p>
-            </div>
-          ) : aiAnalysis ? (
-            <div className="bg-safebite-card-bg-alt p-4 rounded-md">
-              <div className="flex items-center mb-4">
-                <Bot className="h-5 w-5 text-safebite-teal mr-2" />
-                <h4 className="text-lg font-medium text-safebite-text">AI Nutritional Analysis</h4>
-              </div>
-              <div className="text-safebite-text-secondary">
-                {aiAnalysis.split('\n').map((line, index) => {
-                  // Check if line is a heading (starts with number and period or has a colon)
-                  if (/^\d+\.\s/.test(line) || line.includes(':')) {
-                    return (
-                      <h5 key={index} className="font-semibold text-safebite-teal mt-3 mb-1">
-                        {line}
-                      </h5>
-                    );
-                  }
-                  // Check if line is a bullet point
-                  else if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
-                    return (
-                      <div key={index} className="flex items-start ml-2 mb-1">
-                        <span className="text-safebite-teal mr-2">•</span>
-                        <p>{line.replace(/^[•\-]\s*/, '')}</p>
-                      </div>
-                    );
-                  }
-                  // Regular paragraph
-                  else if (line.trim()) {
-                    return <p key={index} className="mb-2">{line}</p>;
-                  }
-                  // Empty line
-                  return <div key={index} className="h-2"></div>;
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-safebite-text-secondary">No AI analysis available</p>
-            </div>
-          )}
+          <SimpleGeminiAnalysis foodItem={food} />
         </TabsContent>
       </Tabs>
 
@@ -414,11 +372,11 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
             </div>
           </div>
           <Button
-            disabled
-            className="w-full mt-3 bg-orange-500/20 text-orange-500 hover:bg-orange-500/30 cursor-not-allowed"
+            className="w-full mt-3 bg-orange-500 text-white hover:bg-orange-600"
+            onClick={() => window.open('/food-delivery', '_blank')}
           >
-            <Clock className="mr-2 h-4 w-4" />
-            Coming Soon
+            <Zap className="mr-2 h-4 w-4" />
+            Now Live
           </Button>
         </Card>
 

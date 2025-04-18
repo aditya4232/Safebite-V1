@@ -23,16 +23,16 @@ const FoodDeliveryCard: React.FC<FoodDeliveryCardProps> = ({ className = '' }) =
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-safebite-text">Food Delivery</h3>
-                <Badge className="bg-orange-500 text-white text-xs">Coming Soon</Badge>
+                <Badge className="bg-orange-500 text-white text-xs">Now Live</Badge>
               </div>
             </div>
           </div>
-          
+
           <p className="text-safebite-text-secondary text-sm mb-4">
             Get nutritional insights for your favorite restaurant meals from Zomato and Swiggy.
           </p>
-          
-          <Button 
+
+          <Button
             onClick={() => setIsPopupOpen(true)}
             className="w-full bg-safebite-card-bg-alt hover:bg-safebite-card-bg-alt/80"
           >
@@ -41,10 +41,11 @@ const FoodDeliveryCard: React.FC<FoodDeliveryCardProps> = ({ className = '' }) =
           </Button>
         </CardContent>
       </Card>
-      
-      <FoodDeliveryPopup 
-        isOpen={isPopupOpen} 
-        onClose={() => setIsPopupOpen(false)} 
+
+      <FoodDeliveryPopup
+        isOpen={isPopupOpen}
+        onClose={() => setIsPopupOpen(false)}
+        searchResults={[]}
       />
     </>
   );

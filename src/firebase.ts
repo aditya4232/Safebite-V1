@@ -1,17 +1,17 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth } from "firebase/auth"; // Import getAuth
+import { getAuth } from "firebase/auth";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration with fallback values
+// This ensures the app works even without environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyBuaEOWCEYeV2AknrXhqzuTdIp0rApYPw0",
-  authDomain: "safebite-a5a03.firebaseapp.com",
-  projectId: "safebite-a5a03",
-  storageBucket: "safebite-a5a03.firebasestorage.app",
-  messagingSenderId: "203093821661",
-  appId: "1:203093821661:web:127b2d80f7e08e6c23b334",
-  measurementId: "G-P4KG3JTM4N"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBuaEOWCEYeV2AknrXhqzuTdIp0rApYPw0",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "safebite-a5a03.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "safebite-a5a03",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "safebite-a5a03.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "203093821661",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:203093821661:web:127b2d80f7e08e6c23b334",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-P4KG3JTM4N"
 };
 
 // Initialize Firebase

@@ -366,10 +366,10 @@ const LandingPage = () => {
                      <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
                        <h4 className="text-safebite-teal font-medium mb-2">New Features</h4>
                        <ul className="text-safebite-text-secondary space-y-1 text-sm">
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced AI chatbot</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced AI chatbot with Gemini</span></li>
                          <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Weekly health check-in</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Improved dashboard</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Food delivery integration</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Improved dashboard with charts</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Health data visualization</span></li>
                        </ul>
                      </div>
                      <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">

@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Sparkles, Clock, RefreshCw, UserCircle,
   AlertTriangle, User, Activity, Truck, History, // Added History icon
-  Search, Pizza, ShoppingCart, Stethoscope // Added icons for activity types
+  Search, Pizza, ShoppingCart, Stethoscope, Bell, // Added icons for activity types
+  Trophy, Award // Added icons for achievements
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import GuestDashboard from '@/components/GuestDashboard';
@@ -21,6 +23,9 @@ import MacronutrientChart from '@/components/MacronutrientChart';
 import HighchartsComponent from '@/components/HighchartsComponent';
 import FoodChatBot from '@/components/FoodChatBot';
 import ProfilePopup from '@/components/ProfilePopup';
+import WelcomeAnimation from '@/components/WelcomeAnimation';
+import NotificationSystem from '@/components/NotificationSystem';
+import HealthDataCharts from '@/components/HealthDataCharts';
 
 // Define a basic interface for UserProfile based on usage
 interface UserProfile {
@@ -70,7 +75,8 @@ const Dashboard = () => {
   const [userActivity, setUserActivity] = useState<UserActivity[]>([]);
   const [profileError, setProfileError] = useState('');
   const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
-  const [showProfilePopup, setShowProfilePopup] = useState(false); // State for profile popup
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false); // State for profile popup
 
   // Debug guest mode status
   useEffect(() => {
@@ -139,6 +145,15 @@ const Dashboard = () => {
 
     return () => clearTimeout(popupTimer);
   }, [isGuest, user]);
+
+  // Check if this is the user's first visit
+  useEffect(() => {
+    const isFirstVisit = localStorage.getItem('safebite-first-visit') !== 'false';
+    if (isFirstVisit && !isGuest) {
+      setShowWelcomeAnimation(true);
+      localStorage.setItem('safebite-first-visit', 'false');
+    }
+  }, [isGuest]);
 
   // Load user profile on component mount
   useEffect(() => {
@@ -244,7 +259,7 @@ const Dashboard = () => {
   // Generate food safety issues based on user profile and activity
   const generateFoodSafetyIssues = () => {
     // If we have user activity data, use it to generate more relevant issues
-    if (userActivity && userActivity.length > 0) {
+    if (userActivity && Array.isArray(userActivity) && userActivity.length > 0) {
       const recentFoods = userActivity
         .filter(activity => activity.type === 'food_search' || activity.type === 'recipe_view')
         .map(activity => activity.details?.foodName || activity.details?.recipeName || '')
@@ -372,14 +387,40 @@ const Dashboard = () => {
   const foodSafetyIssues = generateFoodSafetyIssues();
   const healthCheckData = userProfile?.healthCheckData;
 
+  // Mock user stats and achievements for now
+  const userStats = { xp: 250 };
+  const userAchievements = [
+    { name: 'First Login', icon: <UserCircle className="h-6 w-6 text-safebite-teal" /> },
+    { name: 'Food Explorer', icon: <Search className="h-6 w-6 text-safebite-teal" /> },
+    { name: 'Health Check', icon: <Activity className="h-6 w-6 text-safebite-teal" /> }
+  ];
+
+  // Mock nutrition data
+  const userNutrition = {
+    calories: 2000,
+    protein: 50,
+    carbs: 250,
+    fat: 70,
+    fiber: 25,
+    sugar: 50
+  };
+
   return (
     <div className="relative" style={{ zIndex: 10 }}>
       {/* Development banner - Can be removed for production */}
       <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1 px-4 flex items-center justify-center z-50 text-xs font-medium">
         <Sparkles className="h-3 w-3 text-yellow-300 mr-1.5" />
-        <span>SafeBite v2.5 - Production Ready</span>
+        <span>SafeBite v3.0 - Production Ready</span>
         <Sparkles className="h-3 w-3 text-yellow-300 ml-1.5" />
       </div>
+
+      {/* Welcome Animation for new users */}
+      {showWelcomeAnimation && (
+        <WelcomeAnimation
+          onComplete={() => setShowWelcomeAnimation(false)}
+          userName={userProfile?.displayName || user?.displayName || userProfile?.name || user?.email?.split('@')[0] || 'there'}
+        />
+      )}
 
       {/* Food Delivery Popup */}
       <div style={{ marginRight: '6rem' }}>
@@ -388,6 +429,7 @@ const Dashboard = () => {
           onClose={() => setShowFoodDeliveryPopup(false)}
           currentPage="dashboard"
           userData={userProfile}
+          searchResults={[]}
         />
       </div>
 
@@ -442,7 +484,8 @@ const Dashboard = () => {
                 Your dashboard is ready. Check out your health insights and recommendations.
               </p>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex items-center space-x-2">
+              <NotificationSystem currentPage="dashboard" />
               <Button
                 variant="outline"
                 className="border-safebite-teal/30 hover:border-safebite-teal/60 text-safebite-text"
@@ -456,7 +499,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/food-delivery')}
               >
                 <Truck className="mr-2 h-4 w-4" /> Food Delivery
-                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Coming Soon</span>
+                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Now Live</span>
               </Button>
             </div>
           </div>
@@ -585,8 +628,49 @@ const Dashboard = () => {
             </div>
           )}
 
+          {/* Health Data Charts */}
+          {!isGuest && (
+            <div className="mb-6">
+              <HealthDataCharts
+                userId={user?.uid || 'default-user'}
+                initialTab="weight"
+              />
+            </div>
+          )}
+
+          {/* Achievements Card */}
+          <div className="mb-6">
+            <Card className="sci-fi-card border-safebite-teal/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-bold text-safebite-text flex items-center">
+                  <Award className="mr-2 h-5 w-5 text-safebite-teal" />
+                  Achievements
+                  <Badge className="ml-3 bg-safebite-teal text-safebite-dark-blue">XP: {userStats?.xp || 0}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {(userAchievements || []).slice(0, 6).map((achievement, index) => (
+                    <div key={index} className="flex flex-col items-center justify-center p-2 bg-safebite-card-bg-alt/30 rounded-lg">
+                      <div className="w-12 h-12 rounded-full bg-safebite-teal/20 flex items-center justify-center mb-2">
+                        {achievement.icon || <Trophy className="h-6 w-6 text-safebite-teal" />}
+                      </div>
+                      <span className="text-xs text-center text-safebite-text-secondary">{achievement.name}</span>
+                    </div>
+                  ))}
+                </div>
+                {(userAchievements || []).length === 0 && (
+                  <div className="text-center py-8 text-safebite-text-secondary">
+                    <Trophy className="h-8 w-8 mx-auto mb-2 text-safebite-text-secondary opacity-50" />
+                    <p>Complete activities to earn achievements</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Recent Activity Section */}
-          {!isGuest && recentActivities.length > 0 && (
+          {!isGuest && recentActivities && Array.isArray(recentActivities) && recentActivities.length > 0 && (
             <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 mb-6">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-safebite-text flex items-center">
@@ -613,7 +697,7 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           )}
-           {!isGuest && recentActivities.length === 0 && !isLoadingProfile && (
+           {!isGuest && (!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0) && !isLoadingProfile && (
              <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 mb-6">
                <CardContent className="p-4 text-center text-safebite-text-secondary text-sm">
                  No recent activity recorded yet. Start exploring SafeBite!

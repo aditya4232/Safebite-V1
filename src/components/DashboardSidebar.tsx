@@ -69,7 +69,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userProfile }) => {
     { path: '/nutrition', name: 'Nutrition', icon: <Utensils size={20} className="text-safebite-teal" />, guestAccess: false },
     { path: '/recipes', name: 'Recipes', icon: <Pizza size={20} />, guestAccess: false },
     { path: '/grocery-products', name: 'Grocery Products', icon: <ShoppingCart size={20} className="text-safebite-teal" />, badge: <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-1.5 py-0.5 rounded-full">New</span>, guestAccess: false },
-    { path: '/food-delivery', name: 'Food Delivery', icon: <Truck size={20} className="text-orange-400" />, badge: <span className="ml-2 text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-full">Coming Soon</span>, guestAccess: false },
+    { path: '/food-delivery', name: 'Food Delivery', icon: <Truck size={20} className="text-orange-400" />, badge: <span className="ml-2 text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-full">Now Live</span>, guestAccess: false },
     { path: '/community', name: 'Community', icon: <Users size={20} />, guestAccess: false },
     { path: '/healthbox', name: 'HealthBox', icon: <Stethoscope size={20} className="text-safebite-teal" />, guestAccess: false },
     { path: '/health-check', name: 'Health Check', icon: <Heart size={20} />, guestAccess: false }, // Corrected path

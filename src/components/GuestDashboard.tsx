@@ -6,16 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Zap, ArrowRight, Trophy, Stethoscope,
-  Activity, UserCircle, Search, Shield, Brain, Lock, Coffee, CheckCircle
+  Activity, UserCircle, Search, Shield, Brain, Lock, Coffee, CheckCircle, Bell
 } from 'lucide-react';
 import GuestBanner from './GuestBanner';
 // Removed GuestNamePrompt import
 import { getGuestName } from '@/services/guestUserService'; // Import service function
+import NotificationSystem from '@/components/NotificationSystem';
+import WelcomeAnimation from '@/components/WelcomeAnimation';
+import HealthDataCharts from '@/components/HealthDataCharts';
 
 const GuestDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showWelcomeNotification, setShowWelcomeNotification] = useState(true);
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
   // Get guest name from sessionStorage via service
   const [guestName, setGuestName] = useState<string>('');
 
@@ -54,11 +58,20 @@ const GuestDashboard = () => {
 
   // Removed showNamePrompt state and related useEffect debug log
 
+  // Check if this is the first visit to show welcome animation
+  useEffect(() => {
+    const isFirstVisit = localStorage.getItem('safebite-guest-first-visit') !== 'false';
+    if (isFirstVisit) {
+      setShowWelcomeAnimation(true);
+      localStorage.setItem('safebite-guest-first-visit', 'false');
+    }
+  }, []);
+
   // Show welcome notification when component mounts and guestName is loaded
   useEffect(() => {
     // Only show toast if guestName has been set (either empty or with a value)
     // and the notification hasn't been shown yet.
-    if (guestName !== undefined && showWelcomeNotification) {
+    if (guestName !== undefined && showWelcomeNotification && !showWelcomeAnimation) {
       if (guestName) {
         toast({
           title: `Welcome, ${guestName}!`, // Changed "Welcome back" to "Welcome"
@@ -78,7 +91,7 @@ const GuestDashboard = () => {
       setShowWelcomeNotification(false); // Mark notification as shown
     }
     // Depend on guestName state to ensure it runs after name is fetched
-  }, [toast, showWelcomeNotification, guestName]);
+  }, [toast, showWelcomeNotification, guestName, showWelcomeAnimation]);
 
   // Removed handleNameSubmit function
 
@@ -97,6 +110,14 @@ const GuestDashboard = () => {
 
       {/* Removed Guest Name Prompt */}
 
+      {/* Welcome Animation for new users */}
+      {showWelcomeAnimation && (
+        <WelcomeAnimation
+          onComplete={() => setShowWelcomeAnimation(false)}
+          userName={guestName || 'Guest'}
+        />
+      )}
+
       {/* Guest Banner */}
       <GuestBanner />
 
@@ -112,7 +133,8 @@ const GuestDashboard = () => {
             You're exploring in Guest Mode. Sign up to unlock all features.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <NotificationSystem currentPage="guest-dashboard" />
           <Button
             onClick={() => navigate('/auth/signup')}
             className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80 w-full sm:w-auto transition-transform hover:scale-105"
@@ -326,6 +348,15 @@ const GuestDashboard = () => {
         </Card>
       </div>
 
+      {/* Health Data Charts - Sample for Guest Users */}
+      <div className="relative z-10 mb-10">
+        <h2 className="text-2xl font-semibold text-safebite-text mb-6 text-center">Health Insights</h2>
+        <HealthDataCharts
+          userId="guest-user"
+          initialTab="weight"
+        />
+      </div>
+
       {/* Coming Soon - Refined styling */}
       <div className="relative z-10 mb-10">
         <h2 className="text-2xl font-semibold text-safebite-text mb-6 text-center">What's Next?</h2>
@@ -342,13 +373,13 @@ const GuestDashboard = () => {
               <div className="flex-grow text-center sm:text-left">
                 <h3 className="text-xl font-semibold text-orange-400 mb-2">Food Delivery Integration</h3>
                 <p className="text-safebite-text-secondary mb-4 text-sm">
-                  Get nutritional insights for meals from Zomato & Swiggy directly within SafeBite. Stay tuned!
+                  Get nutritional insights for meals from Zomato & Swiggy directly within SafeBite. Search for your favorite dishes!
                 </p>
                 <div className="flex items-center justify-center sm:justify-start">
                   <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30">
-                    Coming Soon
+                    Now Live
                   </Badge>
-                  <span className="ml-3 text-xs text-safebite-text-secondary">Dataset preparation underway</span>
+                  <span className="ml-3 text-xs text-safebite-text-secondary">Try it now!</span>
                 </div>
               </div>
             </div>
@@ -358,7 +389,7 @@ const GuestDashboard = () => {
 
       {/* Footer */}
       <div className="text-center text-safebite-text-secondary text-sm mt-8">
-        <p>SafeBite v2.5</p>
+        <p>SafeBite v3.0</p>
         <p className="mt-2">Guest mode provides limited functionality. <Button variant="link" className="p-0 h-auto text-safebite-teal" onClick={() => navigate('/auth/signup')}>Sign up</Button> for full access.</p>
       </div>
     </div>

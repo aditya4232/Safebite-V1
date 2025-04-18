@@ -1,7 +1,16 @@
-# SafeBite-V1
+# SafeBite-V2
 
 SafeBite is a **one-stop health and food safety platform** designed to provide nutritional insights, food safety metrics, and personalized recommendations. It integrates **multiple APIs, AI-driven suggestions, and real-time data tracking** to help users make healthier food choices.
 Try now - https://aditya4232.github.io/SafeBite-V1/
+
+## 🆕 Latest Updates (v2.5)
+
+- **Enhanced Authentication Flow**: Secure 3-hour sessions for logged-in users and 1-hour sessions for guest users
+- **Gemini AI Integration**: AI-powered food analysis and recommendations
+- **Health Data Visualization**: Interactive charts and graphs in the dashboard
+- **Grocery Product Scraping**: Products from Blinkit, Zepto, Instamart, and BigBasket
+- **Food Delivery Integration**: Now live with restaurant search and health preferences
+- **Improved UI/UX**: Enhanced with shadcn components and modern design
 
 ## 🚀 Features
 
@@ -21,18 +30,21 @@ Try now - https://aditya4232.github.io/SafeBite-V1/
 - **Admin Panel**: (For Admin Only) Track user data and insights.
 
 ## 🛠️ Tech Stack
-- **Frontend**: HTML, Tailwind CSS, JavaScript, ShadCN
+- **Frontend**: React, TypeScript, Tailwind CSS, shadcn/ui, three.js
 - **Backend**:
   - Firebase (Auth, Firestore, Storage)
   - Flask (Python backend for MongoDB integration)
   - MongoDB Atlas (Product database)
 - **Bundler**: Vite
+- **Authentication**: Firebase Authentication with secure session management
 - **APIs Used**:
-  - MongoDB Atlas (Product database)
+  - MongoDB Atlas (Product database with Atlas Search)
   - OpenFoodFacts (Food insights)
   - Edamam (Nutrition analysis)
   - FatSecret (Food tracking)
-  - Gemini AI (Smart recommendations)
+  - CalorieNinjas (Nutrition data)
+  - Gemini AI (Smart recommendations and analysis)
+  - Web scraping for grocery products and food delivery
 
 ## 📂 Folder Structure
 ```
@@ -69,13 +81,31 @@ cd SafeBite-V1
 npm install
 ```
 
-### 3️⃣ Set Up Firebase
+### 3️⃣ Set Up Environment Variables
+1. Create a `.env` file in the root directory with the following variables:
+```
+# Firebase Configuration
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+
+# MongoDB Connection
+VITE_MONGODB_URI=your_mongodb_connection_string
+
+# Backend API
+VITE_API_BASE_URL=https://safebite-backend.onrender.com
+```
+
+### 4️⃣ Set Up Firebase
 1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/).
 2. Enable **Authentication** (Google Sign-in) and **Firestore**.
-3. Copy Firebase config to `src/firebase.js`.
-4. Add GitHub Pages domain in Firebase Auth settings.
+3. Add GitHub Pages domain in Firebase Auth settings.
 
-### 4️⃣ Set Up MongoDB Atlas
+### 5️⃣ Set Up MongoDB Atlas
 1. Create a MongoDB Atlas account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
 2. Create a new cluster and database named `safebite`.
 3. Create a collection named `Grocery Products`.
@@ -83,14 +113,14 @@ npm install
 5. Create a database user with read/write access.
 6. Update the connection string in `backend/app.py`.
 
-### 5️⃣ Run Backend Server
+### 6️⃣ Run Backend Server
 ```sh
 cd backend
 pip install -r requirements.txt
 python app.py
 ```
 
-### 6️⃣ Run Frontend Development Server
+### 7️⃣ Run Frontend Development Server
 ```sh
 npm run dev
 ```
@@ -175,4 +205,4 @@ firebase deploy
 
 🔹 **Created by:** Aditya Shenvi
 🔹 **GitHub:** [@aditya4232](https://github.com/aditya4232)
-🔹 **Version:** v2.5 (Production Ready)
+🔹 **Version:** v3.0 (Production Ready)

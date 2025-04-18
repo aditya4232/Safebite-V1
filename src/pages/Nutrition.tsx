@@ -13,6 +13,7 @@ import Loader from '@/components/Loader';
 import FoodItemCard from '@/components/FoodItemCard';
 import FoodDetailView from '@/components/FoodDetailView';
 import FoodScannerUpload from '@/components/FoodScannerUpload';
+import GeminiNutritionAnalysis from '@/components/GeminiNutritionAnalysis';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/foodApiService';
 import { searchCalorieNinjas } from '@/services/nutritionApiService';

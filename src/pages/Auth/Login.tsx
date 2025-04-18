@@ -12,6 +12,8 @@ import { app } from "../../firebase";
 import guestAuthService from "@/services/guestAuthService";
 import GuestNameDialog from "@/components/GuestNameDialog";
 import { getGuestName } from "@/services/guestUserService";
+import simpleSessionService from "@/services/simpleSessionService";
+import sessionService from "@/services/sessionService";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -39,11 +41,19 @@ const Login = () => {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
+
+      // Create a new session for the logged-in user
+      simpleSessionService.createSession('logged-in');
+
       toast({
         title: "Login successful",
         description: "Welcome back to SafeBite!",
       });
-      navigate('/dashboard');
+
+      // Get return URL from query params or default to dashboard
+      const params = new URLSearchParams(location.search);
+      const returnUrl = params.get('returnUrl') || '/dashboard';
+      navigate(returnUrl);
     } catch (error: any) {
       console.error("Login error:", error);
       toast({
@@ -62,11 +72,19 @@ const Login = () => {
 
     try {
       await signInWithPopup(auth, provider);
+
+      // Create a new session for the logged-in user
+      simpleSessionService.createSession('logged-in');
+
       toast({
         title: "Google login successful",
         description: "Welcome to SafeBite!",
       });
-      navigate('/dashboard');
+
+      // Get return URL from query params or default to dashboard
+      const params = new URLSearchParams(location.search);
+      const returnUrl = params.get('returnUrl') || '/dashboard';
+      navigate(returnUrl);
     } catch (error: any) {
       console.error("Google login error:", error);
       toast({
@@ -88,11 +106,19 @@ const Login = () => {
       setIsLoading(true);
       try {
         await guestAuthService.signInAsGuest(existingGuestName);
+
+        // Create a new session for the guest user
+        simpleSessionService.createSession('guest');
+
         toast({
           title: "Welcome back, " + existingGuestName,
           description: "You're continuing your guest session.",
         });
-        navigate('/dashboard');
+
+        // Get return URL from query params or default to dashboard
+        const params = new URLSearchParams(location.search);
+        const returnUrl = params.get('returnUrl') || '/dashboard';
+        navigate(returnUrl);
       } catch (error: any) {
         console.error("Guest login error:", error);
         toast({
@@ -118,23 +144,28 @@ const Login = () => {
     setIsLoading(true);
     try {
       // Name is already set in sessionStorage by GuestNameDialog via setGuestName service function
-      // Remove incorrect localStorage usage:
-      // localStorage.setItem('guestName', name);
-      // localStorage.setItem('guestNameSet', 'true');
-
       await guestAuthService.signInAsGuest(name);
+
+      // Create a new session for the guest user
+      simpleSessionService.createSession('guest');
+
       toast({
         title: "Welcome, " + name,
         description: "You're now using SafeBite in guest mode. Your data won't be saved permanently.",
       });
+
       // Add more detailed logging for guest login
       console.log('Guest login successful, navigating to dashboard', {
         guestName: name,
         guestMode: sessionStorage.getItem('safebite-guest-mode'),
         userType: localStorage.getItem('userType'),
-        guestSessionExpires: localStorage.getItem('guestSessionExpires')
+        sessionInfo: simpleSessionService.getSessionInfo()
       });
-      navigate('/dashboard');
+
+      // Get return URL from query params or default to dashboard
+      const params = new URLSearchParams(location.search);
+      const returnUrl = params.get('returnUrl') || '/dashboard';
+      navigate(returnUrl);
     } catch (error: any) {
       console.error("Guest login error:", error);
       toast({

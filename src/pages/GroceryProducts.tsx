@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Search, Filter, ShoppingCart, Star, Heart,
   AlertTriangle, CheckCircle, Info, Loader2,
   Apple, Tag, Bookmark, ExternalLink,
-  Database, Server
+  Database, Server, X
 } from 'lucide-react';
 import { fetchGroceryProducts, Product, API_BASE_URL } from '@/services/productService';
 import { trackUserInteraction } from '@/services/mlService';
@@ -20,6 +21,8 @@ import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { app } from "../firebase";
 import Pagination from '@/components/Pagination';
 import Footer from '@/components/Footer';
+import GroceryProductDetail from "@/components/GroceryProductDetail";
+import SafeBiteScrapedProducts from "@/components/SafeBiteScrapedProducts";
 
 const GroceryProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ const GroceryProductsPage: React.FC = () => {
 
   // Products state
   const [groceryProducts, setGroceryProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -380,12 +385,9 @@ const GroceryProductsPage: React.FC = () => {
                               productCategory: productCategory
                             });
 
-                            // Show product details in a modal or navigate to details page
-                            toast({
-                              title: 'Product Details',
-                              description: `Viewing details for ${productName}`,
-                              variant: 'default',
-                            });
+                            // Show product details in dialog
+                            setSelectedProduct(product);
+                            setIsDetailDialogOpen(true);
                           }}
                         >
                           <Info className="h-4 w-4" />
@@ -446,8 +448,34 @@ const GroceryProductsPage: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* SafeBite Scraping Section */}
+          <div className="mt-10 mb-10">
+            <SafeBiteScrapedProducts
+              searchQuery={searchQuery}
+              onProductSelect={(product) => {
+                // Track this interaction
+                trackUserInteraction('select_scraped_product', {
+                  productName: product.name,
+                  productSource: product.source
+                });
+              }}
+            />
+          </div>
         </div>
         <Footer />
+
+        {/* Product Detail Dialog */}
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-4xl bg-safebite-dark-blue border-safebite-teal/30 p-0">
+            {selectedProduct && (
+              <GroceryProductDetail
+                product={selectedProduct}
+                onClose={() => setIsDetailDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
