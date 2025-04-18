@@ -48,6 +48,7 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
           <div className="hidden md:flex items-center space-x-6">
             <Link to="/" className="text-safebite-text hover:text-safebite-teal transition-colors">Home</Link>
             <Link to="/features" className="text-safebite-text hover:text-safebite-teal transition-colors">Features</Link>
+            <Link to="/food-delivery" className="text-safebite-text hover:text-safebite-teal transition-colors">Food Delivery</Link>
             <Link to="/about" className="text-safebite-text hover:text-safebite-teal transition-colors">About</Link>
             {!shouldHideAuthButtons && (
               <>
@@ -105,6 +106,13 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
               onClick={() => setIsMenuOpen(false)}
             >
               About
+            </Link>
+            <Link
+              to="/food-delivery"
+              className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Food Delivery
             </Link>
 
             {!shouldHideAuthButtons && (

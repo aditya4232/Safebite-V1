@@ -41,7 +41,6 @@ import UserActivityService from "@/services/userActivityService";
 import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalClose, ModalTrigger } from "@/components/ui/dialog";
 import WeeklyQuestionsForm from "@/components/WeeklyQuestionsForm";
 
 const queryClient = new QueryClient();

@@ -1,230 +1,265 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import FoodDeliveryPopup from "../components/FoodDeliveryPopup";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Utensils, ShoppingBag, Clock, AlertTriangle, Truck, Lock, Sparkles } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import FoodChatBot from '@/components/FoodChatBot';
+import { Badge } from "@/components/ui/badge";
+import { Search, MapPin, Clock, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import { RestaurantResult } from "@/services/foodDeliveryService";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from "../firebase";
-import { useGuestMode } from '@/hooks/useGuestMode';
-import { useToast } from "@/hooks/use-toast";
+import { useGuestMode } from "@/hooks/useGuestMode";
 
-const FoodDelivery: React.FC = () => {
-  const navigate = useNavigate();
+const FoodDeliveryPage: React.FC = () => {
+  const { toast } = useToast();
+  const { isGuest } = useGuestMode();
   const auth = getAuth(app);
   const db = getFirestore(app);
-  const { isGuest } = useGuestMode();
-  const { toast } = useToast();
-
-  // User data for personalized chat suggestions
+  const [foodQuery, setFoodQuery] = useState<string>("");
+  const [cityQuery, setCityQuery] = useState<string>("");
+  const [submittedQuery, setSubmittedQuery] = useState<{ food: string; city: string } | null>(null);
+  const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<RestaurantResult[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [userActivity, setUserActivity] = useState<any[]>([]);
 
-  // Check if user is a guest, redirect if so
+  // Popular food suggestions
+  const popularFoods = [
+    "Pizza", "Biryani", "Burger", "Sushi", "Pasta", "Curry", "Tacos", "Noodles"
+  ];
+
+  // Popular city suggestions
+  const popularCities = [
+    "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune", "Ahmedabad"
+  ];
+
+  // Fetch user data when component mounts
   useEffect(() => {
-    if (isGuest) {
-      toast({
-        title: "Feature Restricted",
-        description: "Food Delivery is only available for registered users. Please sign up to access this feature.",
-        variant: "destructive"
-      });
-      navigate('/dashboard');
-    }
-  }, [isGuest, navigate, toast]);
-
-  // Load user data for personalized chat
-  useEffect(() => {
-    const loadUserData = async () => {
-      if (auth.currentUser) {
-        try {
-          // Get user profile data
-          const userRef = doc(db, 'users', auth.currentUser.uid);
-          const userDoc = await getDoc(userRef);
-
+    const fetchUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user && !isGuest) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             setUserData(userDoc.data());
           }
-
-          // Get user activity data
-          const activityRef = doc(db, 'user_activities', auth.currentUser.uid);
-          const activityDoc = await getDoc(activityRef);
-
-          if (activityDoc.exists()) {
-            const data = activityDoc.data();
-            setUserActivity(data.activities || []);
-          }
-        } catch (error) {
-          console.error('Error loading user data:', error);
         }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
       }
     };
+    fetchUserData();
+  }, [auth, db, isGuest]);
 
-    loadUserData();
-  }, [auth.currentUser, db]);
+  // Set default city based on browser geolocation (if available)
+  useEffect(() => {
+    // Try to get a default city from localStorage
+    const savedCity = localStorage.getItem('userCity');
+    if (savedCity) {
+      setCityQuery(savedCity);
+      return;
+    }
+
+    // If no saved city, try to get user's location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            // Use a reverse geocoding service to get the city name
+            // This is a simplified example - in production, use a proper geocoding service
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+            );
+            const data = await response.json();
+            if (data.address && data.address.city) {
+              setCityQuery(data.address.city);
+              localStorage.setItem('userCity', data.address.city);
+            }
+          } catch (error) {
+            console.error('Error getting city from coordinates:', error);
+          }
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+        }
+      );
+    }
+  }, []);
+
+  const handleSearch = async (event: React.FormEvent) => {
+    event.preventDefault(); // Prevent default form submission page reload
+    if (foodQuery.trim() && cityQuery.trim()) {
+      setIsLoading(true);
+      setError(null);
+      setSubmittedQuery({ food: foodQuery.trim(), city: cityQuery.trim() });
+
+      try {
+        // Save the city for future use
+        localStorage.setItem('userCity', cityQuery.trim());
+
+        // Fetch search results and open the popup
+        await fetchSearchResults(foodQuery.trim(), cityQuery.trim());
+      } catch (err) {
+        setError('Failed to fetch restaurant data. Please try again.');
+        toast({
+          title: "Search Error",
+          description: "There was a problem finding restaurants. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const fetchSearchResults = async (food: string, city: string) => {
+    // Call the foodDeliveryService to get the search results
+    const { fetchNearbyRestaurants } = await import("../services/foodDeliveryService");
+    const results = await fetchNearbyRestaurants(food, city);
+    setSearchResults(results);
+    setIsPopupOpen(true);
+  };
+
+  const handleFoodSuggestionClick = (food: string) => {
+    setFoodQuery(food);
+  };
+
+  const handleCitySuggestionClick = (city: string) => {
+    setCityQuery(city);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Coming Soon Banner */}
-      <div className="bg-gradient-to-r from-orange-600 via-red-500 to-yellow-500 text-white py-2 px-4 flex items-center justify-center">
-        <Sparkles className="h-4 w-4 text-yellow-300 mr-2" />
-        <span className="font-medium">Coming Soon: Food Delivery Integration</span>
-        <Sparkles className="h-4 w-4 text-yellow-300 ml-2" />
-      </div>
-      <Navbar hideAuthButtons={true} />
+    <div className="min-h-screen bg-safebite-dark-blue">
+      <DashboardSidebar userProfile={userData || {}} />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Button
-            variant="outline"
-            className="mb-4"
-            onClick={() => navigate('/dashboard')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Button>
-
-          <h1 className="text-3xl font-bold text-safebite-text mb-2">Food Delivery Integration</h1>
-          <p className="text-safebite-text-secondary mb-6">
-            Get nutritional insights for your favorite restaurant meals from Zomato and Swiggy.
+      <main className="flex-1 p-6 ml-[220px]">
+        <div className="container mx-auto max-w-6xl">
+          <h1 className="text-3xl font-bold text-safebite-text mb-2">
+            Find Food Delivery
+          </h1>
+          <p className="text-safebite-text-secondary mb-8">
+            Search for your favorite food and find delivery options from Swiggy and Zomato
           </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Zomato Card */}
-          <Card className="p-6 border border-orange-500/30 bg-safebite-card-bg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-bl-full"></div>
+          <Card className="p-6 bg-safebite-card-bg border-safebite-card-bg-alt mb-8">
+            <form onSubmit={handleSearch}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <Label htmlFor="foodQuery" className="text-safebite-text mb-2 block">
+                    What are you craving?
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-safebite-text-secondary" />
+                    </div>
+                    <Input
+                      id="foodQuery"
+                      type="text"
+                      value={foodQuery}
+                      onChange={(e) => setFoodQuery(e.target.value)}
+                      placeholder="e.g., Paneer Butter Masala, Pizza"
+                      className="pl-10 bg-safebite-card-bg-alt border-safebite-card-bg-alt focus:border-safebite-teal text-safebite-text"
+                      required
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {popularFoods.slice(0, 4).map((food) => (
+                      <Badge
+                        key={food}
+                        className="bg-safebite-card-bg-alt hover:bg-safebite-teal/20 cursor-pointer transition-colors"
+                        onClick={() => handleFoodSuggestionClick(food)}
+                      >
+                        {food}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center mr-4">
-                <Utensils className="h-6 w-6 text-white" />
+                <div>
+                  <Label htmlFor="cityQuery" className="text-safebite-text mb-2 block">
+                    Enter your city
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <MapPin className="h-5 w-5 text-safebite-text-secondary" />
+                    </div>
+                    <Input
+                      id="cityQuery"
+                      type="text"
+                      value={cityQuery}
+                      onChange={(e) => setCityQuery(e.target.value)}
+                      placeholder="e.g., Hyderabad, Mumbai"
+                      className="pl-10 bg-safebite-card-bg-alt border-safebite-card-bg-alt focus:border-safebite-teal text-safebite-text"
+                      required
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {popularCities.slice(0, 4).map((city) => (
+                      <Badge
+                        key={city}
+                        className="bg-safebite-card-bg-alt hover:bg-safebite-teal/20 cursor-pointer transition-colors"
+                        onClick={() => handleCitySuggestionClick(city)}
+                      >
+                        {city}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold text-orange-500">Zomato Integration</h2>
-                <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/30">
-                  Coming Soon
-                </Badge>
-              </div>
-            </div>
 
-            <p className="text-safebite-text-secondary mb-4">
-              We're working on integrating with Zomato to provide nutritional information and health recommendations for your favorite restaurant meals.
-            </p>
-
-            <div className="bg-safebite-card-bg-alt p-4 rounded-lg mb-4">
-              <div className="flex items-center mb-2">
-                <Clock className="h-4 w-4 text-safebite-text-secondary mr-2" />
-                <span className="text-sm text-safebite-text-secondary">Status Update</span>
-              </div>
-              <div className="flex items-center">
-                <Loader2 className="h-4 w-4 text-orange-500 animate-spin mr-2" />
-                <span className="text-sm text-safebite-text">Dataset preparation in progress (65%)</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button disabled className="bg-orange-500/20 text-orange-500 hover:bg-orange-500/30 cursor-not-allowed">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Not Available Yet
+              <Button
+                type="submit"
+                className="w-full bg-safebite-teal hover:bg-safebite-teal/80 text-safebite-dark-blue font-medium"
+                disabled={!foodQuery.trim() || !cityQuery.trim() || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  'Search Restaurants'
+                )}
               </Button>
-            </div>
+            </form>
           </Card>
 
-          {/* Swiggy Card */}
-          <Card className="p-6 border border-orange-500/30 bg-safebite-card-bg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-bl-full"></div>
-
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mr-4">
-                <ShoppingBag className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-orange-400">Swiggy Integration</h2>
-                <Badge variant="outline" className="bg-orange-400/10 text-orange-400 border-orange-400/30">
-                  Coming Soon
-                </Badge>
-              </div>
+          {/* Conditionally render the results heading after a search is submitted */}
+          {submittedQuery && (
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-safebite-text mb-2">
+                Results for "{submittedQuery.food}" in "{submittedQuery.city}"
+              </h2>
+              <p className="text-safebite-text-secondary">
+                Click on a restaurant to view delivery options
+              </p>
             </div>
+          )}
 
-            <p className="text-safebite-text-secondary mb-4">
-              We're working on integrating with Swiggy to provide nutritional information and health recommendations for your favorite restaurant meals.
-            </p>
-
-            <div className="bg-safebite-card-bg-alt p-4 rounded-lg mb-4">
-              <div className="flex items-center mb-2">
-                <Clock className="h-4 w-4 text-safebite-text-secondary mr-2" />
-                <span className="text-sm text-safebite-text-secondary">Status Update</span>
-              </div>
-              <div className="flex items-center">
-                <Loader2 className="h-4 w-4 text-orange-400 animate-spin mr-2" />
-                <span className="text-sm text-safebite-text">Dataset preparation in progress (42%)</span>
-              </div>
+          {error && (
+            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-center mb-6">
+              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-safebite-text">{error}</p>
             </div>
+          )}
 
-            <div className="flex justify-end">
-              <Button disabled className="bg-orange-400/20 text-orange-400 hover:bg-orange-400/30 cursor-not-allowed">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Not Available Yet
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        <div className="bg-safebite-card-bg border border-safebite-card-bg-alt rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-safebite-text mb-4">Why We're Building This</h2>
-          <p className="text-safebite-text-secondary mb-4">
-            Eating out shouldn't mean compromising on your health goals. Our integration with popular food delivery platforms will help you:
-          </p>
-          <ul className="space-y-2 text-safebite-text-secondary">
-            <li className="flex items-start">
-              <span className="text-safebite-teal mr-2">•</span>
-              <span>Get nutritional information for restaurant meals</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-safebite-teal mr-2">•</span>
-              <span>Receive personalized recommendations based on your health profile</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-safebite-teal mr-2">•</span>
-              <span>Track your nutrition even when eating out</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-safebite-teal mr-2">•</span>
-              <span>Make informed choices that align with your health goals</span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="text-center">
-          <p className="text-safebite-text-secondary mb-4">
-            We're working hard to bring this feature to you. Check back soon for updates!
-          </p>
-          <Button
-            onClick={() => navigate('/dashboard')}
-            className="bg-safebite-teal text-safebite-dark-blue hover:bg-safebite-teal/80"
-          >
-            Return to Dashboard
-          </Button>
+          <FoodDeliveryPopup
+            isOpen={isPopupOpen}
+            onClose={() => setIsPopupOpen(false)}
+            searchResults={searchResults}
+            userData={userData}
+            currentPage="food-delivery"
+          />
         </div>
       </main>
-
-      {/* AI Chatbot */}
-      <FoodChatBot
-        currentPage="food-delivery"
-        userData={{
-          profile: userData,
-          recentActivity: userActivity
-        }}
-        autoOpen={true}
-        initialMessage="Welcome to our Food Delivery section! While we're still working on integrating with Zomato and Swiggy, I can help you understand how to make healthier choices when ordering food. Would you like some tips for healthier restaurant ordering?"
-      />
-
-      <Footer />
     </div>
   );
 };
 
-export default FoodDelivery;
+export default FoodDeliveryPage;
