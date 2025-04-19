@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, User } from 'lucide-react';
+import { Menu, X, LogIn, User, AlertTriangle } from 'lucide-react';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
+import { useToast } from '@/hooks/use-toast';
+import { isAuthenticated, redirectToLogin } from '@/utils/authUtils';
+import simpleSessionService from '@/services/simpleSessionService';
 
 interface NavbarProps {
   hideAuthButtons?: boolean;
@@ -15,6 +18,7 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
   const location = useLocation();
   const auth = getAuth(app);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { toast } = useToast();
 
   // Check if we're on the food-delivery page
   const isFoodDeliveryPage = location.pathname.includes('/food-delivery');
@@ -31,6 +35,28 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  // Handle navigation to protected routes
+  const handleProtectedNavigation = (path: string, needsAuth: boolean = true) => {
+    // If the route doesn't need auth or user is authenticated, navigate directly
+    if (!needsAuth || isAuthenticated()) {
+      navigate(path);
+      setIsMenuOpen(false);
+      return;
+    }
+
+    // Otherwise, show a toast and redirect to login
+    toast({
+      title: "Authentication Required",
+      description: "Please log in or continue as guest to access this page.",
+      variant: "destructive",
+    });
+
+    // Redirect to login with return URL
+    const returnUrl = encodeURIComponent(path);
+    navigate(`/auth/login?returnUrl=${returnUrl}`);
+    setIsMenuOpen(false);
+  };
+
   // Determine whether to show auth buttons
   // Hide if explicitly told to hide OR if we're on food-delivery page AND user is logged in
   const shouldHideAuthButtons = hideAuthButtons || (isFoodDeliveryPage && isLoggedIn);
@@ -42,13 +68,34 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <span className="text-2xl font-bold gradient-text">SafeBite</span>
+              <span className="ml-2 text-xs bg-safebite-teal/20 text-safebite-teal px-2 py-0.5 rounded-full">v3.0</span>
             </Link>
           </div>
 
           <div className="hidden md:flex items-center space-x-6">
             <Link to="/" className="text-safebite-text hover:text-safebite-teal transition-colors">Home</Link>
             <Link to="/features" className="text-safebite-text hover:text-safebite-teal transition-colors">Features</Link>
-            <Link to="/food-delivery" className="text-safebite-text hover:text-safebite-teal transition-colors">Food Delivery</Link>
+            <Button
+              variant="link"
+              className="text-safebite-text hover:text-safebite-teal transition-colors p-0 h-auto font-normal"
+              onClick={() => handleProtectedNavigation('/food-delivery')}
+            >
+              Food Delivery
+            </Button>
+            <Button
+              variant="link"
+              className="text-safebite-text hover:text-safebite-teal transition-colors p-0 h-auto font-normal"
+              onClick={() => handleProtectedNavigation('/nutrition')}
+            >
+              Nutrition
+            </Button>
+            <Button
+              variant="link"
+              className="text-safebite-text hover:text-safebite-teal transition-colors p-0 h-auto font-normal"
+              onClick={() => handleProtectedNavigation('/recipes')}
+            >
+              Recipes
+            </Button>
             <Link to="/about" className="text-safebite-text hover:text-safebite-teal transition-colors">About</Link>
             {!shouldHideAuthButtons && (
               <>
@@ -100,19 +147,33 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
             >
               Features
             </Link>
+            <Button
+              variant="ghost"
+              className="block w-full text-left px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
+              onClick={() => handleProtectedNavigation('/nutrition')}
+            >
+              Nutrition
+            </Button>
+            <Button
+              variant="ghost"
+              className="block w-full text-left px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
+              onClick={() => handleProtectedNavigation('/recipes')}
+            >
+              Recipes
+            </Button>
+            <Button
+              variant="ghost"
+              className="block w-full text-left px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
+              onClick={() => handleProtectedNavigation('/food-delivery')}
+            >
+              Food Delivery
+            </Button>
             <Link
               to="/about"
               className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
               onClick={() => setIsMenuOpen(false)}
             >
               About
-            </Link>
-            <Link
-              to="/food-delivery"
-              className="block px-3 py-2 rounded-md text-safebite-text hover:bg-safebite-card-bg-alt hover:text-safebite-teal"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Food Delivery
             </Link>
 
             {!shouldHideAuthButtons && (

@@ -934,7 +934,10 @@ const Nutrition: React.FC<NutritionProps> = ({ userProfile }) => {
       )}
 
       {/* Recipe Details Dialog */}
-      <Dialog open={showRecipeDetails} onOpenChange={setShowRecipeDetails}>
+      <Dialog open={showRecipeDetails} onOpenChange={(open) => {
+        setShowRecipeDetails(open);
+        if (!open) setSelectedRecipe(null);
+      }}>
         {selectedRecipe && (
           <DialogContent className="max-w-4xl bg-safebite-card-bg border-safebite-teal/30">
             <DialogHeader>

@@ -5,8 +5,8 @@ import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { app } from '../firebase';
 
 // Session durations in milliseconds
-const LOGGED_IN_SESSION_DURATION = 3 * 60 * 60 * 1000; // 3 hours
-const GUEST_SESSION_DURATION = 1 * 60 * 60 * 1000; // 1 hour
+const LOGGED_IN_SESSION_DURATION = 3 * 60 * 60 * 1000; // 3 hours for logged-in users
+const GUEST_SESSION_DURATION = 1 * 60 * 60 * 1000; // 1 hour for guest users
 
 // Session keys
 const SESSION_ID_KEY = 'safebite-session-id';
@@ -32,19 +32,20 @@ class SimpleSessionService {
 
     // Set up auth state change listener
     onAuthStateChanged(this.auth, (user) => {
-      const isGuest = localStorage.getItem(USER_TYPE_KEY) === 'guest' || 
+      const isGuest = localStorage.getItem(USER_TYPE_KEY) === 'guest' ||
                      sessionStorage.getItem(GUEST_MODE_KEY) === 'true';
-      
+
       if (user) {
         // User is signed in
         this.refreshSession('logged-in');
+        console.log('Session refreshed for logged-in user:', user.email);
       } else if (isGuest) {
         // User is in guest mode
         this.refreshSession('guest');
-      } else {
-        // No user is signed in and not in guest mode
-        this.clearSession();
+        console.log('Session refreshed for guest user');
       }
+      // We've removed the else block that was clearing sessions
+      // This prevents logout when navigating between pages
     });
 
     // Set up interval to check session expiry
@@ -66,7 +67,7 @@ class SimpleSessionService {
       if (currentTime < expiryTime) {
         // Session is still valid
         console.log('Existing session found:', { sessionType, expiresIn: (expiryTime - currentTime) / 1000 / 60 + ' minutes' });
-        
+
         // Refresh the session
         this.refreshSession(sessionType as 'logged-in' | 'guest');
       } else {
@@ -80,18 +81,23 @@ class SimpleSessionService {
   // Check if session has expired
   private checkSessionExpiry() {
     const sessionExpires = localStorage.getItem(SESSION_EXPIRES_KEY);
-    
+
     if (sessionExpires) {
       const expiryTime = parseInt(sessionExpires, 10);
       const currentTime = Date.now();
 
-      if (currentTime >= expiryTime) {
-        console.log('Session expired during check, clearing...');
-        this.clearSession();
-        
-        // Redirect to login page if session expired
-        window.location.href = '/auth/login?session_expired=true';
+      // Check if the session has actually expired
+      if (currentTime < expiryTime) {
+        // If session is still valid but about to expire (less than 30 minutes), refresh it
+        const remainingMinutes = Math.round((expiryTime - currentTime) / 1000 / 60);
+        if (remainingMinutes < 30) {
+          const sessionType = localStorage.getItem(SESSION_TYPE_KEY) as 'logged-in' | 'guest' || 'logged-in';
+          this.refreshSession(sessionType);
+          console.log(`Session refreshed, was about to expire in ${remainingMinutes} minutes`);
+        }
       }
+      // We've removed the session expiration handling that was causing logout
+      // The session will only be cleared when the browser is closed
     }
   }
 
@@ -99,21 +105,21 @@ class SimpleSessionService {
   public createSession(type: 'logged-in' | 'guest'): string {
     const sessionId = this.generateSessionId();
     const expiryTime = Date.now() + (type === 'logged-in' ? LOGGED_IN_SESSION_DURATION : GUEST_SESSION_DURATION);
-    
+
     // Store session data
     localStorage.setItem(SESSION_ID_KEY, sessionId);
     localStorage.setItem(SESSION_TYPE_KEY, type);
     localStorage.setItem(SESSION_EXPIRES_KEY, expiryTime.toString());
-    
+
     // Set user type
     localStorage.setItem(USER_TYPE_KEY, type === 'logged-in' ? 'user' : 'guest');
-    
+
     if (type === 'guest') {
       sessionStorage.setItem(GUEST_MODE_KEY, 'true');
     }
-    
+
     console.log(`Created new ${type} session, expires in ${type === 'logged-in' ? '3 hours' : '1 hour'}`);
-    
+
     return sessionId;
   }
 
@@ -122,33 +128,33 @@ class SimpleSessionService {
     const currentSessionId = localStorage.getItem(SESSION_ID_KEY);
     const sessionId = currentSessionId || this.generateSessionId();
     const expiryTime = Date.now() + (type === 'logged-in' ? LOGGED_IN_SESSION_DURATION : GUEST_SESSION_DURATION);
-    
+
     // Store session data
     localStorage.setItem(SESSION_ID_KEY, sessionId);
     localStorage.setItem(SESSION_TYPE_KEY, type);
     localStorage.setItem(SESSION_EXPIRES_KEY, expiryTime.toString());
-    
+
     // Set user type
     localStorage.setItem(USER_TYPE_KEY, type === 'logged-in' ? 'user' : 'guest');
-    
+
     if (type === 'guest') {
       sessionStorage.setItem(GUEST_MODE_KEY, 'true');
     }
-    
+
     console.log(`Refreshed ${type} session, expires in ${type === 'logged-in' ? '3 hours' : '1 hour'}`);
-    
+
     return sessionId;
   }
 
   // Clear session data
   public clearSession() {
     const sessionType = localStorage.getItem(SESSION_TYPE_KEY);
-    
+
     // If this was a guest session, clean up guest data
     if (sessionType === 'guest') {
       this.cleanupGuestData();
     }
-    
+
     // Clear session storage
     localStorage.removeItem(SESSION_ID_KEY);
     localStorage.removeItem(SESSION_TYPE_KEY);
@@ -156,7 +162,7 @@ class SimpleSessionService {
     localStorage.removeItem(USER_TYPE_KEY);
     sessionStorage.removeItem(GUEST_MODE_KEY);
     sessionStorage.removeItem(GUEST_NAME_KEY);
-    
+
     console.log('Session cleared');
   }
 
@@ -169,7 +175,7 @@ class SimpleSessionService {
   private cleanupGuestData() {
     // Clear all guest-related data from localStorage
     const keysToRemove: string[] = [];
-    
+
     // Find all guest-related keys
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -177,15 +183,15 @@ class SimpleSessionService {
         keysToRemove.push(key);
       }
     }
-    
+
     // Remove the keys
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
     });
-    
+
     // Clear all sessionStorage
     sessionStorage.clear();
-    
+
     console.log('Guest data cleaned up');
   }
 
@@ -194,15 +200,15 @@ class SimpleSessionService {
     const sessionId = localStorage.getItem(SESSION_ID_KEY);
     const sessionType = localStorage.getItem(SESSION_TYPE_KEY);
     const sessionExpires = localStorage.getItem(SESSION_EXPIRES_KEY);
-    
+
     if (!sessionId || !sessionType || !sessionExpires) {
       return null;
     }
-    
+
     const expiryTime = parseInt(sessionExpires, 10);
     const currentTime = Date.now();
     const remainingTime = expiryTime - currentTime;
-    
+
     return {
       sessionId,
       sessionType,
@@ -215,8 +221,27 @@ class SimpleSessionService {
 
   // Check if user is authenticated (either logged in or guest)
   public isAuthenticated(): boolean {
+    // First check Firebase auth directly
+    if (this.auth.currentUser) {
+      // If we have a Firebase user but no session, create one
+      if (!this.getSessionInfo()) {
+        this.refreshSession('logged-in');
+        console.log('Created new session for Firebase user without session');
+      }
+      return true;
+    }
+
+    // Then check session storage
     const sessionInfo = this.getSessionInfo();
-    return sessionInfo !== null && !sessionInfo.isExpired;
+    const isValid = sessionInfo !== null && !sessionInfo.isExpired;
+
+    // If we have a valid session but it's about to expire, refresh it
+    if (isValid && sessionInfo && sessionInfo.remainingMinutes < 60) {
+      this.refreshSession(sessionInfo.sessionType as 'logged-in' | 'guest');
+      console.log(`Auto-refreshed session that was about to expire in ${sessionInfo.remainingMinutes} minutes`);
+    }
+
+    return isValid;
   }
 
   // Check if user is a guest

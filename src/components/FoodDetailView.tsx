@@ -100,7 +100,7 @@ const FoodDetailView: React.FC<FoodDetailViewProps> = ({
   };
 
   return (
-    <div className="sci-fi-card p-6 max-w-5xl mx-auto bg-safebite-card-bg border-2 border-safebite-teal/30 rounded-xl shadow-lg">
+    <div className="sci-fi-card p-6 max-w-5xl mx-auto bg-safebite-card-bg border-2 border-safebite-teal/30 rounded-xl shadow-lg overflow-auto max-h-[90vh]">
       <div className="flex justify-between items-start mb-4">
         <Button
           variant="ghost"

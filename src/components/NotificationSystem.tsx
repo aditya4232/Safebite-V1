@@ -38,7 +38,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
     if (!auth.currentUser && !isGuest) return;
 
     setIsLoading(true);
-    
+
     const userId = isGuest ? 'guest-user' : auth.currentUser?.uid;
     if (!userId) return;
 
@@ -55,16 +55,16 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
     const unsubscribe = onSnapshot(userNotificationsQuery, (snapshot) => {
       const notificationData: Notification[] = [];
       let unread = 0;
-      
+
       snapshot.forEach((doc) => {
         const notification = { id: doc.id, ...doc.data() } as Notification;
         notificationData.push(notification);
-        
+
         if (!notification.read) {
           unread++;
         }
       });
-      
+
       setNotifications(notificationData);
       setUnreadCount(unread);
       setIsLoading(false);
@@ -77,7 +77,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
     const checkAndAddDefaultNotifications = async () => {
       const snapshot = await getDoc(doc(db, 'users', userId));
       const userData = snapshot.exists() ? snapshot.data() : null;
-      
+
       if (userData && !userData.notificationsInitialized) {
         // Add welcome notification
         await setDoc(doc(notificationsRef), {
@@ -90,7 +90,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
           read: false,
           icon: 'sparkles'
         });
-        
+
         // Add health reminder
         await setDoc(doc(notificationsRef), {
           userId,
@@ -103,12 +103,12 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
           link: '/health-check',
           icon: 'heart'
         });
-        
+
         // Mark notifications as initialized
         await setDoc(doc(db, 'users', userId), { notificationsInitialized: true }, { merge: true });
       }
     };
-    
+
     if (!isGuest) {
       checkAndAddDefaultNotifications();
     }
@@ -131,14 +131,14 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
   const markAllAsRead = async () => {
     try {
       const batch = db.batch();
-      
+
       notifications.forEach((notification) => {
         if (!notification.read) {
           const notificationRef = doc(db, 'notifications', notification.id);
           batch.update(notificationRef, { read: true });
         }
       });
-      
+
       await batch.commit();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -163,7 +163,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
           break;
       }
     }
-    
+
     switch (notification.type) {
       case 'info':
         return <Info className="h-5 w-5 text-blue-500" />;
@@ -179,7 +179,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
   };
 
   return (
-    <div className="relative z-40">
+    <div className="relative" style={{ zIndex: 1000 }}>
       {/* Notification Bell Button */}
       <Button
         variant="ghost"
@@ -198,13 +198,25 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
       {/* Notification Panel */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-safebite-dark-blue border border-safebite-card-bg-alt rounded-lg shadow-lg overflow-hidden"
-          >
+          <>
+            {/* Backdrop to capture clicks outside */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0"
+              style={{ zIndex: 990 }}
+              onClick={() => setIsOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="absolute right-0 mt-2 w-80 sm:w-96 bg-safebite-dark-blue border border-safebite-card-bg-alt rounded-lg shadow-lg overflow-hidden"
+              style={{ zIndex: 1000, position: 'fixed', top: '60px', right: '20px' }}
+            >
             <div className="p-3 border-b border-safebite-card-bg-alt flex items-center justify-between">
               <h3 className="text-safebite-text font-medium flex items-center">
                 <Bell className="h-4 w-4 mr-2 text-safebite-teal" />
@@ -293,7 +305,8 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({ currentPage = '
                 Close
               </Button>
             </div>
-          </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

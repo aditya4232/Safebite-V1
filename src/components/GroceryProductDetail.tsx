@@ -14,7 +14,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Product } from '@/services/productService';
-import { GroceryProduct } from '@/services/groceryScrapingService';
+import { GroceryProduct } from '@/types/groceryTypes';
 import { useToast } from '@/hooks/use-toast';
 import { trackUserInteraction } from '@/services/mlService';
 import { useGuestMode } from '@/hooks/useGuestMode';
@@ -81,20 +81,43 @@ const GroceryProductDetail: React.FC<GroceryProductDetailProps> = ({
       source: productSource
     });
 
-    // Open the redirect URL if available
-    if (productRedirect) {
-      window.open(productRedirect, '_blank');
-    } else {
+    // Create a fallback Google Shopping search URL that will definitely work
+    const fallbackUrl = `https://www.google.com/search?q=${encodeURIComponent(productName)}+${encodeURIComponent(productBrand || '')}+buy+online&tbm=shop`;
+
+    try {
+      // Try to open the redirect URL if available
+      if (productRedirect) {
+        // Use window.open with proper parameters
+        window.open(productRedirect, '_blank', 'noopener,noreferrer');
+
+        toast({
+          title: "Opening store website",
+          description: `Taking you to ${productSource} to purchase ${productName}.`,
+        });
+      } else {
+        // If no redirect URL, use the fallback Google Shopping search
+        window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+
+        toast({
+          title: "Searching for product",
+          description: `Searching online stores for ${productName}.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error opening redirect URL:', error);
+
+      // If there's an error with the redirect URL, use the fallback
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+
       toast({
-        title: "Purchase link unavailable",
-        description: "Sorry, we couldn't find a purchase link for this product.",
-        variant: "destructive",
+        title: "Using alternative search",
+        description: `Searching online stores for ${productName}.`,
       });
     }
   };
 
   return (
-    <Card className="max-w-3xl mx-auto bg-safebite-card-bg border-safebite-teal/30">
+    <Card className="max-w-3xl mx-auto bg-safebite-card-bg border-safebite-teal/30 overflow-auto max-h-[90vh]">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl font-bold text-safebite-text">{productName}</CardTitle>

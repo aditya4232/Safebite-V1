@@ -1,8 +1,12 @@
 // Product service for fetching products from the API
-import groceryScrapingService, { GroceryProduct } from './groceryScrapingService';
+import { GroceryProduct } from '@/types/groceryTypes';
+import { searchScrapedProducts } from './unifiedGroceryService';
 
 // API base URL - Always use the Render backend for reliable results
-export const API_BASE_URL = 'http://10.20.65.157:10000';
+export const API_BASE_URL = 'https://safebite-backend.onrender.com';
+
+// Backup API URL in case the main one is down
+export const BACKUP_API_URL = 'https://safebite-backend.onrender.com';
 
 // Product interface
 export interface Product {
@@ -63,24 +67,53 @@ export interface PaginatedResponse<T> {
  * @returns Promise<boolean> - True if API is available, false otherwise
  */
 export const checkApiStatus = async (): Promise<boolean> => {
+  // Try main API URL first
   try {
+    console.log('Checking API status at:', API_BASE_URL);
     const response = await fetch(`${API_BASE_URL}/`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-      }
+      },
+      // Add a timeout to prevent hanging
+      signal: AbortSignal.timeout(5000)
     });
 
-    if (!response.ok) {
-      console.error(`API status check failed with status ${response.status}`);
-      return false;
+    if (response.ok) {
+      const data = await response.json();
+      console.log('API status check response:', data);
+      if (data && (data.status === 'API is running' || data.status === 'running' || data.api_status === 'running')) {
+        return true;
+      }
     }
 
-    const data = await response.json();
-    console.log('API status check response:', data);
-    return data && (data.status === 'API is running' || data.status === 'running' || data.api_status === 'running');
+    console.warn(`Main API check failed with status ${response.status}, trying backup...`);
   } catch (error) {
-    console.error('Error checking API status:', error);
+    console.warn('Error checking main API status:', error);
+  }
+
+  // If main API fails, try backup URL
+  try {
+    console.log('Checking backup API status at:', BACKUP_API_URL);
+    const backupResponse = await fetch(`${BACKUP_API_URL}/`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      // Add a timeout to prevent hanging
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (backupResponse.ok) {
+      const backupData = await backupResponse.json();
+      console.log('Backup API status check response:', backupData);
+      return backupData && (backupData.status === 'API is running' || backupData.status === 'running' || backupData.api_status === 'running');
+    }
+
+    console.error(`Backup API check failed with status ${backupResponse.status}`);
+    return false;
+  } catch (error) {
+    console.error('Error checking backup API status:', error);
     return false;
   }
 };
@@ -178,12 +211,81 @@ export const fetchGroceryProducts = async (
   category: string = ''
 ): Promise<PaginatedResponse<Product>> => {
   try {
+    // Import the unified grocery service for fallback
+    const { unifiedGrocerySearch, generateMockProducts } = await import('./unifiedGroceryService');
+
     // Check if API is available
     const isApiAvailable = await checkApiStatus();
 
     if (!isApiAvailable) {
-      console.warn('API is not available, returning empty data');
-      return { products: [], total: 0, page: 1, totalPages: 1 };
+      console.warn('API is not available, using unified grocery service as fallback');
+
+      try {
+        // Use the unified grocery service which has its own fallback mechanisms
+        const products = await unifiedGrocerySearch(search || 'grocery', false);
+
+        if (products && products.length > 0) {
+          console.log('Successfully retrieved products from unified grocery service:', products.length);
+
+          // Apply pagination
+          const startIndex = (page - 1) * limit;
+          const endIndex = startIndex + limit;
+          const paginatedProducts = products.slice(startIndex, endIndex);
+
+          // Convert to Product format
+          const formattedProducts = paginatedProducts.map(product => ({
+            _id: product._id,
+            name: product.name,
+            brand: product.brand,
+            category: product.category,
+            description: product.description,
+            price: product.price,
+            sale_price: product.sale_price,
+            market_price: product.market_price,
+            imageUrl: product.image_url,
+            rating: product.rating,
+            _collection: 'grocery' as const,
+            nutritionalInfo: product.nutritional_info,
+            tags: product.offers,
+            platform: product.platform,
+            source: product.source
+          }));
+
+          return {
+            products: formattedProducts,
+            total: products.length,
+            page,
+            totalPages: Math.ceil(products.length / limit)
+          };
+        }
+      } catch (fallbackError) {
+        console.error('Unified grocery service fallback failed:', fallbackError);
+      }
+
+      // If unified service fails, use mock data
+      const mockProducts = generateMockProducts(search || 'grocery', 'MongoDB');
+      return {
+        products: mockProducts.map(p => ({
+          _id: p._id,
+          name: p.name,
+          brand: p.brand,
+          category: p.category,
+          description: p.description,
+          price: p.price,
+          sale_price: p.sale_price,
+          market_price: p.market_price,
+          imageUrl: p.image_url,
+          rating: p.rating,
+          _collection: 'grocery' as const,
+          nutritionalInfo: p.nutritional_info,
+          tags: p.offers,
+          platform: p.platform,
+          source: p.source
+        })),
+        total: mockProducts.length,
+        page: 1,
+        totalPages: 1
+      };
     }
 
     // Prioritized list of endpoints to try in order
@@ -278,7 +380,7 @@ export const fetchGroceryProducts = async (
       // Use web scraping service as a last resort
       try {
         if (search) {
-          const scrapedProducts = await groceryScrapingService.searchGroceryProducts(search);
+          const scrapedProducts = await searchScrapedProducts(search);
 
           if (scrapedProducts && scrapedProducts.length > 0) {
             console.log('Using scraped grocery products:', scrapedProducts.length);

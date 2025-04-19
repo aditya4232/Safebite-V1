@@ -2,14 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Leaf, ThumbsUp, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Loader2, Leaf, ThumbsUp, AlertTriangle, ExternalLink, ShoppingBag, Heart, ArrowRight } from 'lucide-react';
 import { Product } from '@/services/productService';
-import { GroceryProduct } from '@/services/groceryScrapingService';
+import { GroceryProduct } from '@/types/groceryTypes';
 import { useToast } from '@/hooks/use-toast';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { app } from '../firebase';
+import { trackUserInteraction } from '@/services/mlService';
+import { useGuestMode } from '@/hooks/useGuestMode';
 
 interface HealthyAlternativesProps {
   product: Product | GroceryProduct;
   onAlternativeSelect?: (alternative: any) => void;
+  onSaveAlternative?: (alternative: any) => void;
 }
 
 // Mock function to simulate Gemini AI response
@@ -151,9 +157,13 @@ const getHealthyAlternativesFromGemini = async (product: any): Promise<any[]> =>
 
 const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
   product,
-  onAlternativeSelect
+  onAlternativeSelect,
+  onSaveAlternative
 }) => {
   const { toast } = useToast();
+  const { isGuest } = useGuestMode();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
   const [alternatives, setAlternatives] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,9 +198,92 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
       onAlternativeSelect(alternative);
     }
 
+    // Track this interaction
+    trackUserInteraction('select_healthy_alternative', {
+      originalProduct: product.name,
+      alternativeName: alternative.name,
+      healthScore: alternative.healthScore
+    });
+
     toast({
       title: 'Healthy Alternative Selected',
       description: `You've selected ${alternative.name} as a healthier option.`,
+      variant: 'default',
+    });
+  };
+
+  const handleSaveAlternative = async (alternative: any) => {
+    try {
+      if (isGuest) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save healthy alternatives.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!auth.currentUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save healthy alternatives.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Save to user's saved alternatives in Firebase
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      await setDoc(userRef, {
+        savedAlternatives: arrayUnion({
+          originalProduct: product.name,
+          alternative: alternative.name,
+          healthScore: alternative.healthScore,
+          benefits: alternative.benefits,
+          timestamp: new Date()
+        })
+      }, { merge: true });
+
+      // Track this interaction
+      trackUserInteraction('save_healthy_alternative', {
+        originalProduct: product.name,
+        alternativeName: alternative.name,
+        healthScore: alternative.healthScore
+      });
+
+      toast({
+        title: 'Alternative Saved',
+        description: `${alternative.name} has been saved to your profile.`,
+        variant: 'default',
+      });
+
+      if (onSaveAlternative) {
+        onSaveAlternative(alternative);
+      }
+    } catch (error) {
+      console.error('Error saving alternative:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save alternative. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBuyAlternative = (alternative: any) => {
+    // Track this interaction
+    trackUserInteraction('buy_healthy_alternative', {
+      originalProduct: product.name,
+      alternativeName: alternative.name,
+      healthScore: alternative.healthScore
+    });
+
+    // Open a search for this product in a new tab
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(alternative.name)}+buy+online&tbm=shop`, '_blank');
+
+    toast({
+      title: 'Opening Shopping Options',
+      description: `Searching for ${alternative.name} in online stores.`,
       variant: 'default',
     });
   };
@@ -294,14 +387,33 @@ const HealthyAlternatives: React.FC<HealthyAlternativesProps> = ({
                 <span className="text-xs text-green-600 dark:text-green-400">
                   Source: {alternative.source}
                 </span>
-                <Button
-                  size="sm"
-                  className="bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors duration-200"
-                  onClick={() => handleSelectAlternative(alternative)}
-                >
-                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                  Learn More
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-green-500 text-green-600 hover:bg-green-500/10"
+                    onClick={() => handleSaveAlternative(alternative)}
+                  >
+                    <Heart className="h-3.5 w-3.5 mr-1" />
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-orange-500 text-white hover:bg-orange-600 transition-colors duration-200"
+                    onClick={() => handleBuyAlternative(alternative)}
+                  >
+                    <ShoppingBag className="h-3.5 w-3.5 mr-1" />
+                    Buy
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-colors duration-200"
+                    onClick={() => handleSelectAlternative(alternative)}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Details
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

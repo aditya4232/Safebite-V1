@@ -1,375 +1,386 @@
 // src/services/foodDeliveryService.ts
 
-// Define the base URL for the backend API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://safebite-backend.onrender.com';
+// Import API service for consistent API handling
+import { API_BASE_URL, fetchWithTimeout, generateFallbackData, checkApiStatus } from './apiService';
 
-// Define the dish details interface
-export interface DishDetails {
-  name: string;
-  price?: string;
-  description?: string;
-  image_url?: string;
-  rating?: number;
-  is_veg?: boolean;
-}
+// Import location service
+import { calculateDistance, UserLocation } from './locationService';
 
 // Define the restaurant result interface
 export interface RestaurantResult {
   restaurant: string;
   redirect: string;
-  rating?: number;
-  delivery_time?: string;
-  price_range?: string;
-  source?: string;
-  cuisine?: string;
-  popular_dishes?: string[];
-  address?: string;
+  rating: number;
+  delivery_time: string;
+  price_range: string;
+  cuisine: string;
+  address: string;
+  image_url: string;
+  platform: string;
+  distance_km?: number;
+  latitude?: number;
+  longitude?: number;
+  offers?: string[];
   is_favorite?: boolean;
-  dish_details?: DishDetails[];
+  popular_dishes?: string[];
+  min_order?: string;
+  delivery_fee?: string;
+  estimated_delivery_time?: string;
+  restaurant_type?: 'veg' | 'non-veg' | 'both';
+}
+
+// Define the dish details interface
+export interface DishDetails {
+  name: string;
+  price: string;
+  description: string;
+  image_url: string;
+  rating: number;
+  is_veg: boolean;
 }
 
 /**
  * Fetches nearby restaurants from Swiggy and Zomato based on food and city
  * @param food The food item to search for
  * @param city The city to search in
+ * @param userLocation Optional user location for distance calculation
  * @returns Promise with an array of restaurant results
  */
-export const fetchNearbyRestaurants = async (food: string, city: string): Promise<RestaurantResult[]> => {
+export const fetchNearbyRestaurants = async (food: string, city: string, userLocation?: UserLocation): Promise<RestaurantResult[]> => {
   try {
-    // First try to fetch from our backend API
-    const apiUrl = `${API_BASE_URL}/api/food-delivery?food=${encodeURIComponent(food)}&city=${encodeURIComponent(city)}`;
-    console.log(`Fetching food delivery data from: ${apiUrl}`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Food delivery API response:', data);
-      return data;
+    console.log(`Fetching restaurants for ${food} in ${city}`);
+    if (userLocation) {
+      console.log(`User coordinates: ${userLocation.latitude}, ${userLocation.longitude}`);
     }
 
-    console.warn(`API request failed with status: ${response.status}`);
-    throw new Error(`API request failed with status: ${response.status}`);
-  } catch (error) {
-    console.error('Error fetching food delivery data:', error);
+    // Normalize city name
+    const normalizedCity = city.toLowerCase();
+    const isHyderabad = normalizedCity.includes('hyd') || normalizedCity.includes('hyderabad');
+    const isMumbai = normalizedCity.includes('mum') || normalizedCity.includes('bombay');
+    const isDelhi = normalizedCity.includes('delhi') || normalizedCity.includes('new delhi');
+    const isBangalore = normalizedCity.includes('bang') || normalizedCity.includes('bengaluru');
 
-    // Fallback to mock data if the API request fails
-    console.log('Using fallback mock data for food delivery');
+    // Normalize food query
+    const foodQuery = food.toLowerCase();
 
-    // Generate dynamic mock data based on the search parameters
-    const foodType = food.toLowerCase();
-    const cityName = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
-
-    // Determine cuisine based on food type
-    let cuisine = "Various";
-    if (foodType.includes("pizza") || foodType.includes("pasta")) {
-      cuisine = "Italian";
-    } else if (foodType.includes("burger")) {
-      cuisine = "American";
-    } else if (foodType.includes("biryani") || foodType.includes("paneer") || foodType.includes("curry")) {
-      cuisine = "Indian";
-    } else if (foodType.includes("noodles")) {
-      cuisine = "Chinese";
-    } else if (foodType.includes("sushi")) {
-      cuisine = "Japanese";
-    } else if (foodType.includes("tacos")) {
-      cuisine = "Mexican";
-    }
-
-    // Generate popular dishes based on food type
-    let popularDishes: string[] = [];
-    let dishDetails: DishDetails[] = [];
-
-    if (foodType.includes("pizza")) {
-      popularDishes = ["Margherita Pizza", "Pepperoni Pizza", "Cheese Pizza", "Veggie Supreme"];
-      dishDetails = [
-        {
-          name: "Margherita Pizza",
-          price: "₹249",
-          description: "Classic delight with 100% real mozzarella cheese",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.2,
-          is_veg: true
-        },
-        {
-          name: "Pepperoni Pizza",
-          price: "₹349",
-          description: "Classic pepperoni pizza with extra cheese",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.5,
-          is_veg: false
-        },
-        {
-          name: "Cheese Pizza",
-          price: "₹299",
-          description: "Extra cheese pizza with mozzarella and cheddar",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.3,
-          is_veg: true
-        },
-        {
-          name: "Veggie Supreme",
-          price: "₹399",
-          description: "Loaded with garden fresh veggies and extra cheese",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.1,
-          is_veg: true
-        }
-      ];
-    } else if (foodType.includes("burger")) {
-      popularDishes = ["Cheese Burger", "Veggie Burger", "Chicken Burger", "Double Patty Burger"];
-      dishDetails = [
-        {
-          name: "Cheese Burger",
-          price: "₹199",
-          description: "Classic cheese burger with fresh veggies",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.0,
-          is_veg: false
-        },
-        {
-          name: "Veggie Burger",
-          price: "₹179",
-          description: "Made with fresh vegetable patty and cheese",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 3.9,
-          is_veg: true
-        },
-        {
-          name: "Chicken Burger",
-          price: "₹229",
-          description: "Juicy chicken patty with special sauce",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.4,
-          is_veg: false
-        },
-        {
-          name: "Double Patty Burger",
-          price: "₹299",
-          description: "Double the fun with two juicy patties",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.6,
-          is_veg: false
-        }
-      ];
-    } else if (foodType.includes("biryani")) {
-      popularDishes = ["Chicken Biryani", "Mutton Biryani", "Veg Biryani", "Hyderabadi Biryani"];
-      dishDetails = [
-        {
-          name: "Chicken Biryani",
-          price: "₹299",
-          description: "Aromatic basmati rice cooked with tender chicken pieces",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.5,
-          is_veg: false
-        },
-        {
-          name: "Mutton Biryani",
-          price: "₹349",
-          description: "Fragrant rice with tender mutton pieces",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.7,
-          is_veg: false
-        },
-        {
-          name: "Veg Biryani",
-          price: "₹249",
-          description: "Aromatic rice with mixed vegetables",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.0,
-          is_veg: true
-        },
-        {
-          name: "Hyderabadi Biryani",
-          price: "₹329",
-          description: "Authentic Hyderabadi style biryani with special spices",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.6,
-          is_veg: false
-        }
-      ];
-    } else if (foodType.includes("paneer")) {
-      popularDishes = ["Paneer Butter Masala", "Kadai Paneer", "Paneer Tikka", "Shahi Paneer"];
-      dishDetails = [
-        {
-          name: "Paneer Butter Masala",
-          price: "₹269",
-          description: "Cottage cheese cooked in rich tomato and butter gravy",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.4,
-          is_veg: true
-        },
-        {
-          name: "Kadai Paneer",
-          price: "₹249",
-          description: "Cottage cheese cooked with bell peppers in a spicy gravy",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.3,
-          is_veg: true
-        },
-        {
-          name: "Paneer Tikka",
-          price: "₹229",
-          description: "Marinated cottage cheese grilled to perfection",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.5,
-          is_veg: true
-        },
-        {
-          name: "Shahi Paneer",
-          price: "₹279",
-          description: "Cottage cheese in a rich and creamy gravy",
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.2,
-          is_veg: true
-        }
-      ];
-    } else {
-      popularDishes = [`${foodType.charAt(0).toUpperCase() + foodType.slice(1)} Special`,
-                      `Spicy ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-                      `Classic ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-                      `House ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`];
-
-      // Generic dish details for any other food type
-      dishDetails = [
-        {
-          name: `${foodType.charAt(0).toUpperCase() + foodType.slice(1)} Special`,
-          price: "₹299",
-          description: `Our chef's special ${foodType} preparation`,
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.3,
-          is_veg: Math.random() > 0.5
-        },
-        {
-          name: `Spicy ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-          price: "₹279",
-          description: `Hot and spicy ${foodType} for spice lovers`,
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.1,
-          is_veg: Math.random() > 0.5
-        },
-        {
-          name: `Classic ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-          price: "₹249",
-          description: `Traditional ${foodType} prepared with authentic recipe`,
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/9f2f843523d0e8b9ecd9ee9ee32c1c46.jpg",
-          rating: 4.0,
-          is_veg: Math.random() > 0.5
-        },
-        {
-          name: `House ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-          price: "₹269",
-          description: `Our signature ${foodType} dish`,
-          image_url: "https://b.zmtcdn.com/data/pictures/chains/1/50691/2efa3a244c3c1e9b11499f167a7b1e2e.jpg",
-          rating: 4.2,
-          is_veg: Math.random() > 0.5
-        }
-      ];
-    }
-
-    return [
+    // Hardcoded restaurant data for Hyderabad
+    const hyderabadRestaurants: RestaurantResult[] = [
       {
-        "restaurant": `${cityName} ${foodType.charAt(0).toUpperCase() + foodType.slice(1)} House`,
-        "redirect": `https://www.swiggy.com/search?query=${foodType.replace(' ', '%20')}%20${city.toLowerCase().replace(' ', '%20')}`,
-        "rating": 4.2,
-        "delivery_time": "30-35 min",
-        "price_range": "₹₹",
-        "source": "Swiggy",
-        "cuisine": cuisine,
-        "popular_dishes": popularDishes.slice(0, 2),
-        "address": `Road No. 12, ${cityName} Central`,
-        "is_favorite": false,
-        "dish_details": dishDetails.slice(0, 2)
+        restaurant: "Paradise Biryani",
+        redirect: "https://www.zomato.com/hyderabad/paradise-biryani",
+        rating: 4.2,
+        delivery_time: "30-35 mins",
+        price_range: "₹350 for two",
+        cuisine: "North Indian",
+        address: "Masab Tank, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?biryani,restaurant",
+        platform: "Zomato",
+        distance_km: 2.3,
+        latitude: 17.3950,
+        longitude: 78.4867,
+        popular_dishes: ["Chicken Biryani", "Mutton Biryani", "Kebabs"]
       },
       {
-        "restaurant": `Royal ${foodType.charAt(0).toUpperCase() + foodType.slice(1)}`,
-        "redirect": `https://www.zomato.com/search?q=${foodType.replace(' ', '%20')}%20${city.toLowerCase().replace(' ', '%20')}`,
-        "rating": 4.3,
-        "delivery_time": "35-40 min",
-        "price_range": "₹₹₹",
-        "source": "Zomato",
-        "cuisine": cuisine,
-        "popular_dishes": popularDishes.slice(1, 3),
-        "address": `Banjara Hills, ${cityName}`,
-        "is_favorite": false,
-        "dish_details": dishDetails.slice(1, 3)
+        restaurant: "Bawarchi Restaurant",
+        redirect: "https://www.swiggy.com/restaurants/bawarchi-restaurant-hyderabad",
+        rating: 4.0,
+        delivery_time: "35-40 mins",
+        price_range: "₹300 for two",
+        cuisine: "North Indian",
+        address: "RTC X Roads, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?indian,restaurant",
+        platform: "Swiggy",
+        distance_km: 3.1,
+        latitude: 17.4010,
+        longitude: 78.4930,
+        popular_dishes: ["Hyderabadi Biryani", "Butter Chicken", "Rumali Roti"]
       },
       {
-        "restaurant": `The ${foodType.charAt(0).toUpperCase() + foodType.slice(1)} Factory`,
-        "redirect": `https://www.swiggy.com/search?query=${foodType.replace(' ', '%20')}%20${city.toLowerCase().replace(' ', '%20')}`,
-        "rating": 4.0,
-        "delivery_time": "25-30 min",
-        "price_range": "₹₹₹",
-        "source": "Swiggy",
-        "cuisine": cuisine,
-        "popular_dishes": popularDishes.slice(2, 4),
-        "address": `Jubilee Hills, ${cityName}`,
-        "is_favorite": false,
-        "dish_details": dishDetails.slice(2, 4)
+        restaurant: "Shah Ghouse",
+        redirect: "https://www.zomato.com/hyderabad/shah-ghouse-cafe-restaurant-tolichowki",
+        rating: 4.3,
+        delivery_time: "25-30 mins",
+        price_range: "₹250 for two",
+        cuisine: "North Indian",
+        address: "Tolichowki, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?kebab,restaurant",
+        platform: "Zomato",
+        distance_km: 1.8,
+        latitude: 17.4050,
+        longitude: 78.4060,
+        popular_dishes: ["Haleem", "Biryani", "Irani Chai"]
       },
       {
-        "restaurant": `${cityName} ${foodType.charAt(0).toUpperCase() + foodType.slice(1)} Corner`,
-        "redirect": `https://www.zomato.com/search?q=${foodType.replace(' ', '%20')}%20${city.toLowerCase().replace(' ', '%20')}`,
-        "rating": 4.1,
-        "delivery_time": "30-35 min",
-        "price_range": "₹₹",
-        "source": "Zomato",
-        "cuisine": cuisine,
-        "popular_dishes": popularDishes.slice(0, 2),
-        "address": `Madhapur, ${cityName}`,
-        "is_favorite": false,
-        "dish_details": dishDetails.slice(0, 2)
+        restaurant: "Domino's Pizza",
+        redirect: "https://www.swiggy.com/restaurants/dominos-pizza-hyderabad",
+        rating: 4.1,
+        delivery_time: "20-25 mins",
+        price_range: "₹400 for two",
+        cuisine: "Italian",
+        address: "Banjara Hills, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?pizza,restaurant",
+        platform: "Swiggy",
+        distance_km: 2.5,
+        latitude: 17.4150,
+        longitude: 78.4350,
+        popular_dishes: ["Margherita Pizza", "Pepperoni Pizza", "Garlic Bread"]
+      },
+      {
+        restaurant: "Pizza Hut",
+        redirect: "https://www.zomato.com/hyderabad/pizza-hut-himayath-nagar",
+        rating: 3.9,
+        delivery_time: "30-35 mins",
+        price_range: "₹450 for two",
+        cuisine: "Italian",
+        address: "Himayath Nagar, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?pizza,restaurant",
+        platform: "Zomato",
+        distance_km: 3.7,
+        latitude: 17.3930,
+        longitude: 78.4800,
+        popular_dishes: ["Cheese Pizza", "Stuffed Crust Pizza", "Pasta"]
+      },
+      {
+        restaurant: "Mehfil Restaurant",
+        redirect: "https://www.swiggy.com/restaurants/mehfil-restaurant-hyderabad",
+        rating: 4.2,
+        delivery_time: "25-30 mins",
+        price_range: "₹350 for two",
+        cuisine: "North Indian",
+        address: "Ameerpet, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?curry,restaurant",
+        platform: "Swiggy",
+        distance_km: 4.2,
+        latitude: 17.4370,
+        longitude: 78.4480,
+        popular_dishes: ["Chicken Biryani", "Butter Naan", "Paneer Butter Masala"]
+      },
+      {
+        restaurant: "Kritunga Restaurant",
+        redirect: "https://www.zomato.com/hyderabad/kritunga-restaurant-madhapur",
+        rating: 4.0,
+        delivery_time: "35-40 mins",
+        price_range: "₹400 for two",
+        cuisine: "South Indian",
+        address: "Madhapur, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?southindian,restaurant",
+        platform: "Zomato",
+        distance_km: 5.1,
+        latitude: 17.4480,
+        longitude: 78.3910,
+        popular_dishes: ["Andhra Biryani", "Gongura Chicken", "Ragi Sangati"]
+      },
+      {
+        restaurant: "Chutneys",
+        redirect: "https://www.swiggy.com/restaurants/chutneys-hyderabad",
+        rating: 4.4,
+        delivery_time: "20-25 mins",
+        price_range: "₹300 for two",
+        cuisine: "South Indian",
+        address: "Jubilee Hills, Hyderabad",
+        image_url: "https://source.unsplash.com/random/300x300/?dosa,restaurant",
+        platform: "Swiggy",
+        distance_km: 3.9,
+        latitude: 17.4310,
+        longitude: 78.4070,
+        popular_dishes: ["Masala Dosa", "Idli Sambar", "Mysore Bonda"]
       }
     ];
-  }
-};
 
-/**
- * Toggles a restaurant as favorite in Firebase
- * @param userId The user ID
- * @param restaurantId The restaurant ID or name
- * @param isFavorite Whether the restaurant is a favorite
- * @returns Promise with success status
- */
-export const toggleFavoriteRestaurant = async (
-  userId: string,
-  restaurantId: string,
-  isFavorite: boolean
-): Promise<boolean> => {
-  try {
-    // In a real implementation, this would update Firebase
-    console.log(`Toggling restaurant ${restaurantId} as ${isFavorite ? 'favorite' : 'not favorite'} for user ${userId}`);
-    return true;
-  } catch (error) {
-    console.error('Error toggling favorite restaurant:', error);
-    return false;
-  }
-};
+    // Hardcoded restaurant data for Mumbai
+    const mumbaiRestaurants: RestaurantResult[] = [
+      {
+        restaurant: "Trishna",
+        redirect: "https://www.zomato.com/mumbai/trishna-fort",
+        rating: 4.5,
+        delivery_time: "30-35 mins",
+        price_range: "₹1500 for two",
+        cuisine: "Seafood",
+        address: "Fort, Mumbai",
+        image_url: "https://source.unsplash.com/random/300x300/?seafood,restaurant",
+        platform: "Zomato",
+        distance_km: 2.3,
+        latitude: 18.9322,
+        longitude: 72.8328,
+        popular_dishes: ["Butter Garlic Crab", "Prawns Koliwada", "Fish Tikka"]
+      },
+      {
+        restaurant: "Britannia & Co.",
+        redirect: "https://www.swiggy.com/restaurants/britannia-and-co-mumbai",
+        rating: 4.6,
+        delivery_time: "35-40 mins",
+        price_range: "₹800 for two",
+        cuisine: "Parsi",
+        address: "Ballard Estate, Mumbai",
+        image_url: "https://source.unsplash.com/random/300x300/?parsi,food",
+        platform: "Swiggy",
+        distance_km: 3.1,
+        latitude: 18.9372,
+        longitude: 72.8384,
+        popular_dishes: ["Berry Pulao", "Sali Boti", "Caramel Custard"]
+      },
+      {
+        restaurant: "Mahesh Lunch Home",
+        redirect: "https://www.zomato.com/mumbai/mahesh-lunch-home-juhu",
+        rating: 4.3,
+        delivery_time: "25-30 mins",
+        price_range: "₹1000 for two",
+        cuisine: "Seafood",
+        address: "Juhu, Mumbai",
+        image_url: "https://source.unsplash.com/random/300x300/?fish,restaurant",
+        platform: "Zomato",
+        distance_km: 1.8,
+        latitude: 19.0883,
+        longitude: 72.8264,
+        popular_dishes: ["Butter Garlic Prawns", "Bombil Fry", "Crab Masala"]
+      }
+    ];
 
-/**
- * Gets user's favorite restaurants from Firebase
- * @param userId The user ID
- * @returns Promise with array of favorite restaurant IDs
- */
-export const getFavoriteRestaurants = async (userId: string): Promise<string[]> => {
-  try {
-    // In a real implementation, this would fetch from Firebase
-    console.log(`Getting favorite restaurants for user ${userId}`);
-    return [];
+    // Hardcoded restaurant data for Delhi
+    const delhiRestaurants: RestaurantResult[] = [
+      {
+        restaurant: "Karim's",
+        redirect: "https://www.zomato.com/ncr/karims-jama-masjid-old-delhi",
+        rating: 4.5,
+        delivery_time: "30-35 mins",
+        price_range: "₹600 for two",
+        cuisine: "North Indian",
+        address: "Jama Masjid, Old Delhi",
+        image_url: "https://source.unsplash.com/random/300x300/?kebab,restaurant",
+        platform: "Zomato",
+        distance_km: 2.3,
+        latitude: 28.6507,
+        longitude: 77.2334,
+        popular_dishes: ["Mutton Burra", "Chicken Jahangiri", "Mutton Korma"]
+      },
+      {
+        restaurant: "Bukhara",
+        redirect: "https://www.swiggy.com/restaurants/bukhara-itc-maurya-delhi",
+        rating: 4.8,
+        delivery_time: "35-40 mins",
+        price_range: "₹5000 for two",
+        cuisine: "North Indian",
+        address: "ITC Maurya, Diplomatic Enclave",
+        image_url: "https://source.unsplash.com/random/300x300/?tandoori,restaurant",
+        platform: "Swiggy",
+        distance_km: 3.1,
+        latitude: 28.5977,
+        longitude: 77.1700,
+        popular_dishes: ["Dal Bukhara", "Sikandari Raan", "Tandoori Jhinga"]
+      },
+      {
+        restaurant: "Moti Mahal",
+        redirect: "https://www.zomato.com/ncr/moti-mahal-delux-south-extension-2-delhi",
+        rating: 4.3,
+        delivery_time: "25-30 mins",
+        price_range: "₹1200 for two",
+        cuisine: "North Indian",
+        address: "South Extension, Delhi",
+        image_url: "https://source.unsplash.com/random/300x300/?curry,restaurant",
+        platform: "Zomato",
+        distance_km: 1.8,
+        latitude: 28.5691,
+        longitude: 77.2220,
+        popular_dishes: ["Butter Chicken", "Tandoori Chicken", "Dal Makhani"]
+      }
+    ];
+
+    // Hardcoded restaurant data for Bangalore
+    const bangaloreRestaurants: RestaurantResult[] = [
+      {
+        restaurant: "MTR",
+        redirect: "https://www.zomato.com/bangalore/mavalli-tiffin-room-mtr-lalbagh-bangalore",
+        rating: 4.6,
+        delivery_time: "30-35 mins",
+        price_range: "₹400 for two",
+        cuisine: "South Indian",
+        address: "Lalbagh, Bangalore",
+        image_url: "https://source.unsplash.com/random/300x300/?dosa,restaurant",
+        platform: "Zomato",
+        distance_km: 2.3,
+        latitude: 12.9516,
+        longitude: 77.5932,
+        popular_dishes: ["Masala Dosa", "Rava Idli", "Filter Coffee"]
+      },
+      {
+        restaurant: "Meghana Foods",
+        redirect: "https://www.swiggy.com/restaurants/meghana-foods-bangalore",
+        rating: 4.5,
+        delivery_time: "35-40 mins",
+        price_range: "₹700 for two",
+        cuisine: "Andhra",
+        address: "Residency Road, Bangalore",
+        image_url: "https://source.unsplash.com/random/300x300/?biryani,restaurant",
+        platform: "Swiggy",
+        distance_km: 3.1,
+        latitude: 12.9698,
+        longitude: 77.6003,
+        popular_dishes: ["Boneless Biryani", "Andhra Chicken", "Apollo Fish"]
+      },
+      {
+        restaurant: "Empire Restaurant",
+        redirect: "https://www.zomato.com/bangalore/empire-restaurant-koramangala-5th-block",
+        rating: 4.2,
+        delivery_time: "25-30 mins",
+        price_range: "₹500 for two",
+        cuisine: "North Indian",
+        address: "Koramangala, Bangalore",
+        image_url: "https://source.unsplash.com/random/300x300/?kebab,restaurant",
+        platform: "Zomato",
+        distance_km: 1.8,
+        latitude: 12.9347,
+        longitude: 77.6205,
+        popular_dishes: ["Butter Chicken", "Coin Parotta", "Chicken Kebab"]
+      }
+    ];
+
+    // Select restaurants based on city
+    let restaurants: RestaurantResult[] = [];
+
+    if (isHyderabad) {
+      restaurants = hyderabadRestaurants;
+    } else if (isMumbai) {
+      restaurants = mumbaiRestaurants;
+    } else if (isDelhi) {
+      restaurants = delhiRestaurants;
+    } else if (isBangalore) {
+      restaurants = bangaloreRestaurants;
+    } else {
+      // Default to Hyderabad if city not recognized
+      restaurants = hyderabadRestaurants;
+    }
+
+    // Filter restaurants based on food query if provided
+    if (food && food.trim() !== '') {
+      // First try to match restaurants with dishes containing the food query
+      const dishMatches = restaurants.filter(r =>
+        r.popular_dishes?.some(dish => dish.toLowerCase().includes(foodQuery))
+      );
+
+      // If we have dish matches, return those
+      if (dishMatches.length > 0) {
+        console.log(`Found ${dishMatches.length} restaurants with matching dishes`);
+        return dishMatches;
+      }
+
+      // Otherwise, try to match by cuisine or restaurant name
+      const otherMatches = restaurants.filter(r =>
+        (r.cuisine && r.cuisine.toLowerCase().includes(foodQuery)) ||
+        r.restaurant.toLowerCase().includes(foodQuery)
+      );
+
+      if (otherMatches.length > 0) {
+        console.log(`Found ${otherMatches.length} restaurants with matching cuisine or name`);
+        return otherMatches;
+      }
+    }
+
+    // If no matches or no food query, return all restaurants for the city
+    console.log(`Returning all ${restaurants.length} restaurants for ${city}`);
+    return restaurants;
+
   } catch (error) {
-    console.error('Error getting favorite restaurants:', error);
+    console.error('Error in food delivery service:', error);
     return [];
   }
 };

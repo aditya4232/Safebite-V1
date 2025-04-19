@@ -19,34 +19,46 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowGuest = true }) =>
   const auth = getAuth(app);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    // Check for Firebase auth persistence
+    const checkAuth = () => {
+      const user = auth.currentUser;
+
       // Check if user is authenticated through Firebase
       const isFirebaseAuth = !!user;
-      
+
       // Check if user is in guest mode
       const isGuestMode = sessionService.isGuestUser();
-      
+
       // Check if session is valid
       const isSessionValid = sessionService.isAuthenticated();
-      
+
       // Set authentication state
       setIsAuthenticated(isFirebaseAuth || (allowGuest && isGuestMode && isSessionValid));
       setIsGuest(isGuestMode);
       setIsChecking(false);
-      
+
       // Log authentication state for debugging
-      console.log('AuthGuard - Auth state:', { 
-        isFirebaseAuth, 
-        isGuestMode, 
+      console.log('AuthGuard - Auth state:', {
+        isFirebaseAuth,
+        isGuestMode,
         isSessionValid,
         isAuthenticated: isFirebaseAuth || (allowGuest && isGuestMode && isSessionValid),
-        allowGuest
+        allowGuest,
+        currentUser: user?.email || 'none'
       });
-      
+
       // If session is invalid but user is logged in, refresh the session
       if (!isSessionValid && isFirebaseAuth) {
         sessionService.refreshSession('logged-in');
       }
+    };
+
+    // Initial check
+    checkAuth();
+
+    // Set up auth state change listener
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      checkAuth();
     });
 
     return () => unsubscribe();
@@ -72,7 +84,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowGuest = true }) =>
       description: "Please log in or continue as guest to access this page.",
       variant: "destructive",
     });
-    
+
     // Redirect to login page with return URL
     return <Navigate to={`/auth/login?returnUrl=${encodeURIComponent(location.pathname)}`} replace />;
   }
@@ -85,7 +97,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowGuest = true }) =>
       description: "This feature requires a full account. Please sign up to continue.",
       variant: "destructive",
     });
-    
+
     // Redirect to signup page
     return <Navigate to="/auth/signup" replace />;
   }

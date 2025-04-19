@@ -2,11 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { 
-  Search, Zap, Heart, BarChart2, Pizza, 
+import {
+  Search, Zap, Heart, BarChart2, Pizza,
   Users, Bell, Shield, Scan, Award, Sparkles
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
+import PublicNavbar from '@/components/PublicNavbar';
 import Footer from '@/components/Footer';
 
 const Features = () => {
@@ -99,8 +99,8 @@ const Features = () => {
 
   return (
     <div className="min-h-screen bg-safebite-dark-blue">
-      <Navbar />
-      
+      <PublicNavbar />
+
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold mb-4">
@@ -110,7 +110,7 @@ const Features = () => {
             Discover all the powerful tools and features that make SafeBite your ultimate companion for healthier food choices
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
           {features.map((feature, index) => (
             <Card key={index} className={`sci-fi-card border ${feature.border} hover:shadow-lg transition-shadow`}>
@@ -128,7 +128,7 @@ const Features = () => {
             </Card>
           ))}
         </div>
-        
+
         <div className="bg-safebite-card-bg border border-safebite-card-bg-alt rounded-lg p-8 mb-16">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-semibold text-safebite-text mb-2">Special Project Information</h2>
@@ -136,7 +136,7 @@ const Features = () => {
               SafeBite is a special engineering project developed by Aditya Shenvi at IFHE Hyderabad
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <h3 className="text-xl font-medium text-safebite-text mb-3">Project Goals</h3>
@@ -159,7 +159,7 @@ const Features = () => {
                 </li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-xl font-medium text-safebite-text mb-3">Technical Implementation</h3>
               <ul className="space-y-2 text-safebite-text-secondary">
@@ -183,7 +183,7 @@ const Features = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="text-center">
           <p className="text-safebite-text-secondary mb-6">
             Ready to experience all these features and start your journey to healthier eating?
@@ -202,7 +202,7 @@ const Features = () => {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

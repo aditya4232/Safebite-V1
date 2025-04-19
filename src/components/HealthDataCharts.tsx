@@ -16,6 +16,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/mlService';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { app } from '../firebase';
 
 // Mock data for charts
 const generateMockHealthData = (userId: string) => {
@@ -31,11 +34,11 @@ const generateMockHealthData = (userId: string) => {
   const weightData = Array.from({ length: 30 }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - (29 - i));
-    
+
     // Generate a somewhat realistic weight progression
     const baseWeight = 70 + random(-10, 10);
     const dayWeight = baseWeight + (Math.sin(i / 5) * 1.5);
-    
+
     return {
       date: date.toISOString().split('T')[0],
       weight: parseFloat(dayWeight.toFixed(1)),
@@ -47,7 +50,7 @@ const generateMockHealthData = (userId: string) => {
   const nutritionData = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - (6 - i));
-    
+
     return {
       date: date.toISOString().split('T')[0],
       calories: random(1800, 2500),
@@ -61,7 +64,7 @@ const generateMockHealthData = (userId: string) => {
   const activityData = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - (6 - i));
-    
+
     return {
       date: date.toISOString().split('T')[0],
       steps: random(3000, 12000),
@@ -126,35 +129,77 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
     pieColors: ['#10b981', '#6366f1', '#f97316', '#eab308', '#ec4899', '#8b5cf6']
   };
 
-  // Fetch health data
+  // Fetch health data with better error handling
   useEffect(() => {
     const fetchHealthData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
-        // In a real implementation, this would call an API
-        // For now, we'll use mock data
-        const mockData = generateMockHealthData(userId);
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        // Always generate mock data first as a fallback
+        const mockData = generateMockHealthData(userId || 'default-user');
+
+        // Set mock data immediately to prevent white screen
         setHealthData(mockData);
-        
+
+        // Try to get real data from Firebase if not in guest mode
+        let realData = null;
+
+        if (!isGuest && userId !== 'default-user') {
+          const auth = getAuth(app);
+          const db = getFirestore(app);
+
+          if (auth.currentUser) {
+            try {
+              const userRef = doc(db, 'users', auth.currentUser.uid);
+              const userDoc = await getDoc(userRef);
+
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+
+                // Check if user has health data
+                if (userData.healthData) {
+                  realData = userData.healthData;
+                  console.log('Found real health data:', realData);
+
+                  // Update with real data if available
+                  setHealthData(realData);
+                } else {
+                  console.log('No health data found in user profile, using mock data');
+                }
+              } else {
+                console.log('User document does not exist, using mock data');
+              }
+            } catch (firebaseErr) {
+              console.error('Firebase error fetching health data:', firebaseErr);
+              // Already using mock data, so just log the error
+            }
+          } else {
+            console.log('No current user, using mock data');
+          }
+        } else {
+          console.log('Guest mode or default user, using mock data');
+        }
+
         // Track this interaction
-        trackUserInteraction('view_health_charts', { 
-          isGuest, 
+        trackUserInteraction('view_health_charts', {
+          isGuest,
           tab: activeTab,
-          timeRange
+          timeRange,
+          dataSource: realData ? 'firebase' : 'mock'
         });
       } catch (err) {
-        console.error('Error fetching health data:', err);
-        setError('Failed to load health data. Please try again.');
+        console.error('Error in health data component:', err);
+        setError('Failed to load health data. Using sample data instead.');
+
+        // Ensure we always have data by generating mock data again
+        const fallbackData = generateMockHealthData('fallback-' + Date.now());
+        setHealthData(fallbackData);
+
         toast({
-          title: 'Error',
-          description: 'Could not load health data charts.',
-          variant: 'destructive',
+          title: 'Using Sample Data',
+          description: 'Could not load your health data. Showing sample data instead.',
+          variant: 'default',
         });
       } finally {
         setIsLoading(false);
@@ -162,7 +207,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
     };
 
     fetchHealthData();
-  }, [userId, toast, isGuest]);
+  }, [userId, toast, isGuest, activeTab]);
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -173,10 +218,10 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
   // Handle tab change
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    
+
     // Track this interaction
-    trackUserInteraction('change_health_chart_tab', { 
-      isGuest, 
+    trackUserInteraction('change_health_chart_tab', {
+      isGuest,
       tab: value
     });
   };
@@ -184,10 +229,10 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
   // Handle time range change
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
-    
+
     // Track this interaction
-    trackUserInteraction('change_health_chart_timerange', { 
-      isGuest, 
+    trackUserInteraction('change_health_chart_timerange', {
+      isGuest,
       timeRange: value
     });
   };
@@ -199,10 +244,10 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
       description: 'Your health data is being prepared for download.',
       variant: 'default',
     });
-    
+
     // Track this interaction
-    trackUserInteraction('export_health_data', { 
-      isGuest, 
+    trackUserInteraction('export_health_data', {
+      isGuest,
       tab: activeTab
     });
   };
@@ -220,30 +265,28 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
     );
   }
 
-  if (error || !healthData) {
-    return (
-      <Card className="sci-fi-card border-safebite-teal/30">
-        <CardContent className="p-6">
-          <div className="flex items-start">
-            <AlertTriangle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-safebite-text font-medium">Failed to load health data</p>
-              <p className="text-safebite-text-secondary text-sm mt-1">
-                {error || "Could not retrieve your health data. Please try again later."}
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => window.location.reload()}
-              >
-                Retry
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+  // Always ensure we have health data
+  if (!healthData) {
+    // Generate mock data as a fallback
+    const fallbackData = generateMockHealthData(userId || 'fallback-user');
+    setHealthData(fallbackData);
+    console.log('Generated fallback data in render phase');
   }
+
+  // Show error message if there was an error, but still render the charts with mock data
+  const errorMessage = error ? (
+    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+      <div className="flex items-start">
+        <AlertTriangle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-safebite-text font-medium">Health Data Notice</p>
+          <p className="text-safebite-text-secondary text-sm mt-1">
+            {error || "Using sample data for visualization. Your actual health data will appear here when available."}
+          </p>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <Card className="sci-fi-card border-safebite-teal/30">
@@ -259,7 +302,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
               Visualize your health progress and patterns
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Select defaultValue={timeRange} onValueChange={handleTimeRangeChange}>
               <SelectTrigger className="w-[120px] bg-safebite-card-bg-alt border-safebite-card-bg">
@@ -272,7 +315,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                 <SelectItem value="1y">Last Year</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Button
               variant="outline"
               size="icon"
@@ -284,8 +327,10 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="pt-4">
+        {/* Show error message if there was an error */}
+        {errorMessage}
         <Tabs defaultValue={activeTab} className="mb-6" onValueChange={handleTabChange}>
           <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="weight">
@@ -305,7 +350,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
               <span className="hidden sm:inline">Distribution</span>
             </TabsTrigger>
           </TabsList>
-          
+
           {/* Weight Tab */}
           <TabsContent value="weight">
             <div className="bg-safebite-card-bg-alt/30 p-4 rounded-lg mb-4">
@@ -316,7 +361,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                   <span>Target: {healthData.weightData[0].target} kg</span>
                 </div>
               </div>
-              
+
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -324,20 +369,20 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                     margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={COLORS.background} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={formatDate} 
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDate}
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                     />
-                    <YAxis 
+                    <YAxis
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                       domain={['dataMin - 2', 'dataMax + 2']}
                     />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: COLORS.background, 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
                         borderColor: COLORS.primary,
                         color: COLORS.text
                       }}
@@ -345,19 +390,19 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                       labelFormatter={(label) => formatDate(label)}
                     />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="weight" 
-                      stroke={COLORS.primary} 
+                    <Line
+                      type="monotone"
+                      dataKey="weight"
+                      stroke={COLORS.primary}
                       strokeWidth={2}
                       dot={{ r: 3, fill: COLORS.primary }}
                       activeDot={{ r: 5 }}
                       name="Weight (kg)"
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="target" 
-                      stroke={COLORS.secondary} 
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      stroke={COLORS.secondary}
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       dot={false}
@@ -366,7 +411,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              
+
               <div className="mt-4 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Badge className="bg-safebite-teal/20 text-safebite-teal border-safebite-teal/30">
@@ -382,7 +427,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
               </div>
             </div>
           </TabsContent>
-          
+
           {/* Nutrition Tab */}
           <TabsContent value="nutrition">
             <div className="bg-safebite-card-bg-alt/30 p-4 rounded-lg mb-4">
@@ -393,7 +438,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                   <span>Last 7 Days</span>
                 </div>
               </div>
-              
+
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -401,19 +446,19 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                     margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={COLORS.background} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={formatDate} 
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDate}
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                     />
-                    <YAxis 
+                    <YAxis
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                     />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: COLORS.background, 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
                         borderColor: COLORS.primary,
                         color: COLORS.text
                       }}
@@ -421,15 +466,15 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                       labelFormatter={(label) => formatDate(label)}
                     />
                     <Legend />
-                    <Bar 
-                      dataKey="calories" 
-                      fill={COLORS.primary} 
+                    <Bar
+                      dataKey="calories"
+                      fill={COLORS.primary}
                       name="Calories (kcal)"
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              
+
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <Badge className="bg-safebite-teal/20 text-safebite-teal border-safebite-teal/30 flex justify-center">
                   Avg Calories: {Math.round(healthData.nutritionData.reduce((acc: number, day: any) => acc + day.calories, 0) / healthData.nutritionData.length)} kcal
@@ -443,7 +488,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
               </div>
             </div>
           </TabsContent>
-          
+
           {/* Activity Tab */}
           <TabsContent value="activity">
             <div className="bg-safebite-card-bg-alt/30 p-4 rounded-lg mb-4">
@@ -454,7 +499,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                   <span>Last 7 Days</span>
                 </div>
               </div>
-              
+
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -462,19 +507,19 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                     margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={COLORS.background} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={formatDate} 
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDate}
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                     />
-                    <YAxis 
+                    <YAxis
                       stroke={COLORS.textSecondary}
                       tick={{ fontSize: 12 }}
                     />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: COLORS.background, 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
                         borderColor: COLORS.primary,
                         color: COLORS.text
                       }}
@@ -482,15 +527,15 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                       labelFormatter={(label) => formatDate(label)}
                     />
                     <Legend />
-                    <Bar 
-                      dataKey="steps" 
-                      fill={COLORS.primary} 
+                    <Bar
+                      dataKey="steps"
+                      fill={COLORS.primary}
                       name="Steps"
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              
+
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <Badge className="bg-safebite-teal/20 text-safebite-teal border-safebite-teal/30 flex justify-center">
                   Avg Steps: {Math.round(healthData.activityData.reduce((acc: number, day: any) => acc + day.steps, 0) / healthData.activityData.length)}
@@ -504,14 +549,14 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
               </div>
             </div>
           </TabsContent>
-          
+
           {/* Distribution Tab */}
           <TabsContent value="distribution">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Macronutrient Distribution */}
               <div className="bg-safebite-card-bg-alt/30 p-4 rounded-lg">
                 <h3 className="text-safebite-text font-medium mb-4">Macronutrient Distribution</h3>
-                
+
                 <div className="h-64 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -529,9 +574,9 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                           <Cell key={`cell-${index}`} fill={COLORS.pieColors[index % COLORS.pieColors.length]} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: COLORS.background, 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: COLORS.background,
                           borderColor: COLORS.primary,
                           color: COLORS.text
                         }}
@@ -542,11 +587,11 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                   </ResponsiveContainer>
                 </div>
               </div>
-              
+
               {/* Food Category Distribution */}
               <div className="bg-safebite-card-bg-alt/30 p-4 rounded-lg">
                 <h3 className="text-safebite-text font-medium mb-4">Food Category Distribution</h3>
-                
+
                 <div className="h-64 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -564,9 +609,9 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                           <Cell key={`cell-${index}`} fill={COLORS.pieColors[index % COLORS.pieColors.length]} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: COLORS.background, 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: COLORS.background,
                           borderColor: COLORS.primary,
                           color: COLORS.text
                         }}

@@ -639,7 +639,10 @@ const Recipes = () => {
           </Tabs>
         </div>
         {/* Recipe Details Dialog */}
-        <Dialog open={showRecipeDetails} onOpenChange={setShowRecipeDetails}>
+        <Dialog open={showRecipeDetails} onOpenChange={(open) => {
+          setShowRecipeDetails(open);
+          if (!open) setSelectedRecipe(null);
+        }}>
           <DialogContent className="sci-fi-card max-w-4xl">
             {selectedRecipe && (
               <>

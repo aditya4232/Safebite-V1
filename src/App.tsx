@@ -29,16 +29,18 @@ import AboutUs from "@/pages/AboutUs";
 import Features from "@/pages/Features";
 import FoodDelivery from "@/pages/FoodDelivery";
 import Help from "@/pages/Help";
+import Changelog from "@/pages/Changelog";
 import { getAuth } from "firebase/auth";
 import { app } from "./firebase";
 import DevPopup from "@/components/DevPopup";
 import FoodChatBot from "@/components/FoodChatBot";
 // import { useGuestMode } from "@/hooks/useGuestMode";
 import { useEffect, useState, lazy, Suspense } from "react";
-import { isAuthPage, redirectToLogin } from "@/utils/authUtils";
+import { isAuthPage, isProtectedPage, redirectToLogin, fixAuthState } from "@/utils/authUtils";
 import guestAuthService from "@/services/guestAuthService";
 import UserActivityService from "@/services/userActivityService";
 import simpleSessionService from "@/services/simpleSessionService";
+import windowCloseService from "@/services/windowCloseService";
 import SimpleAuthGuard from "@/components/SimpleAuthGuard";
 import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -91,54 +93,41 @@ const App = () => {
   }, [auth, db]);
 
 
-  // Global authentication check
+  // Global authentication check with improved handling
   useEffect(() => {
-    // Check if we're on a protected route
-    const path = window.location.pathname;
-    const protectedRoutes = [
-      '/dashboard',
-      '/nutrition',
-      '/food-search',
-      '/food-delivery',
-      '/product-recommendations',
-      '/products',
-      '/community',
-      '/healthbox',
-      '/reports',
-      '/recipes',
-      '/settings',
-      '/tools',
-      '/features'
-    ];
+    // Fix any authentication state issues
+    fixAuthState();
 
-    const isProtectedRoute = protectedRoutes.some(route =>
-      path.toLowerCase().includes(route.toLowerCase())
-    );
+    // Initialize window close service to handle logout on window/browser close
+    windowCloseService.initialize();
 
-    // Check if we're on an auth page
-    const isOnAuthPage = path.includes('/auth/login') ||
-                        path.includes('/auth/signup') ||
-                        path.includes('/auth/forgot-password') ||
-                        path === '/' ||
-                        path === '/SafeBite-V1/' ||
-                        path.includes('/about') ||
-                        path.includes('/features');
-
-    // Only check auth on protected pages, not on auth pages
-    if (isProtectedRoute && !isOnAuthPage) {
-      const user = auth.currentUser;
-      const isGuestMode = guestAuthService.isGuestUser(); // This checks for valid session
-
-      if (!user && !isGuestMode) {
-        // Get the base URL for the application
-        const baseUrl = window.location.pathname.includes('/SafeBite-V1')
-          ? '/SafeBite-V1'
-          : '';
-
-        // Redirect to login page
-        window.location.href = `${baseUrl}/auth/login`;
+    // Set up an interval to periodically check and fix auth state
+    const authCheckInterval = setInterval(() => {
+      // Only run checks if we're on a protected page
+      if (isProtectedPage() && !isAuthPage()) {
+        fixAuthState();
       }
-    }
+    }, 60000); // Check every minute
+
+    // Log the current auth state for debugging
+    const user = auth.currentUser;
+    const isGuestMode = guestAuthService.isGuestUser();
+    const isSessionValid = simpleSessionService.isAuthenticated();
+
+    console.log('App - Initial auth state:', {
+      path: window.location.pathname,
+      isProtectedPage: isProtectedPage(),
+      isAuthPage: isAuthPage(),
+      hasUser: !!user,
+      isGuestMode,
+      isSessionValid
+    });
+
+    // Clean up window close service and interval when component unmounts
+    return () => {
+      windowCloseService.cleanup();
+      clearInterval(authCheckInterval);
+    };
   }, [auth]);
 
   const [open, setOpen] = React.useState(false);
@@ -186,15 +175,20 @@ const App = () => {
           <DevPopup />
           <BrowserRouter basename="/SafeBite-V1/">
             <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/about" element={<AboutUs />} />
-              <Route path="/features" element={<Features />} />
-              <Route path="/help" element={<Help />} />
+              {/* Public Routes - Only auth and info pages */}
               <Route path="/auth/login" element={<Login />} />
               <Route path="/auth/signup" element={<Signup />} />
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/questionnaire" element={<Questionnaire />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/changelog" element={<Changelog />} />
+
+              {/* Public pages that don't require login */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/features" element={<Features />} />
+
+              {/* Pages that require authentication */}
+              <Route path="/questionnaire" element={<SimpleAuthGuard allowGuest={true}><Questionnaire /></SimpleAuthGuard>} />
               <Route path="/health-check" element={<SimpleAuthGuard><HealthCheck /></SimpleAuthGuard>} />
 
               {/* Protected Routes */}

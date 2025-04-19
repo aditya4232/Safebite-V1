@@ -8,7 +8,7 @@ import {
   Home, BarChart2, Pizza, Users, Settings, Menu, X,
   Search, Heart, LogOut, Activity, Calculator, Stethoscope,
   Zap, BookOpen, Bot, ShoppingCart, Sparkles, ShoppingBag, Badge, Utensils,
-  UserCircle, HelpCircle, Truck
+  UserCircle, HelpCircle, Truck, Bell, MessageSquare
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, signOut } from "firebase/auth";
@@ -18,9 +18,19 @@ import { getGuestName } from '@/services/guestUserService';
 
 interface DashboardSidebarProps {
   userProfile: any;
+  onProfileClick?: () => void;
+  onNotificationsClick?: () => void;
+  onChatClick?: () => void;
+  isLoadingProfile?: boolean;
 }
 
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userProfile }) => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
+  userProfile,
+  onProfileClick,
+  onNotificationsClick,
+  onChatClick,
+  isLoadingProfile = false
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const navigate = useNavigate();
@@ -138,12 +148,42 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userProfile }) => {
             </ul>
           </nav>
 
+          {/* Quick Actions */}
+          <div className="px-4 py-2 border-t border-safebite-card-bg-alt">
+            <div className="flex justify-around mb-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-safebite-card-bg-alt hover:text-safebite-teal transition-colors"
+                onClick={onNotificationsClick}
+              >
+                <Bell size={20} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-safebite-card-bg-alt hover:text-safebite-teal transition-colors"
+                onClick={onChatClick}
+              >
+                <MessageSquare size={20} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-safebite-card-bg-alt hover:text-safebite-teal transition-colors"
+                onClick={() => navigate('/help')}
+              >
+                <HelpCircle size={20} />
+              </Button>
+            </div>
+          </div>
+
           {/* User section & Logout */}
           <div className="p-4 border-t border-safebite-card-bg-alt">
             <Button
               variant="ghost"
               className="flex items-center space-x-3 mb-4 w-full hover:bg-safebite-card-bg-alt rounded-md p-2"
-              onClick={() => setShowProfilePopup(true)}
+              onClick={onProfileClick || (() => setShowProfilePopup(true))}
             >
               <div className="relative">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-r from-safebite-teal/30 to-safebite-purple/30 flex items-center justify-center text-safebite-teal border border-safebite-teal/50">

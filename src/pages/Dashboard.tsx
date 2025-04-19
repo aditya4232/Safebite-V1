@@ -9,7 +9,7 @@ import {
   Sparkles, Clock, RefreshCw, UserCircle,
   AlertTriangle, User, Activity, Truck, History, // Added History icon
   Search, Pizza, ShoppingCart, Stethoscope, Bell, // Added icons for activity types
-  Trophy, Award // Added icons for achievements
+  Trophy, Award, ClipboardCheck // Added icons for achievements and weekly check-in
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import GuestDashboard from '@/components/GuestDashboard';
@@ -22,10 +22,19 @@ import userActivityService, { UserActivity } from '@/services/userActivityServic
 import MacronutrientChart from '@/components/MacronutrientChart';
 import HighchartsComponent from '@/components/HighchartsComponent';
 import FoodChatBot from '@/components/FoodChatBot';
+import EnhancedChatBot from '@/components/EnhancedChatBot';
+import UnifiedNotificationSystem from '@/components/UnifiedNotificationSystem';
+import HealthDataFallback from '@/components/HealthDataFallback';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import ProfilePopup from '@/components/ProfilePopup';
 import WelcomeAnimation from '@/components/WelcomeAnimation';
 import NotificationSystem from '@/components/NotificationSystem';
 import HealthDataCharts from '@/components/HealthDataCharts';
+import Footer from '@/components/Footer';
+import WeeklyQuestionsPopup from '@/components/WeeklyQuestionsPopup';
+import WeeklyDataCharts from '@/components/WeeklyDataCharts';
+import HealthNewsSection from '@/components/HealthNewsSection';
+import AchievementBadges from '@/components/AchievementBadges';
 
 // Define a basic interface for UserProfile based on usage
 interface UserProfile {
@@ -76,7 +85,12 @@ const Dashboard = () => {
   const [profileError, setProfileError] = useState('');
   const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
-  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false); // State for profile popup
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false); // State for welcome animation
+  const [showWeeklyQuestions, setShowWeeklyQuestions] = useState(false); // State for weekly questions popup
+  const [showNotifications, setShowNotifications] = useState(false); // State for notifications popup
+  const [showEnhancedChat, setShowEnhancedChat] = useState(false); // State for enhanced chat
+  const [isEnhancedChatExpanded, setIsEnhancedChatExpanded] = useState(false); // State for expanded chat
+  const [healthDataError, setHealthDataError] = useState<string | null>(null); // State for health data error
 
   // Debug guest mode status
   useEffect(() => {
@@ -151,7 +165,55 @@ const Dashboard = () => {
       }
     };
 
+    // Check if user needs to complete weekly questions
+    const checkWeeklyQuestions = async () => {
+      if (isGuest || !user) return;
+
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+
+          // Check if user has completed weekly check-in this week
+          if (userData.weeklyCheckin?.lastSubmitted) {
+            const lastSubmitted = userData.weeklyCheckin.lastSubmitted.toDate();
+            const currentDate = new Date();
+
+            // Get week number for both dates
+            const getWeekNumber = (d: Date) => {
+              const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+              const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+              return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+            };
+
+            const lastSubmittedWeek = getWeekNumber(lastSubmitted);
+            const currentWeek = getWeekNumber(currentDate);
+
+            // If different week, show weekly questions popup
+            if (lastSubmittedWeek !== currentWeek ||
+                lastSubmitted.getFullYear() !== currentDate.getFullYear()) {
+
+              // Wait a bit before showing the popup to not overwhelm the user
+              setTimeout(() => {
+                setShowWeeklyQuestions(true);
+              }, 5000); // 5 seconds delay
+            }
+          } else {
+            // User has never completed weekly questions
+            setTimeout(() => {
+              setShowWeeklyQuestions(true);
+            }, 5000); // 5 seconds delay
+          }
+        }
+      } catch (error) {
+        console.error('Error checking weekly questions status:', error);
+      }
+    };
+
     addFoodDeliveryNotification();
+    checkWeeklyQuestions();
   }, [isGuest, user, db, toast]);
 
   // Load user profile on component mount
@@ -381,6 +443,22 @@ const Dashboard = () => {
     );
   }
 
+  // Helper function to get color for each metric
+  const getColorForMetric = (metricName: string): string => {
+    switch (metricName) {
+      case 'Sleep Quality':
+        return 'bg-blue-500';
+      case 'Physical Activity':
+        return 'bg-green-500';
+      case 'Nutrition Balance':
+        return 'bg-amber-500';
+      case 'Stress Level':
+        return 'bg-purple-500';
+      default:
+        return 'bg-safebite-teal';
+    }
+  };
+
   // Generate dashboard data
   const healthMetrics = generateHealthMetrics();
   const foodSafetyIssues = generateFoodSafetyIssues();
@@ -405,13 +483,30 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="relative" style={{ zIndex: 10 }}>
+    <div className="relative" style={{ zIndex: 1 }}>
       {/* Development banner - Can be removed for production */}
-      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1 px-4 flex items-center justify-center z-50 text-xs font-medium">
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-red-500 to-yellow-500 text-white py-1 px-4 flex items-center justify-center z-20 text-xs font-medium">
         <Sparkles className="h-3 w-3 text-yellow-300 mr-1.5" />
         <span>SafeBite v3.0 - Production Ready</span>
         <Sparkles className="h-3 w-3 text-yellow-300 ml-1.5" />
       </div>
+
+      {/* Enhanced Notification System */}
+      <UnifiedNotificationSystem
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
+
+      {/* Enhanced Chat Bot */}
+      {showEnhancedChat && (
+        <div className="fixed bottom-20 right-6 z-40">
+          <EnhancedChatBot
+            onClose={() => setShowEnhancedChat(false)}
+            isExpanded={isEnhancedChatExpanded}
+            onToggleExpand={() => setIsEnhancedChatExpanded(!isEnhancedChatExpanded)}
+          />
+        </div>
+      )}
 
       {/* Welcome Animation for new users */}
       {showWelcomeAnimation && (
@@ -421,20 +516,39 @@ const Dashboard = () => {
         />
       )}
 
+      {/* Weekly Questions Popup */}
+      <WeeklyQuestionsPopup
+        isOpen={showWeeklyQuestions}
+        onClose={() => setShowWeeklyQuestions(false)}
+        onComplete={() => {
+          // Refresh user profile to get the latest weekly check-in data
+          if (user) {
+            const userRef = doc(db, 'users', user.uid);
+            getDoc(userRef).then(docSnap => {
+              if (docSnap.exists()) {
+                setUserProfile(docSnap.data() as UserProfile);
+
+                // Show toast notification
+                toast({
+                  title: "Dashboard Updated",
+                  description: "Your dashboard has been updated with your latest check-in data.",
+                });
+              }
+            });
+          }
+        }}
+      />
+
       {/* Food Delivery Popup removed as it's now live */}
 
-      {/* AI Chatbot */}
-      <div ref={chatbotRef} style={{ zIndex: 50 }}>
-        <FoodChatBot
-          currentPage="dashboard"
-          userData={{ profile: userProfile, recentActivity: userActivity }}
-          autoOpen={false}
-          initialMessage="Welcome back! How can I help with your health goals today?"
-        />
-      </div>
-
       {/* Sidebar */}
-      <DashboardSidebar userProfile={userProfile} />
+      <DashboardSidebar
+        userProfile={userProfile}
+        onProfileClick={handleProfileClick}
+        onNotificationsClick={() => setShowNotifications(true)}
+        onChatClick={() => setShowEnhancedChat(true)}
+        isLoadingProfile={isLoadingProfile}
+      />
 
       {/* Profile Popup */}
       <ProfilePopup
@@ -443,8 +557,18 @@ const Dashboard = () => {
         userProfile={userProfile}
       />
 
+      {/* AI Chatbot - moved to end for better z-index handling */}
+      <div ref={chatbotRef} style={{ zIndex: 100 }}>
+        <FoodChatBot
+          currentPage="dashboard"
+          userData={{ profile: userProfile, recentActivity: userActivity }}
+          autoOpen={false}
+          initialMessage="Welcome back! How can I help with your health goals today?"
+        />
+      </div>
+
       {/* Main content */}
-      <main className="md:ml-64 min-h-screen bg-gradient-to-br from-safebite-dark-blue to-safebite-dark-blue/95 relative overflow-hidden pt-8">
+      <main className="md:ml-64 min-h-screen bg-gradient-to-br from-safebite-dark-blue to-safebite-dark-blue/95 relative overflow-hidden pt-8 pb-16">
         {/* Subtle grid pattern */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -460,8 +584,8 @@ const Dashboard = () => {
         {/* Content Area */}
         <div className="p-4 sm:p-6 md:p-8 relative z-10">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 p-4 bg-safebite-card-bg/70 backdrop-blur-md rounded-lg border border-safebite-teal/20 shadow-md">
-            <div className="mb-3 sm:mb-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 p-5 bg-safebite-card-bg/70 backdrop-blur-md rounded-lg border border-safebite-teal/20 shadow-md">
+            <div className="mb-4 sm:mb-0">
               <h1 className="text-3xl font-bold text-safebite-text mb-2">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-safebite-teal to-safebite-purple">
                   Welcome back, {isGuest
@@ -470,22 +594,30 @@ const Dashboard = () => {
                 </span>
               </h1>
               <p className="text-safebite-text-secondary flex items-center">
-                <UserCircle className="h-5 w-5 mr-2 text-safebite-teal/70" />
+                <UserCircle className="h-5 w-5 mr-2.5 text-safebite-teal/70" />
                 Your dashboard is ready. Check out your health insights and recommendations.
               </p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
               <NotificationSystem currentPage="dashboard" />
               <Button
                 variant="outline"
-                className="border-safebite-teal/30 hover:border-safebite-teal/60 text-safebite-text"
+                className="border-safebite-teal/30 hover:border-safebite-teal/60 text-safebite-text h-10"
                 onClick={handleProfileClick}
               >
                 <User className="mr-2 h-4 w-4 text-safebite-teal" />
                 Profile
               </Button>
               <Button
-                className="bg-gradient-to-r from-green-500 to-teal-500 text-white hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                variant="outline"
+                className="border-purple-400/30 hover:border-purple-400/60 text-safebite-text h-10"
+                onClick={() => setShowWeeklyQuestions(true)}
+              >
+                <ClipboardCheck className="mr-2 h-4 w-4 text-purple-400" />
+                Weekly Check-in
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-green-500 to-teal-500 text-white hover:from-green-600 hover:to-teal-600 transition-all duration-300 h-10"
                 onClick={() => navigate('/food-delivery')}
               >
                 <Truck className="mr-2 h-4 w-4" /> Food Delivery
@@ -497,18 +629,23 @@ const Dashboard = () => {
           {/* Health Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {healthMetrics.map((metric, index) => (
-              <Card key={index} className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-2">
+              <Card key={index} className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 h-full">
+                <CardContent className="p-4 flex flex-col h-full">
+                  <div className="flex justify-between items-center mb-3">
                     <h3 className="text-sm font-medium text-safebite-text">{metric.name}</h3>
                     {metric.icon}
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
+                  <div className="space-y-2 mt-auto w-full">
+                    <div className="flex justify-between text-xs mb-1.5">
                       <span className="text-safebite-text-secondary">Score</span>
                       <span className="text-safebite-text font-medium">{metric.value}%</span>
                     </div>
-                    <Progress value={metric.value} className={`h-2 bg-safebite-card-bg-alt`} />
+                    <div className="w-full h-2.5 bg-safebite-card-bg rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${getColorForMetric(metric.name)}`}
+                        style={{ width: `${metric.value}%` }}
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -516,20 +653,20 @@ const Dashboard = () => {
           </div>
 
           {/* Food Safety Analysis Card */}
-          <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 mb-6">
-            <CardHeader>
+          <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300 mb-8">
+            <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold text-safebite-text flex items-center">
-                <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" /> Food Safety Insights
+                <AlertTriangle className="mr-2.5 h-5 w-5 text-amber-500" /> Food Safety Insights
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-safebite-text-secondary text-xs mb-3">Potential issues based on profile & activity:</p>
+              <p className="text-safebite-text-secondary text-xs mb-4">Potential issues based on profile & activity:</p>
               {foodSafetyIssues.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {foodSafetyIssues.map((issue, index) => (
-                    <div key={index} className="p-3 bg-safebite-card-bg-alt rounded-lg border border-safebite-card-bg-alt">
+                    <div key={index} className="p-4 bg-safebite-card-bg-alt rounded-lg border border-safebite-card-bg-alt hover:border-safebite-teal/30 transition-colors">
                       <div className="flex items-start">
-                        <div className={`rounded-full p-1.5 mr-2 ${
+                        <div className={`rounded-full p-1.5 mr-3 flex-shrink-0 ${
                           issue.severity === 'high' ? 'bg-red-500/20 text-red-500' :
                           issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-500' :
                           'bg-blue-500/20 text-blue-500'
@@ -537,15 +674,15 @@ const Dashboard = () => {
                           <AlertTriangle className="h-4 w-4" />
                         </div>
                         <div>
-                          <h4 className="text-sm font-medium text-safebite-text mb-1">{issue.title}</h4>
-                          <p className="text-xs text-safebite-text-secondary">{issue.description}</p>
+                          <h4 className="text-sm font-medium text-safebite-text mb-1.5">{issue.title}</h4>
+                          <p className="text-xs text-safebite-text-secondary leading-relaxed">{issue.description}</p>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-safebite-text-secondary text-sm">No food safety issues detected based on your recent activity.</p>
+                <p className="text-safebite-text-secondary text-sm text-center py-4">No food safety issues detected based on your recent activity.</p>
               )}
             </CardContent>
           </Card>
@@ -568,95 +705,52 @@ const Dashboard = () => {
 
           {/* Display Charts if weekly check-in data is available */}
           {userProfile?.weeklyCheckin?.answers && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-safebite-text">Weekly Activity Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Example: Using MacronutrientChart structure for weekly data */}
-                  <MacronutrientChart
-                    data={[
-                      { name: 'Exercise (min)', value: userProfile.weeklyCheckin.answers.exercise_minutes || 0 },
-                      { name: 'Home Meals', value: userProfile.weeklyCheckin.answers.home_cooked_meals || 0 },
-                      { name: 'Water (glasses)', value: userProfile.weeklyCheckin.answers.water_intake || 0 },
-                      { name: 'Sleep (hrs)', value: userProfile.weeklyCheckin.answers.sleep_hours || 0 },
-                    ]}
-                    colors={['#FFBB28', '#FF8042', '#00C49F', '#0088FE']}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card className="sci-fi-card bg-safebite-card-bg/80 backdrop-blur-md border-safebite-teal/20 hover:border-safebite-teal/50 hover:shadow-neon-teal transition-all duration-300">
-                 <CardHeader>
-                   <CardTitle className="text-lg font-semibold text-safebite-text">Weekly Trends (Example)</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                  <HighchartsComponent
-                    options={{
-                      chart: { type: 'line', backgroundColor: 'transparent' },
-                      title: { text: 'Example Trend', style: { color: '#e0e0e0' } },
-                      xAxis: { categories: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'], labels: { style: { color: '#a0a0a0' } } },
-                      yAxis: { title: { text: 'Value', style: { color: '#a0a0a0' } }, labels: { style: { color: '#a0a0a0' } }, gridLineColor: 'rgba(255, 255, 255, 0.1)' },
-                      legend: { itemStyle: { color: '#e0e0e0' } },
-                      series: [{
-                        name: 'Metric',
-                        type: 'line', // Ensure type is specified
-                        data: [
-                          userProfile.weeklyCheckin.answers.junk_food_consumption || 0,
-                          (userProfile.weeklyCheckin.answers.stress_level || 0) * 10, // Scale stress level for visibility
-                          userProfile.weeklyCheckin.answers.fruit_vegetable_servings || 0,
-                          (userProfile.weeklyCheckin.answers.exercise_minutes || 0) / 10 // Scale exercise minutes
-                        ],
-                        color: '#00C49F'
-                      }],
-                      credits: { enabled: false }
-                    }}
-                  />
-                 </CardContent>
-              </Card>
+            <div className="mb-6">
+              <WeeklyDataCharts weeklyData={userProfile.weeklyCheckin} />
             </div>
           )}
 
-          {/* Health Data Charts */}
+
+          {/* Health Data Charts with Fallback */}
           {!isGuest && (
             <div className="mb-6">
-              <HealthDataCharts
-                userId={user?.uid || 'default-user'}
-                initialTab="weight"
-              />
+              {healthDataError ? (
+                <HealthDataFallback
+                  userProfile={userProfile}
+                  errorMessage={healthDataError}
+                  onRetry={() => setHealthDataError(null)}
+                />
+              ) : (
+                <ErrorBoundary
+                  fallback={(
+                    <HealthDataFallback
+                      userProfile={userProfile}
+                      errorMessage="Could not load health data charts. Please try again later."
+                      onRetry={() => setHealthDataError(null)}
+                    />
+                  )}
+                  onError={(error) => {
+                    console.error('Health data charts error:', error);
+                    setHealthDataError('Could not load health data charts. Please try again later.');
+                  }}
+                >
+                  <HealthDataCharts
+                    userId={user?.uid || 'default-user'}
+                    initialTab="weight"
+                  />
+                </ErrorBoundary>
+              )}
             </div>
           )}
+
+          {/* Health News Section */}
+          <div className="mb-6">
+            <HealthNewsSection />
+          </div>
 
           {/* Achievements Card */}
           <div className="mb-6">
-            <Card className="sci-fi-card border-safebite-teal/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-bold text-safebite-text flex items-center">
-                  <Award className="mr-2 h-5 w-5 text-safebite-teal" />
-                  Achievements
-                  <Badge className="ml-3 bg-safebite-teal text-safebite-dark-blue">XP: {userStats?.xp || 0}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {(userAchievements || []).slice(0, 6).map((achievement, index) => (
-                    <div key={index} className="flex flex-col items-center justify-center p-2 bg-safebite-card-bg-alt/30 rounded-lg">
-                      <div className="w-12 h-12 rounded-full bg-safebite-teal/20 flex items-center justify-center mb-2">
-                        {achievement.icon || <Trophy className="h-6 w-6 text-safebite-teal" />}
-                      </div>
-                      <span className="text-xs text-center text-safebite-text-secondary">{achievement.name}</span>
-                    </div>
-                  ))}
-                </div>
-                {(userAchievements || []).length === 0 && (
-                  <div className="text-center py-8 text-safebite-text-secondary">
-                    <Trophy className="h-8 w-8 mx-auto mb-2 text-safebite-text-secondary opacity-50" />
-                    <p>Complete activities to earn achievements</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <AchievementBadges />
           </div>
 
           {/* Recent Activity Section */}
@@ -697,6 +791,9 @@ const Dashboard = () => {
 
         </div>
       </main>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

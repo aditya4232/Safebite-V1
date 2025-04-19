@@ -4,6 +4,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -30,6 +32,11 @@ class ErrorBoundary extends Component<Props, State> {
       error,
       errorInfo
     });
+
+    // Call the onError callback if provided
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
   }
 
   private handleReload = () => {
@@ -42,6 +49,12 @@ class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      // If a custom fallback is provided, use it
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      // Otherwise, use the default error UI
       return (
         <div className="min-h-screen bg-safebite-dark-blue flex items-center justify-center p-4">
           <Card className="w-full max-w-md border-safebite-teal/50 bg-safebite-card-bg">

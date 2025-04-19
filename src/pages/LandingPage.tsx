@@ -7,9 +7,10 @@ import DevPopup from "@/components/DevPopup";
 import ProfileImage from "@/components/ProfileImage";
 import {
   Shield, Brain, Heart, Zap, Search, ArrowRight,
-  Users, BarChart, Clock, Star, LogIn, Info, Check, Sparkles
+  Users, BarChart, Clock, Star, LogIn, Info, Check, Sparkles,
+  ShoppingCart, Pizza, Utensils, Coffee, Apple, Salad
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
+import PublicNavbar from '@/components/PublicNavbar';
 import Footer from '@/components/Footer';
 import FeatureCard from '@/components/FeatureCard';
 import TestimonialCard from '@/components/TestimonialCard';
@@ -26,7 +27,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex flex-col relative">
       <ParticleBackground />
-      <Navbar />
+      <PublicNavbar />
       <DevPopup isOpen={showDevPopup} onClose={() => setShowDevPopup(false)} />
       {/* Conditionally render FloatingActionButton only for logged-in users */}
       {user && <FloatingActionButton />}
@@ -35,16 +36,26 @@ const LandingPage = () => {
       <section className="pt-32 pb-20 md:pt-40 md:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
         <div className="flex flex-col md:flex-row items-center">
           <div className="md:w-1/2 md:pr-8 mb-10 md:mb-0">
-            {/* Removed animate-pulse */}
-            <div className="inline-block bg-safebite-teal text-safebite-dark-blue px-4 py-2 rounded-full text-sm font-medium mb-4 shadow-md">
-              Version 2.5 - Production Ready
+            <div className="inline-block bg-safebite-teal text-safebite-dark-blue px-4 py-2 rounded-full text-sm font-medium mb-4 shadow-md animate-pulse">
+              Version 3.0 - Final Release
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               <span className="gradient-text animate-gradient-text">Safe Food Choices</span><br />
               <span className="text-safebite-text">for a Healthier You</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-xs text-safebite-teal bg-safebite-teal/10 px-2 py-1 rounded-full inline-flex items-center">
+                  <Sparkles className="h-3 w-3 mr-1" /> AI-powered recommendations
+                </span>
+                <span className="text-xs text-safebite-teal bg-safebite-teal/10 px-2 py-1 rounded-full inline-flex items-center">
+                  <ShoppingCart className="h-3 w-3 mr-1" /> Grocery product search
+                </span>
+                <span className="text-xs text-safebite-teal bg-safebite-teal/10 px-2 py-1 rounded-full inline-flex items-center">
+                  <Pizza className="h-3 w-3 mr-1" /> Food delivery integration
+                </span>
+              </div>
             </h1>
             <p className="text-safebite-text-secondary text-lg mb-8">
-              Know exactly what's in your food. Track nutrition, receive personalized recommendations, and make informed choices for your health journey.
+              Know exactly what's in your food. Track nutrition, receive personalized recommendations, and make informed choices for your health journey. Our comprehensive platform now includes grocery product search, food delivery options, and AI-powered chatbot assistance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               {/* Added hover scale effect */}
@@ -336,13 +347,13 @@ const LandingPage = () => {
                     <p className="text-safebite-teal text-sm text-center md:text-left">Aditya Shenvi | IFHE Hyderabad</p>
                   </div>
                    <div className="mt-2 sm:mt-0 bg-green-500/20 text-green-500 px-3 py-1 rounded-full text-xs font-medium self-center md:self-auto">
-                     Production Ready v2.5
+                     Production Ready v3.0
                    </div>
                 </div>
                 <p className="text-safebite-text-secondary my-4 text-sm md:text-base">
                   SafeBite was developed as a special engineering project to demonstrate how technology can help people make better food choices.
                   The application combines modern web technologies with nutritional science to create an intuitive platform for food analysis and health tracking.
-                  This release includes fixes to the AI chatbot, improved icon positioning, and overall stability improvements.
+                  This release includes major improvements to the food delivery system with location-based restaurant recommendations, enhanced AI chatbot capabilities, and a unified notification system.
                 </p>
 
                 {/* Tech Stack & Changelog */}
@@ -366,26 +377,26 @@ const LandingPage = () => {
                      <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
                        <h4 className="text-safebite-teal font-medium mb-2">New Features</h4>
                        <ul className="text-safebite-text-secondary space-y-1 text-sm">
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced AI chatbot with Gemini</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Weekly health check-in</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Improved dashboard with charts</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Health data visualization</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Location-based food delivery</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced AI chatbot with context</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Unified notification system</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Achievement badges system</span></li>
                        </ul>
                      </div>
                      <div className="bg-safebite-card-bg-alt p-4 rounded-lg border border-safebite-teal/20">
                        <h4 className="text-safebite-teal font-medium mb-2">Technical Improvements</h4>
                        <ul className="text-safebite-text-secondary space-y-1 text-sm">
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>MongoDB integration</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>User activity tracking</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Firebase security</span></li>
-                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Enhanced UI/UX</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Improved authentication persistence</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Responsive design enhancements</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Performance optimizations</span></li>
+                         <li className="flex items-start"><span className="text-safebite-teal mr-2">•</span><span>Bug fixes & UI improvements</span></li>
                        </ul>
                      </div>
                   </div>
                 </div>
 
                 <p className="text-safebite-text-secondary text-sm md:text-base">
-                  Thank you for your support and feedback! I'm committed to improving SafeBite further.
+                  Thank you for your support and feedback! I'm committed to improving SafeBite further. The next update will focus on meal planning features and expanded health tracking capabilities.
                 </p>
 
                  <div className="mt-6 flex justify-center">

@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, ArrowRight, Utensils, ShoppingBag, Heart,
-  Clock, AlertTriangle, X, Bell, Info, MapPin, Star
+  Clock, AlertTriangle, X, Bell, Info, MapPin, Star,
+  Leaf, Award, Navigation, Locate
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth } from "firebase/auth";
@@ -15,13 +17,15 @@ import { app } from "../firebase";
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { RestaurantData, DishDetail } from '@/services/webScrapingService';
 import webScrapingService from '@/services/webScrapingService';
+import { trackUserInteraction } from '@/services/mlService';
+import { RestaurantResult } from '@/services/foodDeliveryService';
 
 interface FoodDeliveryPopupProps {
   isOpen: boolean;
   onClose: () => void;
   currentPage?: string;
   userData?: any;
-  searchResults?: RestaurantData[];
+  searchResults?: RestaurantResult[];
 }
 
 const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
@@ -68,13 +72,19 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
 
   // Update local results with favorites
   useEffect(() => {
+    console.log('Search results received:', searchResults);
     if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
       const updatedResults = searchResults.map(result => ({
         ...result,
         is_favorite: favorites.includes(result.restaurant)
       }));
+      console.log('Updated results with favorites:', updatedResults);
       setLocalResults(updatedResults);
+
+      // Ensure we're showing the restaurants tab when results are loaded
+      setActiveTab('restaurants');
     } else {
+      console.log('No search results or empty array received');
       setLocalResults([]);
     }
   }, [searchResults, favorites]);
@@ -224,6 +234,15 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
   };
 
   const content = getPageSpecificContent();
+
+  // Get color for health score
+  const getHealthScoreColor = (score: number): string => {
+    if (score >= 80) return '#10b981'; // Green for high scores
+    if (score >= 60) return '#22c55e'; // Light green for good scores
+    if (score >= 40) return '#eab308'; // Yellow for medium scores
+    if (score >= 20) return '#f97316'; // Orange for low scores
+    return '#ef4444'; // Red for very low scores
+  };
 
   const handleNotifyMe = async () => {
     if (isGuest) {
@@ -396,13 +415,24 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                         {r.rating && (
                           <Badge variant="outline" className="bg-safebite-card-bg-alt text-safebite-text-secondary">
                             <Star className="h-3 w-3 mr-1 fill-yellow-500 text-yellow-500" />
-                            {r.rating}
+                            {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}
                           </Badge>
                         )}
                         {r.delivery_time && (
                           <Badge variant="outline" className="bg-safebite-card-bg-alt text-safebite-text-secondary">
                             <Clock className="h-3 w-3 mr-1" />
                             {r.delivery_time}
+                          </Badge>
+                        )}
+                        {r.distance_km !== undefined && (
+                          <Badge variant="outline" className="bg-safebite-card-bg-alt text-safebite-text-secondary">
+                            <Navigation className="h-3 w-3 mr-1 text-blue-400" />
+                            {r.distance_km} km
+                          </Badge>
+                        )}
+                        {r.restaurant_type && (
+                          <Badge variant="outline" className={`${r.restaurant_type === 'veg' ? 'bg-green-500/10 text-green-500' : r.restaurant_type === 'non-veg' ? 'bg-red-500/10 text-red-500' : 'bg-safebite-card-bg-alt text-safebite-text-secondary'}`}>
+                            {r.restaurant_type === 'veg' ? '🟢 Veg' : r.restaurant_type === 'non-veg' ? '🔴 Non-veg' : '🟢🔴 Both'}
                           </Badge>
                         )}
                         {r.price_range && (
@@ -422,8 +452,47 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                         <p className="text-xs text-safebite-text-secondary mb-2 flex items-start">
                           <MapPin className="h-3 w-3 mr-1 mt-0.5 flex-shrink-0" />
                           {r.address}
+                          {r.distance_km !== undefined && (
+                            <span className="ml-1 text-blue-400">
+                              ({r.distance_km} km away)
+                            </span>
+                          )}
                         </p>
                       )}
+
+                      {/* Offers */}
+                      {r.offers && r.offers.length > 0 && (
+                        <div className="mb-2">
+                          {r.offers.map((offer, idx) => (
+                            <div key={idx} className="text-xs flex items-center text-green-500 mb-1">
+                              <span className="bg-green-500/10 p-0.5 rounded mr-1">%</span>
+                              {offer}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Delivery info */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-safebite-text-secondary mb-2">
+                        {r.min_order && (
+                          <span className="flex items-center">
+                            <ShoppingBag className="h-3 w-3 mr-1" />
+                            Min: {r.min_order}
+                          </span>
+                        )}
+                        {r.delivery_fee && (
+                          <span className="flex items-center">
+                            <Truck className="h-3 w-3 mr-1" />
+                            Delivery: {r.delivery_fee === '₹0' ? 'FREE' : r.delivery_fee}
+                          </span>
+                        )}
+                        {r.estimated_delivery_time && (
+                          <span className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            ETA: {r.estimated_delivery_time}
+                          </span>
+                        )}
+                      </div>
 
                       {r.popular_dishes && r.popular_dishes.length > 0 && (
                         <div className="mb-3">
@@ -438,6 +507,45 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                         </div>
                       )}
 
+                      {/* Health Score */}
+                      {r.health_score !== undefined && (
+                        <div className="mt-2 mb-3">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center">
+                              <Leaf className="h-3.5 w-3.5 text-green-500 mr-1" />
+                              <span className="text-xs text-safebite-text-secondary">Health Score</span>
+                            </div>
+                            <span className="text-xs font-medium">
+                              {r.health_score}/100
+                            </span>
+                          </div>
+                          <Progress
+                            value={r.health_score}
+                            className="h-1.5"
+                            style={{
+                              background: 'rgba(255,255,255,0.1)',
+                              '--progress-background': getHealthScoreColor(r.health_score || 0)
+                            } as React.CSSProperties}
+                          />
+                        </div>
+                      )}
+
+                      {/* Health Tags */}
+                      {r.health_tags && r.health_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {r.health_tags.map((tag, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="bg-green-500/10 text-green-400 border-green-500/30 text-xs"
+                            >
+                              <Award className="h-3 w-3 mr-1" />
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex gap-2 mt-3">
                         {r.redirect && (
                           <Button
@@ -448,14 +556,29 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                           </Button>
                         )}
                         {r.redirect && (
-                          <a
-                            href={r.redirect}
-                            className="flex-1 inline-flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white text-sm h-8 rounded"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <Button
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm h-8"
+                            onClick={() => {
+                              // Track this interaction
+                              trackUserInteraction('order_food', {
+                                restaurant: r.restaurant,
+                                source: r.source,
+                                healthScore: r.health_score,
+                                distance_km: r.distance_km
+                              });
+
+                              // Open in new tab
+                              window.open(r.redirect, '_blank', 'noopener,noreferrer');
+
+                              // Show toast
+                              toast({
+                                title: "Opening Restaurant",
+                                description: `Taking you to ${r.source} to order from ${r.restaurant}${r.distance_km ? ` (${r.distance_km} km away)` : ''}.`,
+                              });
+                            }}
                           >
                             Order Now <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                          </a>
+                          </Button>
                         )}
                       </div>
                     </div>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, Clock, AlertTriangle } from "lucide-react";
+import { Search, MapPin, Clock, AlertTriangle, Navigation, Locate } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { RestaurantResult } from "@/services/foodDeliveryService";
@@ -13,6 +13,10 @@ import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from "../firebase";
 import { useGuestMode } from "@/hooks/useGuestMode";
+import FoodDeliveryHealthPreferences, { HealthPreferences } from "@/components/FoodDeliveryHealthPreferences";
+import { trackUserInteraction } from "@/services/mlService";
+import RelatedOffers from "@/components/RelatedOffers";
+import { getCurrentLocation, getCityFromCoordinates, getAddressFromCoordinates, UserLocation } from "@/services/locationService";
 
 const FoodDeliveryPage: React.FC = () => {
   const { toast } = useToast();
@@ -27,6 +31,10 @@ const FoodDeliveryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [healthPreferences, setHealthPreferences] = useState<HealthPreferences | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState<boolean>(false);
+  const [exactAddress, setExactAddress] = useState<string>("");
 
   // Popular food suggestions
   const popularFoods = [
@@ -56,41 +64,45 @@ const FoodDeliveryPage: React.FC = () => {
     fetchUserData();
   }, [auth, db, isGuest]);
 
-  // Set default city based on browser geolocation (if available)
+  // Get user's location and set default city
   useEffect(() => {
     // Try to get a default city from localStorage
     const savedCity = localStorage.getItem('userCity');
     if (savedCity) {
       setCityQuery(savedCity);
-      return;
     }
 
-    // If no saved city, try to get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            // Use a reverse geocoding service to get the city name
-            // This is a simplified example - in production, use a proper geocoding service
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
-            );
-            const data = await response.json();
-            if (data.address && data.address.city) {
-              setCityQuery(data.address.city);
-              localStorage.setItem('userCity', data.address.city);
-            }
-          } catch (error) {
-            console.error('Error getting city from coordinates:', error);
-          }
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
+    // Get precise location
+    const fetchLocation = async () => {
+      setIsLoadingLocation(true);
+      try {
+        const location = await getCurrentLocation();
+        setUserLocation(location);
+
+        // Get city name from coordinates
+        const city = await getCityFromCoordinates(location.latitude, location.longitude);
+        if (city && city !== 'Unknown') {
+          setCityQuery(city);
+          localStorage.setItem('userCity', city);
         }
-      );
-    }
-  }, []);
+
+        // Get full address for more precise location
+        const address = await getAddressFromCoordinates(location.latitude, location.longitude);
+        setExactAddress(address);
+      } catch (error) {
+        console.error('Error getting user location:', error);
+        toast({
+          title: "Location Error",
+          description: "Could not get your precise location. Please enter your city manually.",
+          variant: "default"
+        });
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    };
+
+    fetchLocation();
+  }, [toast]);
 
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault(); // Prevent default form submission page reload
@@ -102,6 +114,18 @@ const FoodDeliveryPage: React.FC = () => {
       try {
         // Save the city for future use
         localStorage.setItem('userCity', cityQuery.trim());
+
+        // Track this search with health preferences and location
+        trackUserInteraction('food_delivery_search', {
+          food: foodQuery.trim(),
+          city: cityQuery.trim(),
+          hasExactLocation: !!userLocation,
+          healthPreferences: healthPreferences ? {
+            dietaryRestrictions: healthPreferences.dietaryRestrictions,
+            preferHealthy: healthPreferences.preferHealthy,
+            cuisines: healthPreferences.preferredCuisines
+          } : null
+        });
 
         // Fetch search results and open the popup
         await fetchSearchResults(foodQuery.trim(), cityQuery.trim());
@@ -121,9 +145,171 @@ const FoodDeliveryPage: React.FC = () => {
   const fetchSearchResults = async (food: string, city: string) => {
     // Call the foodDeliveryService to get the search results
     const { fetchNearbyRestaurants } = await import("../services/foodDeliveryService");
-    const results = await fetchNearbyRestaurants(food, city);
-    setSearchResults(results);
-    setIsPopupOpen(true);
+
+    // Make sure city is properly formatted (capitalize first letter of each word)
+    const formattedCity = city
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    console.log(`Searching for ${food} in ${formattedCity}`);
+
+    try {
+      // Apply health preferences if available and pass user location for distance calculation
+      let results = await fetchNearbyRestaurants(food, formattedCity, userLocation || undefined);
+      console.log('Search results received:', results);
+
+      if (results && results.length > 0) {
+        if (healthPreferences) {
+          // Filter results based on health preferences
+          results = filterResultsByHealthPreferences(results, healthPreferences);
+          console.log('Results after health preferences filtering:', results);
+        }
+
+        setSearchResults(results);
+        setIsPopupOpen(true);
+      } else {
+        console.log('No results found');
+        toast({
+          title: "No restaurants found",
+          description: `We couldn't find any restaurants for "${food}" in "${city}". Try a different search.`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching food delivery results:', error);
+      toast({
+        title: "Error fetching results",
+        description: "There was a problem finding restaurants. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Filter results based on health preferences
+  const filterResultsByHealthPreferences = (results: RestaurantResult[], preferences: HealthPreferences): RestaurantResult[] => {
+    if (!preferences) return results;
+
+    return results.filter(restaurant => {
+      // Filter by dietary restrictions
+      if (preferences.dietaryRestrictions.includes('vegetarian') &&
+          restaurant.cuisine?.toLowerCase().includes('non-veg')) {
+        return false;
+      }
+
+      // Filter by preferred cuisines if specified
+      if (preferences.preferredCuisines.length > 0) {
+        const cuisineMatch = preferences.preferredCuisines.some(cuisine =>
+          restaurant.cuisine?.toLowerCase().includes(cuisine.toLowerCase())
+        );
+
+        if (!cuisineMatch) return false;
+      }
+
+      // Filter by excluded ingredients
+      if (preferences.excludeIngredients.length > 0) {
+        const hasExcludedIngredient = preferences.excludeIngredients.some(ingredient =>
+          restaurant.popular_dishes?.some(dish =>
+            dish.toLowerCase().includes(ingredient.toLowerCase())
+          )
+        );
+
+        if (hasExcludedIngredient) return false;
+      }
+
+      return true;
+    }).map(restaurant => {
+      // Add health score based on preferences
+      if (preferences.preferHealthy) {
+        return {
+          ...restaurant,
+          health_score: calculateHealthScore(restaurant, preferences),
+          health_tags: generateHealthTags(restaurant, preferences)
+        };
+      }
+
+      return restaurant;
+    }).sort((a, b) => {
+      // Sort by health score if preferHealthy is true
+      if (preferences.preferHealthy) {
+        return (b.health_score || 0) - (a.health_score || 0);
+      }
+
+      return 0;
+    });
+  };
+
+  // Calculate health score based on restaurant data and preferences
+  const calculateHealthScore = (restaurant: RestaurantResult, preferences: HealthPreferences): number => {
+    let score = 50; // Base score
+
+    // Boost score for restaurants with healthy cuisine types
+    const healthyCuisines = ['salad', 'healthy', 'vegan', 'vegetarian', 'organic', 'mediterranean'];
+    if (restaurant.cuisine && healthyCuisines.some(c => restaurant.cuisine?.toLowerCase().includes(c))) {
+      score += 20;
+    }
+
+    // Reduce score for restaurants with unhealthy cuisine types
+    const unhealthyCuisines = ['fast food', 'fried', 'pizza', 'burger'];
+    if (restaurant.cuisine && unhealthyCuisines.some(c => restaurant.cuisine?.toLowerCase().includes(c))) {
+      score -= 15;
+    }
+
+    // Adjust score based on popular dishes
+    const healthyDishTerms = ['salad', 'grilled', 'steamed', 'baked', 'roasted', 'boiled'];
+    const unhealthyDishTerms = ['fried', 'cheesy', 'creamy', 'buttery', 'sweet'];
+
+    if (restaurant.popular_dishes) {
+      restaurant.popular_dishes.forEach(dish => {
+        const dishLower = dish.toLowerCase();
+
+        if (healthyDishTerms.some(term => dishLower.includes(term))) {
+          score += 5;
+        }
+
+        if (unhealthyDishTerms.some(term => dishLower.includes(term))) {
+          score -= 5;
+        }
+      });
+    }
+
+    // Ensure score is within 0-100 range
+    return Math.max(0, Math.min(100, score));
+  };
+
+  // Generate health tags based on restaurant data and preferences
+  const generateHealthTags = (restaurant: RestaurantResult, preferences: HealthPreferences): string[] => {
+    const tags: string[] = [];
+
+    // Add tags based on cuisine
+    if (restaurant.cuisine) {
+      const cuisineLower = restaurant.cuisine.toLowerCase();
+
+      if (cuisineLower.includes('vegetarian') || cuisineLower.includes('vegan')) {
+        tags.push('Plant-Based');
+      }
+
+      if (cuisineLower.includes('organic')) {
+        tags.push('Organic');
+      }
+
+      if (cuisineLower.includes('gluten-free')) {
+        tags.push('Gluten-Free');
+      }
+    }
+
+    // Add tags based on health score
+    const healthScore = restaurant.health_score || 0;
+
+    if (healthScore >= 80) {
+      tags.push('Very Healthy');
+    } else if (healthScore >= 60) {
+      tags.push('Healthy Option');
+    } else if (healthScore <= 30) {
+      tags.push('Indulgent');
+    }
+
+    return tags;
   };
 
   const handleFoodSuggestionClick = (food: string) => {
@@ -146,6 +332,14 @@ const FoodDeliveryPage: React.FC = () => {
           <p className="text-safebite-text-secondary mb-8">
             Search for your favorite food and find delivery options from Swiggy and Zomato
           </p>
+
+          {/* Health Preferences */}
+          <div className="mb-6">
+            <FoodDeliveryHealthPreferences
+              onPreferencesChange={setHealthPreferences}
+              isCollapsible={true}
+            />
+          </div>
 
           <Card className="p-6 bg-safebite-card-bg border-safebite-card-bg-alt mb-8">
             <form onSubmit={handleSearch}>
@@ -198,7 +392,50 @@ const FoodDeliveryPage: React.FC = () => {
                       className="pl-10 bg-safebite-card-bg-alt border-safebite-card-bg-alt focus:border-safebite-teal text-safebite-text"
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="absolute right-1 top-1 h-8 w-8 bg-safebite-card-bg-alt border-safebite-card-bg-alt hover:bg-safebite-teal/20"
+                      onClick={async () => {
+                        setIsLoadingLocation(true);
+                        try {
+                          const location = await getCurrentLocation();
+                          setUserLocation(location);
+                          const city = await getCityFromCoordinates(location.latitude, location.longitude);
+                          if (city && city !== 'Unknown') {
+                            setCityQuery(city);
+                            localStorage.setItem('userCity', city);
+                          }
+                          const address = await getAddressFromCoordinates(location.latitude, location.longitude);
+                          setExactAddress(address);
+                          toast({
+                            title: "Location Updated",
+                            description: "Using your current location for better results.",
+                            variant: "default"
+                          });
+                        } catch (error) {
+                          console.error('Error getting location:', error);
+                          toast({
+                            title: "Location Error",
+                            description: "Could not get your location. Please enter your city manually.",
+                            variant: "destructive"
+                          });
+                        } finally {
+                          setIsLoadingLocation(false);
+                        }
+                      }}
+                      disabled={isLoadingLocation}
+                    >
+                      {isLoadingLocation ? <Clock className="h-4 w-4 animate-spin" /> : <Locate className="h-4 w-4" />}
+                    </Button>
                   </div>
+                  {exactAddress && (
+                    <div className="mt-1 text-xs text-safebite-teal flex items-center">
+                      <Navigation className="h-3 w-3 mr-1" />
+                      <span className="truncate">{exactAddress}</span>
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {popularCities.slice(0, 4).map((city) => (
                       <Badge
@@ -246,6 +483,13 @@ const FoodDeliveryPage: React.FC = () => {
             <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-center mb-6">
               <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
               <p className="text-safebite-text">{error}</p>
+            </div>
+          )}
+
+          {/* Related Offers */}
+          {submittedQuery && (
+            <div className="mb-6">
+              <RelatedOffers searchQuery={submittedQuery.food} category="food" maxOffers={4} />
             </div>
           )}
 

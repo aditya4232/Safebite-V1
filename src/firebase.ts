@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 // Firebase configuration with fallback values
 // This ensures the app works even without environment variables
@@ -18,5 +18,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app); // Initialize Auth
+
+// Set persistence to LOCAL to prevent logout on page refresh
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('Firebase persistence set to LOCAL');
+  })
+  .catch((error) => {
+    console.error('Error setting persistence:', error);
+  });
 
 export { app, auth, analytics }; // Export auth
