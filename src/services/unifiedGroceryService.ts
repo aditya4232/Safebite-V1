@@ -78,7 +78,8 @@ export const searchScrapedProducts = async (query: string): Promise<GroceryProdu
     // Try multiple endpoints in order of preference
     const endpoints = [
       `https://safebite-backend.onrender.com/api/grocery/scrape?q=${encodeURIComponent(query)}`,
-      `http://localhost:5000/api/grocery/scrape?q=${encodeURIComponent(query)}`,
+      `http://localhost:5001/api/grocery/scrape?q=${encodeURIComponent(query)}`,
+      `/api/grocery/scrape?q=${encodeURIComponent(query)}`,
       `/api/grocery/search?q=${encodeURIComponent(query)}`
     ];
 
@@ -90,7 +91,13 @@ export const searchScrapedProducts = async (query: string): Promise<GroceryProdu
       try {
         console.log('Trying endpoint:', endpoint);
         // Use the improved fetchWithTimeout function with a longer timeout for scraping
-        data = await fetchWithTimeout(endpoint, {}, 15000);
+        data = await fetchWithTimeout(endpoint, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }, 20000); // 20 second timeout for scraping
 
         if (data && Array.isArray(data.results) && data.results.length > 0) {
           console.log(`Found ${data.results.length} products from ${endpoint}`);

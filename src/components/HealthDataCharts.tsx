@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -11,8 +12,9 @@ import {
 import {
   Activity, TrendingUp, PieChart as PieChartIcon, BarChart2,
   Calendar, ChevronLeft, ChevronRight, Download, Share2,
-  AlertTriangle, Loader2, Info
+  AlertTriangle, Loader2, Info, Upload, FileUp
 } from 'lucide-react';
+import HealthDataImport from './HealthDataImport';
 import { useToast } from '@/hooks/use-toast';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/mlService';
@@ -23,9 +25,10 @@ import { app } from '../firebase';
 // Mock data for charts
 const generateMockHealthData = (userId: string) => {
   // Generate consistent data based on userId
-  const seed = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  let seedValue = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number) => {
-    const x = Math.sin(seed++) * 10000;
+    const x = Math.sin(seedValue) * 10000;
+    seedValue++;
     return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
   };
 
@@ -115,6 +118,7 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
   const [timeRange, setTimeRange] = useState('30d');
   const [healthData, setHealthData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // Colors for charts
   const COLORS = {
@@ -252,6 +256,31 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
     });
   };
 
+  // Handle imported health data
+  const handleDataImported = (importedData: any) => {
+    if (!importedData) return;
+
+    // Update the health data state
+    setHealthData(importedData);
+
+    // Close the import dialog
+    setIsImportDialogOpen(false);
+
+    // Show success toast
+    toast({
+      title: 'Data Imported',
+      description: 'Your health data has been imported and is now displayed.',
+      variant: 'default',
+    });
+
+    // Track this interaction
+    trackUserInteraction('health_data_imported', {
+      isGuest,
+      tab: activeTab,
+      dataSource: 'import'
+    });
+  };
+
   if (isLoading) {
     return (
       <Card className="sci-fi-card border-safebite-teal/30">
@@ -315,6 +344,24 @@ const HealthDataCharts: React.FC<HealthDataChartsProps> = ({
                 <SelectItem value="1y">Last Year</SelectItem>
               </SelectContent>
             </Select>
+
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-safebite-card-bg"
+                >
+                  <FileUp className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] bg-safebite-dark-blue border-safebite-teal/30">
+                <HealthDataImport
+                  userId={userId}
+                  onDataImported={handleDataImported}
+                />
+              </DialogContent>
+            </Dialog>
 
             <Button
               variant="outline"

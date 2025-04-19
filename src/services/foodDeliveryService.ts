@@ -6,6 +6,13 @@ import { API_BASE_URL, fetchWithTimeout, generateFallbackData, checkApiStatus } 
 // Import location service
 import { calculateDistance, UserLocation } from './locationService';
 
+// Define the API endpoints for food delivery scraping
+const FOOD_DELIVERY_SCRAPE_ENDPOINTS = [
+  `${API_BASE_URL}/api/food-delivery/scrape`,
+  `http://localhost:5000/api/food-delivery/scrape`,
+  `/api/food-delivery/scrape`
+];
+
 // Define the restaurant result interface
 export interface RestaurantResult {
   restaurant: string;
@@ -47,6 +54,17 @@ export interface DishDetails {
  * @returns Promise with an array of restaurant results
  */
 export const fetchNearbyRestaurants = async (food: string, city: string, userLocation?: UserLocation): Promise<RestaurantResult[]> => {
+  // First try to fetch from the web scraping API
+  try {
+    const scrapedResults = await fetchScrapedRestaurants(food, city, userLocation);
+    if (scrapedResults && scrapedResults.length > 0) {
+      console.log(`Found ${scrapedResults.length} restaurants from web scraping`);
+      return scrapedResults;
+    }
+  } catch (error) {
+    console.error('Error fetching from web scraping API:', error);
+    // Continue to fallback data if scraping fails
+  }
   try {
     console.log(`Fetching restaurants for ${food} in ${city}`);
     if (userLocation) {
@@ -381,6 +399,87 @@ export const fetchNearbyRestaurants = async (food: string, city: string, userLoc
 
   } catch (error) {
     console.error('Error in food delivery service:', error);
+    return [];
+  }
+};
+
+/**
+ * Fetches restaurant data from the web scraping API
+ * @param food The food item to search for
+ * @param city The city to search in
+ * @param userLocation Optional user location for distance calculation
+ * @returns Promise with an array of restaurant results
+ */
+const fetchScrapedRestaurants = async (food: string, city: string, userLocation?: UserLocation): Promise<RestaurantResult[]> => {
+  try {
+    // Build the parameters
+    const params = new URLSearchParams();
+    params.append('food', food);
+    params.append('city', city);
+
+    // Add coordinates if available
+    if (userLocation) {
+      params.append('lat', userLocation.latitude.toString());
+      params.append('lon', userLocation.longitude.toString());
+    }
+
+    const queryString = params.toString();
+    let data = null;
+    let error = null;
+
+    // Try each endpoint until one works
+    for (const baseEndpoint of FOOD_DELIVERY_SCRAPE_ENDPOINTS) {
+      try {
+        const apiUrl = `${baseEndpoint}?${queryString}`;
+        console.log(`Trying scraping endpoint: ${apiUrl}`);
+
+        // Use the improved fetchWithTimeout function with a longer timeout
+        data = await fetchWithTimeout(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }, 15000); // 15 second timeout for scraping
+
+        if (data && data.results && Array.isArray(data.results) && data.results.length > 0) {
+          console.log(`Found ${data.results.length} restaurants from ${baseEndpoint}`);
+
+          // Process the results
+          const restaurants: RestaurantResult[] = data.results.map((restaurant: any) => {
+            // Ensure all required fields are present
+            return {
+              restaurant: restaurant.restaurant || 'Unknown Restaurant',
+              redirect: restaurant.redirect || '#',
+              rating: restaurant.rating || 4.0,
+              delivery_time: restaurant.delivery_time || '30-40 mins',
+              price_range: restaurant.price_range || '₹300 for two',
+              cuisine: restaurant.cuisine || 'Various',
+              address: restaurant.address || `${city}`,
+              image_url: restaurant.image_url || `https://source.unsplash.com/random/300x300/?restaurant,${food}`,
+              platform: restaurant.platform || 'Food Delivery',
+              distance_km: restaurant.distance_km,
+              latitude: restaurant.latitude,
+              longitude: restaurant.longitude,
+              popular_dishes: restaurant.popular_dishes || [food],
+              offers: restaurant.offers || [],
+              is_favorite: false
+            };
+          });
+
+          return restaurants;
+        }
+      } catch (err) {
+        console.warn(`Scraping endpoint ${baseEndpoint} failed:`, err);
+        error = err;
+      }
+    }
+
+    // If we get here, all endpoints failed
+    console.log('All scraping endpoints failed');
+    return [];
+  } catch (error) {
+    console.error('Error in scraping service:', error);
     return [];
   }
 };
