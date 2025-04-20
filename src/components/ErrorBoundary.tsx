@@ -56,18 +56,18 @@ class ErrorBoundary extends Component<Props, State> {
 
       // Otherwise, use the default error UI
       return (
-        <div className="min-h-screen bg-safebite-dark-blue flex items-center justify-center p-4">
-          <Card className="w-full max-w-md border-safebite-teal/50 bg-safebite-card-bg">
+        <div className="min-h-screen bg-[hsl(var(--safebite-dark-blue))] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border-[hsl(var(--safebite-teal))]/50 bg-[hsl(var(--safebite-card-bg))]">
             <CardHeader>
-              <CardTitle className="text-safebite-text text-xl">Something went wrong</CardTitle>
+              <CardTitle className="text-[hsl(var(--safebite-text))] text-xl">Something went wrong</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-safebite-text-secondary">
+                <p className="text-[hsl(var(--safebite-text-secondary))]">
                   We're sorry, but an error occurred while loading the application.
                 </p>
                 {this.state.error && (
-                  <div className="bg-safebite-card-bg-alt p-3 rounded-md overflow-auto max-h-40">
+                  <div className="bg-[hsl(var(--safebite-card-bg-alt))] p-3 rounded-md overflow-auto max-h-40">
                     <p className="text-red-400 text-sm font-mono">{this.state.error.toString()}</p>
                   </div>
                 )}

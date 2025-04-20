@@ -494,7 +494,20 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                         )}
                       </div>
 
-                      {r.popular_dishes && r.popular_dishes.length > 0 && (
+                      {/* Menu Items */}
+                      {r.menu_items && r.menu_items.length > 0 ? (
+                        <div className="mb-3">
+                          <p className="text-xs text-safebite-text-secondary mb-1">Menu items:</p>
+                          <div className="space-y-2 mt-2">
+                            {r.menu_items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-safebite-card-bg-alt/30 p-2 rounded-md">
+                                <span className="text-xs text-safebite-text">{item.name}</span>
+                                <span className="text-xs font-medium text-safebite-teal">{item.price}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : r.popular_dishes && r.popular_dishes.length > 0 && (
                         <div className="mb-3">
                           <p className="text-xs text-safebite-text-secondary mb-1">Popular dishes:</p>
                           <div className="flex flex-wrap gap-1">
@@ -504,6 +517,26 @@ const FoodDeliveryPopup: React.FC<FoodDeliveryPopupProps> = ({
                               </Badge>
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Restaurant Type */}
+                      {r.restaurant_type && (
+                        <div className="mb-3">
+                          <div className="flex items-center mb-1">
+                            <Utensils className="h-3.5 w-3.5 text-safebite-text-secondary mr-1" />
+                            <span className="text-xs text-safebite-text-secondary">Restaurant Type</span>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs ${r.restaurant_type === 'veg' ? 'bg-green-500/20 text-green-500' :
+                              r.restaurant_type === 'non-veg' ? 'bg-red-500/20 text-red-500' :
+                              'bg-amber-500/20 text-amber-500'}`}
+                          >
+                            {r.restaurant_type === 'veg' ? 'Vegetarian' :
+                             r.restaurant_type === 'non-veg' ? 'Non-Vegetarian' :
+                             'Both Veg & Non-Veg'}
+                          </Badge>
                         </div>
                       )}
 

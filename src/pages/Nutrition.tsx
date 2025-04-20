@@ -14,9 +14,10 @@ import FoodItemCard from '@/components/FoodItemCard';
 import FoodDetailView from '@/components/FoodDetailView';
 import FoodScannerUpload from '@/components/FoodScannerUpload';
 import GeminiNutritionAnalysis from '@/components/GeminiNutritionAnalysis';
+import NutritionSearchSkeleton from '@/components/NutritionSearchSkeleton';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/foodApiService';
-import { searchCalorieNinjas } from '@/services/nutritionApiService';
+import { searchNutrition } from '@/services/nutritionApiService';
 import { searchRecipes } from '@/utils/calorieNinjasApi';
 import groceryProductService from '@/services/groceryProductService';
 import mongoDbService from '@/services/mongoDbService';
@@ -260,8 +261,8 @@ const Nutrition: React.FC<NutritionProps> = ({ userProfile }) => {
         return;
       }
 
-      // Fallback to CalorieNinjas API if MongoDB search returns no results
-      const results = await searchCalorieNinjas(searchQuery);
+      // Fallback to our unified nutrition search if MongoDB search returns no results
+      const results = await searchNutrition(searchQuery);
 
       if (results && results.length > 0) {
         // Process the results to calculate nutrition scores
@@ -551,8 +552,8 @@ const Nutrition: React.FC<NutritionProps> = ({ userProfile }) => {
   const renderFoodResults = () => {
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center py-12">
-          <Loader size="lg" />
+        <div className="py-4">
+          <NutritionSearchSkeleton count={6} />
         </div>
       );
     }
@@ -609,8 +610,8 @@ const Nutrition: React.FC<NutritionProps> = ({ userProfile }) => {
   const renderRecipeResults = () => {
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center py-12">
-          <Loader size="lg" />
+        <div className="py-4">
+          <NutritionSearchSkeleton count={6} />
         </div>
       );
     }

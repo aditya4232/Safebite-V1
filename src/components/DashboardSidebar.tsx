@@ -13,6 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, signOut } from "firebase/auth";
 import { app } from "../firebase";
+import { ThemeToggle } from '@/components/ThemeToggle';
 import ProfilePopup from './ProfilePopup';
 import { getGuestName } from '@/services/guestUserService';
 
@@ -175,6 +176,11 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               >
                 <HelpCircle size={20} />
               </Button>
+              <ThemeToggle
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-safebite-card-bg-alt hover:text-safebite-teal transition-colors"
+              />
             </div>
           </div>
 

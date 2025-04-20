@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, User, AlertTriangle } from 'lucide-react';
+import { Menu, X, LogIn, User, AlertTriangle, Moon, Sun } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { getAuth } from "firebase/auth";
 import { app } from "../firebase";
 import { useToast } from '@/hooks/use-toast';
@@ -97,6 +98,7 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
               Recipes
             </Button>
             <Link to="/about" className="text-safebite-text hover:text-safebite-teal transition-colors">About</Link>
+            <ThemeToggle variant="ghost" className="text-safebite-text hover:text-safebite-teal hover:bg-transparent" />
             {!shouldHideAuthButtons && (
               <>
                 <Button
@@ -175,6 +177,10 @@ const Navbar: React.FC<NavbarProps> = ({ hideAuthButtons }) => {
             >
               About
             </Link>
+
+            <div className="px-3 py-2">
+              <ThemeToggle variant="outline" size="default" className="w-full justify-start" />
+            </div>
 
             {!shouldHideAuthButtons && (
               <div className="flex flex-col space-y-2 pt-2">

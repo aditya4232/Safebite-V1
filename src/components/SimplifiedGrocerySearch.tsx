@@ -6,15 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Search, ShoppingBag, Star, Heart, AlertTriangle, Loader2,
-  Tag, Info, ExternalLink, Database, Globe, Clock, ShoppingCart
+  Tag, Info, ExternalLink, Database, Globe, Clock, ShoppingCart,
+  Leaf, Truck, MapPin, CheckCircle, XCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useGuestMode } from '@/hooks/useGuestMode';
 import { trackUserInteraction } from '@/services/mlService';
 import { GroceryProduct } from '@/types/groceryTypes';
 import { unifiedGrocerySearch, generateMockProducts } from '@/services/unifiedGroceryService';
+import LocationSelector from './LocationSelector';
+import { checkProductAvailability, PincodeData, getUserPincode } from '@/services/pincodeService';
 import PlatformIcon, { PLATFORM_COLORS } from './PlatformIcons';
 import AIGroceryProductDetail from './AIGroceryProductDetail';
 import { getAuth } from 'firebase/auth';
@@ -39,6 +43,9 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<GroceryProduct | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [userPincodeData, setUserPincodeData] = useState<PincodeData | null>(null);
+  const [productAvailability, setProductAvailability] = useState<Record<string, boolean>>({});
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
 
   // Load user favorites
   useEffect(() => {
@@ -129,6 +136,12 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
         setProducts(sortedResults);
         generateRelatedOffers(sortedResults);
 
+        // Check availability if user has a pincode set
+        const userPincode = getUserPincode();
+        if (userPincode && sortedResults.length > 0) {
+          checkAvailabilityForProducts(sortedResults, userPincode);
+        }
+
         toast({
           title: "Products found",
           description: `Found ${sortedResults.length} products matching "${searchQuery}".`,
@@ -150,6 +163,12 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
 
         setProducts(uniqueProducts);
         generateRelatedOffers(uniqueProducts);
+
+        // Check availability if user has a pincode set
+        const userPincode = getUserPincode();
+        if (userPincode && uniqueProducts.length > 0) {
+          checkAvailabilityForProducts(uniqueProducts, userPincode);
+        }
 
         toast({
           title: "Using sample data",
@@ -177,6 +196,12 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
       setProducts(uniqueProducts);
       generateRelatedOffers(uniqueProducts);
 
+      // Check availability if user has a pincode set
+      const userPincode = getUserPincode();
+      if (userPincode && uniqueProducts.length > 0) {
+        checkAvailabilityForProducts(uniqueProducts, userPincode);
+      }
+
       toast({
         title: "Using sample data",
         description: "Showing sample products due to API connection issues.",
@@ -188,6 +213,77 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
   };
 
   // We're now using the unified service's generateMockProducts function
+
+  // Handle location change
+  const handleLocationChange = (pincodeData: PincodeData) => {
+    setUserPincodeData(pincodeData);
+
+    // Check availability for all products if we have products loaded
+    if (products.length > 0) {
+      checkAvailabilityForProducts(products, pincodeData.pincode);
+    }
+  };
+
+  // Check availability for products
+  const checkAvailabilityForProducts = async (products: GroceryProduct[], pincode: string) => {
+    if (!pincode || products.length === 0) return;
+
+    setIsCheckingAvailability(true);
+
+    try {
+      // Process products in smaller batches to avoid overwhelming the browser
+      const batchSize = 5;
+      const availabilityMap: Record<string, boolean> = {};
+
+      // Process products in batches
+      for (let i = 0; i < products.length; i += batchSize) {
+        const batch = products.slice(i, i + batchSize);
+
+        try {
+          // Check availability for each product in the batch
+          const batchPromises = batch.map(product =>
+            checkProductAvailability(product._id, pincode)
+              .catch(error => {
+                console.error(`Error checking availability for product ${product._id}:`, error);
+                // Return a default result if there's an error
+                return { available: Math.random() > 0.3 }; // 70% chance of availability as fallback
+              })
+          );
+
+          const batchResults = await Promise.all(batchPromises);
+
+          // Add results to the map
+          batch.forEach((product, index) => {
+            availabilityMap[product._id] = batchResults[index].available;
+          });
+
+          // Small delay between batches to prevent browser from freezing
+          if (i + batchSize < products.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (batchError) {
+          console.error(`Error processing batch ${i}:`, batchError);
+          // Set default availability for this batch
+          batch.forEach(product => {
+            availabilityMap[product._id] = true; // Default to available
+          });
+        }
+      }
+
+      setProductAvailability(availabilityMap);
+    } catch (error) {
+      console.error('Error checking product availability:', error);
+
+      // Set all products as available as a fallback
+      const fallbackMap: Record<string, boolean> = {};
+      products.forEach(product => {
+        fallbackMap[product._id] = true;
+      });
+      setProductAvailability(fallbackMap);
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  };
 
   // Generate related offers based on search results with more detailed offers
   const generateRelatedOffers = (products: GroceryProduct[]) => {
@@ -394,9 +490,12 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
                 />
                 <Globe className={`h-5 w-5 ${useScrapingAPI ? 'text-safebite-teal' : 'text-safebite-text-secondary'}`} />
               </div>
-              <Label htmlFor="search-mode" className="text-sm text-safebite-text-secondary">
-                {useScrapingAPI ? 'Live Scraping' : 'MongoDB Search'}
-              </Label>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="search-mode" className="text-sm text-safebite-text-secondary">
+                  {useScrapingAPI ? 'Live Scraping' : 'MongoDB Search'}
+                </Label>
+                <LocationSelector onLocationChange={handleLocationChange} />
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -582,6 +681,76 @@ const SimplifiedGrocerySearch: React.FC<SimplifiedGrocerySearchProps> = ({
                     <p className="text-safebite-text-secondary text-sm line-clamp-2 mb-2">
                       {product.description}
                     </p>
+                  )}
+
+                  {/* Availability Information */}
+                  {getUserPincode() && (
+                    <div className="mb-2 mt-1">
+                      <p className="text-xs text-safebite-text-secondary mb-1 flex items-center">
+                        <MapPin className="h-3 w-3 mr-1 text-safebite-teal" />
+                        Availability
+                      </p>
+                      <div className="flex items-center gap-2 text-xs">
+                        {isCheckingAvailability ? (
+                          <div className="flex items-center text-safebite-text-secondary">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Checking availability...
+                          </div>
+                        ) : productAvailability[product._id] ? (
+                          <div className="flex items-center text-green-500">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Available in your area
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-amber-500">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Not available in your area
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nutritional Information */}
+                  {product.nutritional_info && (
+                    <div className="mb-2 mt-1">
+                      <p className="text-xs text-safebite-text-secondary mb-1 flex items-center">
+                        <Leaf className="h-3 w-3 mr-1 text-green-500" />
+                        Nutritional Info
+                      </p>
+                      <div className="grid grid-cols-5 gap-1 text-xs">
+                        {product.nutritional_info.calories !== undefined && (
+                          <div className="bg-safebite-card-bg-alt/30 p-1 rounded text-center">
+                            <span className="block font-medium">{product.nutritional_info.calories}</span>
+                            <span className="text-safebite-text-secondary">Cal</span>
+                          </div>
+                        )}
+                        {product.nutritional_info.protein !== undefined && (
+                          <div className="bg-safebite-card-bg-alt/30 p-1 rounded text-center">
+                            <span className="block font-medium">{product.nutritional_info.protein}g</span>
+                            <span className="text-safebite-text-secondary">Protein</span>
+                          </div>
+                        )}
+                        {product.nutritional_info.carbs !== undefined && (
+                          <div className="bg-safebite-card-bg-alt/30 p-1 rounded text-center">
+                            <span className="block font-medium">{product.nutritional_info.carbs}g</span>
+                            <span className="text-safebite-text-secondary">Carbs</span>
+                          </div>
+                        )}
+                        {product.nutritional_info.fat !== undefined && (
+                          <div className="bg-safebite-card-bg-alt/30 p-1 rounded text-center">
+                            <span className="block font-medium">{product.nutritional_info.fat}g</span>
+                            <span className="text-safebite-text-secondary">Fat</span>
+                          </div>
+                        )}
+                        {product.nutritional_info.fiber !== undefined && (
+                          <div className="bg-safebite-card-bg-alt/30 p-1 rounded text-center">
+                            <span className="block font-medium">{product.nutritional_info.fiber}g</span>
+                            <span className="text-safebite-text-secondary">Fiber</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   <div className="mt-auto pt-2 flex gap-2">

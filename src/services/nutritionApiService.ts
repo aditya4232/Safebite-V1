@@ -1,4 +1,5 @@
 // src/services/nutritionApiService.ts
+import { cacheService } from './cacheService';
 
 // API Keys from environment variables with fallbacks
 const CALORIENINJAS_API_KEY = import.meta.env.VITE_CALORIENINJAS_API_KEY || 'Rl0Rl5Hs9Hn9Yx9Nt9Ht9A==Ck9Nt9Ht9A==Ck9Nt9Ht9A==';
@@ -99,7 +100,7 @@ export const checkApiAvailability = async (apiName: 'calorieNinjas' | 'fatSecret
           'Content-Type': 'application/json'
         }
       });
-      
+
       apiStatus.calorieNinjas.isAvailable = response.ok;
       apiStatus.calorieNinjas.lastChecked = new Date();
       return response.ok;
@@ -111,7 +112,7 @@ export const checkApiAvailability = async (apiName: 'calorieNinjas' | 'fatSecret
           'Authorization': `Bearer ${FATSECRET_API_KEY}`
         }
       });
-      
+
       apiStatus.fatSecret.isAvailable = response.ok;
       apiStatus.fatSecret.lastChecked = new Date();
       return response.ok;
@@ -130,47 +131,53 @@ export const checkApiAvailability = async (apiName: 'calorieNinjas' | 'fatSecret
  */
 export const searchCalorieNinjas = async (query: string): Promise<FoodItem[]> => {
   try {
-    const response = await fetch(`${CALORIENINJAS_BASE_URL}/nutrition?query=${encodeURIComponent(query)}`, {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': CALORIENINJAS_API_KEY,
-        'Content-Type': 'application/json'
+    // Create a cache key for this specific query
+    const cacheKey = `calorieninjas_${query}`;
+
+    // Try to get results from cache first
+    return await cacheService.getOrSet(cacheKey, async () => {
+      const response = await fetch(`${CALORIENINJAS_BASE_URL}/nutrition?query=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+          'X-Api-Key': CALORIENINJAS_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`CalorieNinjas API error: ${response.status}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`CalorieNinjas API error: ${response.status}`);
-    }
+      const data = await response.json();
 
-    const data = await response.json();
-    
-    // Update API status
-    apiStatus.calorieNinjas.isAvailable = true;
-    apiStatus.calorieNinjas.lastChecked = new Date();
+      // Update API status
+      apiStatus.calorieNinjas.isAvailable = true;
+      apiStatus.calorieNinjas.lastChecked = new Date();
 
-    // Transform the data to our FoodItem format
-    return data.items.map((item: NutritionData, index: number) => ({
-      id: `cn-${index}-${Date.now()}`,
-      name: item.name,
-      calories: item.calories,
-      serving_size: `${item.serving_size_g}g`,
-      nutrients: {
-        protein: item.protein_g,
-        carbs: item.carbohydrates_total_g,
-        fat: item.fat_total_g,
-        fiber: item.fiber_g,
-        sugar: item.sugar_g,
-        sodium: item.sodium_mg
-      },
-      source: 'CalorieNinjas'
-    }));
+      // Transform the data to our FoodItem format
+      return data.items.map((item: NutritionData, index: number) => ({
+        id: `cn-${index}-${Date.now()}`,
+        name: item.name,
+        calories: item.calories,
+        serving_size: `${item.serving_size_g}g`,
+        nutrients: {
+          protein: item.protein_g,
+          carbs: item.carbohydrates_total_g,
+          fat: item.fat_total_g,
+          fiber: item.fiber_g,
+          sugar: item.sugar_g,
+          sodium: item.sodium_mg
+        },
+        source: 'CalorieNinjas'
+      }));
+    }, 30 * 60 * 1000); // Cache for 30 minutes
   } catch (error) {
     console.error('Error searching CalorieNinjas:', error);
-    
+
     // Update API status
     apiStatus.calorieNinjas.isAvailable = false;
     apiStatus.calorieNinjas.lastChecked = new Date();
-    
+
     return [];
   }
 };
@@ -181,56 +188,62 @@ export const searchCalorieNinjas = async (query: string): Promise<FoodItem[]> =>
  */
 export const searchFatSecret = async (query: string): Promise<FoodItem[]> => {
   try {
-    // In a real implementation, we would need to handle OAuth 2.0 authentication
-    // For simplicity, we're assuming we already have a valid access token
-    
-    const response = await fetch(`${FATSECRET_BASE_URL}?method=foods.search&search_expression=${encodeURIComponent(query)}&format=json`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${FATSECRET_API_KEY}`
+    // Create a cache key for this specific query
+    const cacheKey = `fatsecret_${query}`;
+
+    // Try to get results from cache first
+    return await cacheService.getOrSet(cacheKey, async () => {
+      // In a real implementation, we would need to handle OAuth 2.0 authentication
+      // For simplicity, we're assuming we already have a valid access token
+
+      const response = await fetch(`${FATSECRET_BASE_URL}?method=foods.search&search_expression=${encodeURIComponent(query)}&format=json`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${FATSECRET_API_KEY}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`FatSecret API error: ${response.status}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`FatSecret API error: ${response.status}`);
-    }
+      const data = await response.json();
 
-    const data = await response.json();
-    
-    // Update API status
-    apiStatus.fatSecret.isAvailable = true;
-    apiStatus.fatSecret.lastChecked = new Date();
+      // Update API status
+      apiStatus.fatSecret.isAvailable = true;
+      apiStatus.fatSecret.lastChecked = new Date();
 
-    // Transform the data to our FoodItem format
-    // Note: This is a simplified transformation as the actual FatSecret API response is more complex
-    if (data.foods && data.foods.food) {
-      return data.foods.food.map((item: any, index: number) => ({
-        id: `fs-${item.food_id || index}-${Date.now()}`,
-        name: item.food_name,
-        brand: item.brand_name,
-        calories: parseFloat(item.food_description.split('|')[0].replace('kcal', '').trim()),
-        serving_size: item.serving_description || '100g',
-        nutrients: {
-          protein: parseFloat(item.food_description.split('|')[1].replace('g', '').trim()),
-          carbs: parseFloat(item.food_description.split('|')[2].replace('g', '').trim()),
-          fat: parseFloat(item.food_description.split('|')[3].replace('g', '').trim()),
-          fiber: 0, // Not provided in basic search
-          sugar: 0, // Not provided in basic search
-          sodium: 0 // Not provided in basic search
-        },
-        image_url: item.food_image,
-        source: 'FatSecret'
-      }));
-    }
-    
-    return [];
+      // Transform the data to our FoodItem format
+      // Note: This is a simplified transformation as the actual FatSecret API response is more complex
+      if (data.foods && data.foods.food) {
+        return data.foods.food.map((item: any, index: number) => ({
+          id: `fs-${item.food_id || index}-${Date.now()}`,
+          name: item.food_name,
+          brand: item.brand_name,
+          calories: parseFloat(item.food_description.split('|')[0].replace('kcal', '').trim()),
+          serving_size: item.serving_description || '100g',
+          nutrients: {
+            protein: parseFloat(item.food_description.split('|')[1].replace('g', '').trim()),
+            carbs: parseFloat(item.food_description.split('|')[2].replace('g', '').trim()),
+            fat: parseFloat(item.food_description.split('|')[3].replace('g', '').trim()),
+            fiber: 0, // Not provided in basic search
+            sugar: 0, // Not provided in basic search
+            sodium: 0 // Not provided in basic search
+          },
+          image_url: item.food_image,
+          source: 'FatSecret'
+        }));
+      }
+
+      return [];
+    }, 30 * 60 * 1000); // Cache for 30 minutes
   } catch (error) {
     console.error('Error searching FatSecret:', error);
-    
+
     // Update API status
     apiStatus.fatSecret.isAvailable = false;
     apiStatus.fatSecret.lastChecked = new Date();
-    
+
     return [];
   }
 };
@@ -241,42 +254,53 @@ export const searchFatSecret = async (query: string): Promise<FoodItem[]> => {
  * @param preferredApi - Preferred API to use (optional)
  */
 export const searchNutrition = async (
-  query: string, 
+  query: string,
   preferredApi?: 'calorieNinjas' | 'fatSecret'
 ): Promise<FoodItem[]> => {
   try {
-    let results: FoodItem[] = [];
-    
-    // If a preferred API is specified, try that first
-    if (preferredApi) {
-      if (preferredApi === 'calorieNinjas') {
-        results = await searchCalorieNinjas(query);
-        
-        // If no results or API failed, fall back to FatSecret
-        if (results.length === 0 && apiStatus.fatSecret.isAvailable) {
-          const fatSecretResults = await searchFatSecret(query);
-          results = [...results, ...fatSecretResults];
+    // Create a cache key based on the query and preferred API
+    const cacheKey = `nutrition_search_${query}_${preferredApi || 'both'}`;
+
+    // Try to get results from cache first
+    return await cacheService.getOrSet(cacheKey, async () => {
+      let results: FoodItem[] = [];
+
+      // If a preferred API is specified, try that first
+      if (preferredApi) {
+        if (preferredApi === 'calorieNinjas') {
+          results = await searchCalorieNinjas(query);
+
+          // If no results or API failed, fall back to FatSecret
+          if (results.length === 0 && apiStatus.fatSecret.isAvailable) {
+            const fatSecretResults = await searchFatSecret(query);
+            results = [...results, ...fatSecretResults];
+          }
+        } else {
+          results = await searchFatSecret(query);
+
+          // If no results or API failed, fall back to CalorieNinjas
+          if (results.length === 0 && apiStatus.calorieNinjas.isAvailable) {
+            const calorieNinjasResults = await searchCalorieNinjas(query);
+            results = [...results, ...calorieNinjasResults];
+          }
         }
       } else {
-        results = await searchFatSecret(query);
-        
-        // If no results or API failed, fall back to CalorieNinjas
-        if (results.length === 0 && apiStatus.calorieNinjas.isAvailable) {
-          const calorieNinjasResults = await searchCalorieNinjas(query);
-          results = [...results, ...calorieNinjasResults];
-        }
+        // Try both APIs in parallel
+        const [calorieNinjasResults, fatSecretResults] = await Promise.all([
+          apiStatus.calorieNinjas.isAvailable ? searchCalorieNinjas(query) : Promise.resolve([]),
+          apiStatus.fatSecret.isAvailable ? searchFatSecret(query) : Promise.resolve([])
+        ]);
+
+        results = [...calorieNinjasResults, ...fatSecretResults];
       }
-    } else {
-      // Try both APIs in parallel
-      const [calorieNinjasResults, fatSecretResults] = await Promise.all([
-        apiStatus.calorieNinjas.isAvailable ? searchCalorieNinjas(query) : Promise.resolve([]),
-        apiStatus.fatSecret.isAvailable ? searchFatSecret(query) : Promise.resolve([])
-      ]);
-      
-      results = [...calorieNinjasResults, ...fatSecretResults];
-    }
-    
-    return results;
+
+      // Add a small delay to prevent rate limiting
+      if (results.length === 0) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      return results;
+    }, 15 * 60 * 1000); // Cache for 15 minutes
   } catch (error) {
     console.error('Error searching nutrition data:', error);
     return [];
@@ -291,10 +315,10 @@ export const analyzeImage = async (imageUrl: string): Promise<ImageAnalysisResul
   try {
     // In a real implementation, we would send the image to an API for analysis
     // For now, we'll simulate a response
-    
+
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // Simulate a successful response with some food items
     const simulatedFoods: FoodItem[] = [
       {
@@ -328,7 +352,7 @@ export const analyzeImage = async (imageUrl: string): Promise<ImageAnalysisResul
         source: 'Image Analysis'
       }
     ];
-    
+
     return {
       success: true,
       foods: simulatedFoods
@@ -350,10 +374,10 @@ export const scanBarcode = async (barcode: string): Promise<BarcodeScanResult> =
   try {
     // In a real implementation, we would send the barcode to an API for lookup
     // For now, we'll simulate a response
-    
+
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Simulate a successful response
     const simulatedProduct: FoodItem = {
       id: `barcode-${barcode}-${Date.now()}`,
@@ -372,7 +396,7 @@ export const scanBarcode = async (barcode: string): Promise<BarcodeScanResult> =
       image_url: 'https://example.com/chocolate.jpg',
       source: 'Barcode Scan'
     };
-    
+
     return {
       success: true,
       product: simulatedProduct

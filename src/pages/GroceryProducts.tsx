@@ -26,6 +26,7 @@ import Footer from '@/components/Footer';
 import GroceryProductDetail from "@/components/GroceryProductDetail";
 import RelatedOffers from "@/components/RelatedOffers";
 import SimplifiedGrocerySearch from "@/components/SimplifiedGrocerySearch";
+import BestGroceryResults from "@/components/BestGroceryResults";
 
 const GroceryProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -223,6 +224,51 @@ const GroceryProductsPage: React.FC = () => {
 
           {/* Simplified Grocery Search Component */}
           <SimplifiedGrocerySearch initialQuery={searchQuery} />
+
+          {/* Best Results Section */}
+          {!isLoading && groceryProducts.length > 0 && searchQuery && (
+            <BestGroceryResults
+              products={groceryProducts}
+              searchQuery={searchQuery}
+              favorites={favorites}
+              onToggleFavorite={handleToggleFavorite}
+              onViewDetails={(product) => {
+                // Track this interaction
+                trackUserInteraction('view_grocery_details', {
+                  productId: product._id,
+                  productName: product.name,
+                  productCategory: product.category || ''
+                });
+
+                // Show product details in dialog
+                setSelectedProduct(product);
+                setIsDetailDialogOpen(true);
+              }}
+              onBuyNow={(product) => {
+                // Track this interaction
+                trackUserInteraction('buy_grocery_product', {
+                  productId: product._id,
+                  productName: product.name,
+                  productCategory: product.category || ''
+                });
+
+                // Create a fallback Google Shopping search URL
+                const fallbackUrl = `https://www.google.com/search?q=${encodeURIComponent(product.name)}+${encodeURIComponent(product.brand || '')}+buy+online&tbm=shop`;
+
+                try {
+                  // Try to open the redirect URL if available
+                  if (product.redirect) {
+                    window.open(product.redirect, '_blank', 'noopener,noreferrer');
+                  } else {
+                    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+                  }
+                } catch (error) {
+                  console.error('Error opening redirect URL:', error);
+                  window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+                }
+              }}
+            />
+          )}
 
           {/* Products Grid */}
           {isLoading ? (

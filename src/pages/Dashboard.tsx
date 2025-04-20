@@ -35,6 +35,10 @@ import WeeklyQuestionsPopup from '@/components/WeeklyQuestionsPopup';
 import WeeklyDataCharts from '@/components/WeeklyDataCharts';
 import HealthNewsSection from '@/components/HealthNewsSection';
 import AchievementBadges from '@/components/AchievementBadges';
+import GroceryDashboardSection from '@/components/GroceryDashboardSection';
+import FoodDeliveryDashboardSection from '@/components/FoodDeliveryDashboardSection';
+import GroceryShoppingList from '@/components/GroceryShoppingList';
+import PriceAlerts from '@/components/PriceAlerts';
 
 // Define a basic interface for UserProfile based on usage
 interface UserProfile {
@@ -742,6 +746,18 @@ const Dashboard = () => {
               )}
             </div>
           )}
+
+          {/* Food Delivery and Grocery Products Sections */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <FoodDeliveryDashboardSection />
+            <GroceryDashboardSection />
+          </div>
+
+          {/* Shopping List and Price Alerts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <GroceryShoppingList />
+            <PriceAlerts />
+          </div>
 
           {/* Health News Section */}
           <div className="mb-6">

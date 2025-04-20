@@ -3,56 +3,82 @@ import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import LandingPage from "@/pages/LandingPage";
-import Settings from "@/pages/Settings";
-import HealthCheck from "@/pages/HealthCheck";
-import Login from "@/pages/Auth/Login";
-import Signup from "@/pages/Auth/Signup";
-import ForgotPassword from "@/pages/Auth/ForgotPassword";
-import Questionnaire from "@/pages/Questionnaire";
-import Dashboard from "@/pages/Dashboard";
-// Removed FoodSearch import as it's redirected
-import Community from "@/pages/Community";
-import Reports from "@/pages/Reports";
-import Recipes from "@/pages/Recipes";
-import HealthBox from "@/pages/HealthBox";
-import ProductRecommendationsPage from "@/pages/ProductRecommendations";
-import GroceryProducts from "@/pages/GroceryProducts";
-import Nutrition from "@/pages/Nutrition";
-import NotFound from "@/pages/NotFound";
-import AdminLogin from "@/pages/Admin/Login";
-import AdminPanel from "@/pages/Admin/Panel";
-import AboutUs from "@/pages/AboutUs";
-import Features from "@/pages/Features";
-import FoodDelivery from "@/pages/FoodDelivery";
-import Help from "@/pages/Help";
-import Changelog from "@/pages/Changelog";
 import { getAuth } from "firebase/auth";
 import { app } from "./firebase";
-import DevPopup from "@/components/DevPopup";
-import FoodChatBot from "@/components/FoodChatBot";
-// import { useGuestMode } from "@/hooks/useGuestMode";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { isAuthPage, isProtectedPage, redirectToLogin, fixAuthState } from "@/utils/authUtils";
 import guestAuthService from "@/services/guestAuthService";
-import UserActivityService from "@/services/userActivityService";
 import simpleSessionService from "@/services/simpleSessionService";
 import windowCloseService from "@/services/windowCloseService";
+import { startPerformanceMonitoring, mark, measure } from "@/services/performanceService";
+import useResponsive from "@/hooks/useResponsive";
 import SimpleAuthGuard from "@/components/SimpleAuthGuard";
-import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+
+// Core components that are needed immediately
+import DevPopup from "@/components/DevPopup";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
+import CookieConsent from "@/components/CookieConsent";
 import WeeklyQuestionsForm from "@/components/WeeklyQuestionsForm";
 import SimpleDashboard from "@/components/SimpleDashboard";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+// Lazy-loaded components for better performance
+const FoodChatBot = lazy(() => import("@/components/FoodChatBot"));
+
+// Lazy-loaded pages
+const LandingPage = lazy(() => import("@/pages/LandingPage"));
+const Login = lazy(() => import("@/pages/Auth/Login"));
+const Signup = lazy(() => import("@/pages/Auth/Signup"));
+const ForgotPassword = lazy(() => import("@/pages/Auth/ForgotPassword"));
+const AboutUs = lazy(() => import("@/pages/AboutUs"));
+const Help = lazy(() => import("@/pages/Help"));
+const Changelog = lazy(() => import("@/pages/Changelog"));
+const Features = lazy(() => import("@/pages/Features"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+// Lazy-loaded authenticated pages
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Nutrition = lazy(() => import("@/pages/Nutrition"));
+const FoodDelivery = lazy(() => import("@/pages/FoodDelivery"));
+const ProductRecommendationsPage = lazy(() => import("@/pages/ProductRecommendations"));
+const GroceryProducts = lazy(() => import("@/pages/GroceryProducts"));
+const Community = lazy(() => import("@/pages/Community"));
+const HealthBox = lazy(() => import("@/pages/HealthBox"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Recipes = lazy(() => import("@/pages/Recipes"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const HealthCheck = lazy(() => import("@/pages/HealthCheck"));
+const Questionnaire = lazy(() => import("@/pages/Questionnaire"));
+
+// Admin pages
+const AdminLogin = lazy(() => import("@/pages/Admin/Login"));
+const AdminPanel = lazy(() => import("@/pages/Admin/Panel"));
 
 const queryClient = new QueryClient();
 
 // We're now using the AuthGuard component instead of ProtectedRoute
 
 const App = () => {
+  // Start performance monitoring
+  useEffect(() => {
+    startPerformanceMonitoring();
+    mark('app-init-start');
+
+    return () => {
+      measure('total-app-lifetime', 'app-init-start', 'app-unmount');
+    };
+  }, []);
+
+  // Get responsive information
+  const { isMobile, isTablet, isDesktop } = useResponsive();
+
   const auth = getAuth(app);
   const db = getFirestore(app);
   const [userProfile, setUserProfile] = useState<any>(null); // Use a more specific type if available
@@ -81,13 +107,19 @@ const App = () => {
     fetchUserProfile();
 
     // Listen for auth state changes to update profile
+    mark('auth-listener-setup-start');
     const unsubscribe = auth.onAuthStateChanged((user) => {
+      mark('auth-state-changed');
       if (user) {
         fetchUserProfile();
       } else {
         setUserProfile(null);
       }
+      measure('auth-state-change-time', 'auth-state-changed', 'auth-state-processed');
+      mark('auth-state-processed');
     });
+    measure('auth-listener-setup-time', 'auth-listener-setup-start', 'auth-listener-setup-end');
+    mark('auth-listener-setup-end');
 
     return () => unsubscribe();
   }, [auth, db]);
@@ -168,70 +200,187 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <DevPopup />
-          <BrowserRouter basename="/SafeBite-V1/">
+      <ThemeProvider defaultTheme="dark" storageKey="safebite-theme">
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <DevPopup />
+            <ScrollToTopButton />
+            <CookieConsent />
+            <BrowserRouter basename="/SafeBite-V1/">
             <Routes>
               {/* Public Routes - Only auth and info pages */}
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/signup" element={<Signup />} />
-              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/about" element={<AboutUs />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/changelog" element={<Changelog />} />
+              <Route path="/auth/login" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <Login />
+                </Suspense>
+              } />
+              <Route path="/auth/signup" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <Signup />
+                </Suspense>
+              } />
+              <Route path="/auth/forgot-password" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <ForgotPassword />
+                </Suspense>
+              } />
+              <Route path="/about" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <AboutUs />
+                </Suspense>
+              } />
+              <Route path="/help" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <Help />
+                </Suspense>
+              } />
+              <Route path="/changelog" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <Changelog />
+                </Suspense>
+              } />
 
               {/* Public pages that don't require login */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/features" element={<Features />} />
+              <Route path="/" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <LandingPage />
+                </Suspense>
+              } />
+              <Route path="/features" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                  <Features />
+                </Suspense>
+              } />
 
               {/* Pages that require authentication */}
-              <Route path="/questionnaire" element={<SimpleAuthGuard allowGuest={true}><Questionnaire /></SimpleAuthGuard>} />
-              <Route path="/health-check" element={<SimpleAuthGuard><HealthCheck /></SimpleAuthGuard>} />
+              <Route path="/questionnaire" element={
+                <SimpleAuthGuard allowGuest={true}>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                    <Questionnaire />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/health-check" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading..." />}>
+                    <HealthCheck />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
 
               {/* Protected Routes */}
               <Route path="/dashboard" element={
                 <SimpleAuthGuard>
                   <ErrorBoundary fallback={<SimpleDashboard />}>
-                    <Dashboard />
+                    <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading dashboard..." />}>
+                      <Dashboard />
+                    </Suspense>
                   </ErrorBoundary>
                 </SimpleAuthGuard>
               } />
-              <Route path="/nutrition" element={<SimpleAuthGuard><Nutrition userProfile={userProfile} /></SimpleAuthGuard>} />
+              <Route path="/nutrition" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading nutrition data..." />}>
+                    <Nutrition userProfile={userProfile} />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
               {/* Redirect old food search to nutrition page */}
               <Route path="/food-search" element={<Navigate to="/nutrition" replace />} />
-              <Route path="/food-delivery" element={<SimpleAuthGuard><FoodDelivery /></SimpleAuthGuard>} />
-              <Route path="/product-recommendations" element={<SimpleAuthGuard><ProductRecommendationsPage /></SimpleAuthGuard>} />
+              <Route path="/food-delivery" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading food delivery..." />}>
+                    <FoodDelivery />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/product-recommendations" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading recommendations..." />}>
+                    <ProductRecommendationsPage />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
               {/* Redirect from old products page to grocery products */}
               <Route path="/products" element={<Navigate to="/grocery-products" replace />} />
-              <Route path="/grocery-products" element={<SimpleAuthGuard><GroceryProducts /></SimpleAuthGuard>} />
-              <Route path="/community" element={<SimpleAuthGuard><Community /></SimpleAuthGuard>} />
-              <Route path="/healthbox" element={<SimpleAuthGuard><HealthBox /></SimpleAuthGuard>} />
-              <Route path="/reports" element={<SimpleAuthGuard><Reports /></SimpleAuthGuard>} />
-              <Route path="/recipes" element={<SimpleAuthGuard><Recipes /></SimpleAuthGuard>} />
-              <Route path="/settings" element={<SimpleAuthGuard><Settings /></SimpleAuthGuard>} />
+              <Route path="/grocery-products" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading grocery products..." />}>
+                    <GroceryProducts />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/community" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading community..." />}>
+                    <Community />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/healthbox" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading health box..." />}>
+                    <HealthBox />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/reports" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading reports..." />}>
+                    <Reports />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/recipes" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading recipes..." />}>
+                    <Recipes />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
+              <Route path="/settings" element={
+                <SimpleAuthGuard>
+                  <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading settings..." />}>
+                    <Settings />
+                  </Suspense>
+                </SimpleAuthGuard>
+              } />
 
               {/* Admin Routes */}
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin/panel" element={<AdminPanel />} />
+              <Route path="/admin/login" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading admin login..." />}>
+                  <AdminLogin />
+                </Suspense>
+              } />
+              <Route path="/admin/panel" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Loading admin panel..." />}>
+                  <AdminPanel />
+                </Suspense>
+              } />
 
               {/* Catch-all route for 404 */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={
+                <Suspense fallback={<LoadingSpinner size="lg" fullScreen text="Page not found..." />}>
+                  <NotFound />
+                </Suspense>
+              } />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
         {/* Global ChatBot available on all pages */}
-        <FoodChatBot
-          initialMessage="Hi! I'm your SafeBite AI assistant. Ask me anything about food, nutrition, or health!"
-          currentPage="global"
-          userData={{
-            profile: userProfile,
-            recentActivity: []
-          }}
-          autoOpen={false}
-        />
+        <Suspense fallback={null}>
+          <FoodChatBot
+            initialMessage="Hi! I'm your SafeBite AI assistant. Ask me anything about food, nutrition, or health!"
+            currentPage="global"
+            userData={{
+              profile: userProfile,
+              recentActivity: []
+            }}
+            autoOpen={false}
+          />
+        </Suspense>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
@@ -244,6 +393,7 @@ const App = () => {
           </DialogContent>
         </Dialog>
       </QueryClientProvider>
+    </ThemeProvider>
     </ErrorBoundary>
   );
 };
