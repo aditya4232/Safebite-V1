@@ -3,7 +3,8 @@
 
 **One-stop platform for smart, healthy food decisions powered by AI.**
 
-![SafeBite Banner](./assets/banner.png) <!-- Add your banner image if you have one -->
+<img width="947" alt="image" src="https://github.com/user-attachments/assets/93724a47-c4b1-4c93-897c-f32b55a3f2a9" />
+ <!-- Add your banner image if you have one -->
 
 🌐 **Live Demo:** [SafeBite Platform](https://aditya4232.github.io/SafeBite-V1/)
 📦 **Repository:** [github.com/aditya4232/SafeBite-V1](https://github.com/aditya4232/SafeBite-V1)
